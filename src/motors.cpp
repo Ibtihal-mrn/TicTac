@@ -31,7 +31,7 @@ void motors_init(void) {
   motors_stop();
 }
 
-void motors_applySpeeds(int speedL, int speedR) {
+void motors_applySpeeds(int speedL, int speedR) { // On va normalement plus l'utiliser
   motorL->run(FORWARD);
   motorR->run(FORWARD);
 
