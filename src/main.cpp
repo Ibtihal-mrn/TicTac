@@ -12,6 +12,8 @@ void setup() {
 
 void loop() {
 
-  robot_step();
-  
+  //robot_step();
+  Serial.println(ticksL);
+  delay(200);
+
 }
