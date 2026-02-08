@@ -23,7 +23,10 @@ extern int trimR;
 
 void motors_init(void);
 void motors_applySpeeds(int speedL, int speedR);
+void motors_forward(int speedL, int speedR);
+void motors_backward(int speedL, int speedR);
 void motors_stop();
-void motors_rotate();
+void motors_rotateRight(int speed);
+void motors_rotateLeft(int speed);
 
 #endif

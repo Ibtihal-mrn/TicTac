@@ -45,3 +45,30 @@ void motors_stop() {
   motorL->run(RELEASE); // Release permet de couper le pont H, arrêt propre
   motorR->run(RELEASE);
 }
+
+void motors_forward(int speedL, int speedR) {
+  speedL = constrain(speedL, 0, 255);
+  speedR = constrain(speedR, 0, 255);
+
+  motorL->setSpeed(speedL);
+  motorR->setSpeed(speedR);
+
+  motorL->run(FORWARD);
+  motorR->run(FORWARD);
+}
+
+void motors_rotateRight(int speed) {
+  speed = constrain(speed, 0, 255);
+  motorL->setSpeed(speed);
+  motorR->setSpeed(speed);
+  motorL->run(FORWARD);
+  motorR->run(BACKWARD);
+}
+
+void motors_rotateLeft(int speed) {
+  speed = constrain(speed, 0, 255);
+  motorL->setSpeed(speed);
+  motorR->setSpeed(speed);
+  motorL->run(BACKWARD);
+  motorR->run(FORWARD);
+}
