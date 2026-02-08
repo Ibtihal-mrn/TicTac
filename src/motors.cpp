@@ -23,11 +23,12 @@ void motors_init(void) {
   motorR = AFMS.getMotor(2); // moteur droit
 
   // moteurs initialisés à l'arrêt
-  motorL->setSpeed(0);
-  motorL->run(FORWARD);
+  // motorL->setSpeed(0);
+  // motorL->run(FORWARD);
 
-  motorR->setSpeed(0);
-  motorR->run(FORWARD);
+  // motorR->setSpeed(0);
+  // motorR->run(FORWARD);
+  motors_stop();
 }
 
 void motors_applySpeeds(int speedL, int speedR) {
@@ -36,4 +37,11 @@ void motors_applySpeeds(int speedL, int speedR) {
 
   motorL->setSpeed(speedL);
   motorR->setSpeed(speedR);
+}
+
+void motors_stop() {
+  motorL->setSpeed(0);
+  motorR->setSpeed(0);
+  motorL->run(RELEASE); // Release permet de couper le pont H, arrêt propre
+  motorR->run(RELEASE);
 }

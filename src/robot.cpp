@@ -20,3 +20,7 @@ void robot_step() {
 
   motors_applySpeeds(speedL, speedR);
 }
+
+void robot_stop(){
+    motors_stop();
+}

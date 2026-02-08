@@ -23,5 +23,6 @@ extern int trimR;
 
 void motors_init(void);
 void motors_applySpeeds(int speedL, int speedR);
+void motors_stop();
 
 #endif

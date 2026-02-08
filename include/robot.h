@@ -3,3 +3,4 @@
 
 void robot_init();
 void robot_step();
+void robot_stop();
