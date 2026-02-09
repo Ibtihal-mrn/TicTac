@@ -27,8 +27,8 @@ void encoders_init(void) {
   pinMode(ENC_R_A, INPUT_PULLUP);
   pinMode(ENC_R_B, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(ENC_L_A), ISR_left, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENC_R_A), ISR_right, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_L_A), ISR_left, RISING);
+  attachInterrupt(digitalPinToInterrupt(ENC_R_A), ISR_right, RISING);
 }
 
 void encoders_read(long *left, long *right) {

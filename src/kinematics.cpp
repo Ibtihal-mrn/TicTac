@@ -3,7 +3,7 @@
 // TES mesures
 float wheelDiameter_mm = 60.0;   // rayon 3cm -> diamètre 6cm = 60mm
 float trackWidth_mm    = 213.0;  // entraxe 21.3cm = 213mm
-long  ticksPerRev      = 2292;   // 1 tour de roue = 2292 ticks (mesuré)
+long  ticksPerRev      = 1146;   // 1 tour de roue = 2292 ticks (mesuré)
 
 float mm_per_tick() {
   return (PI * wheelDiameter_mm) / (float)ticksPerRev;

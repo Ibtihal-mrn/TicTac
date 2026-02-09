@@ -12,15 +12,15 @@ bool invertRight = false;
 int baseSpeed = 140; // vitesse de base
 float Kp = 0.5;      // gain correction trajectoire
 
-int trimL = -2.5;
-int trimR = 0;
+int trimL = 0;
+int trimR = -2;
 
 void motors_init(void) {
   Wire.begin();
   AFMS.begin();
 
-  motorL = AFMS.getMotor(1); // moteur gauche
-  motorR = AFMS.getMotor(2); // moteur droit
+  motorL = AFMS.getMotor(2); // moteur gauche
+  motorR = AFMS.getMotor(1); // moteur droit
 
   // moteurs initialisés à l'arrêt
   // motorL->setSpeed(0);
@@ -61,14 +61,14 @@ void motors_rotateRight(int speed) {
   speed = constrain(speed, 0, 255);
   motorL->setSpeed(speed);
   motorR->setSpeed(speed);
-  motorL->run(FORWARD);
-  motorR->run(BACKWARD);
+  motorL->run(BACKWARD);
+  motorR->run(FORWARD);
 }
 
 void motors_rotateLeft(int speed) {
   speed = constrain(speed, 0, 255);
   motorL->setSpeed(speed);
   motorR->setSpeed(speed);
-  motorL->run(BACKWARD);
-  motorR->run(FORWARD);
+  motorL->run(FORWARD);
+  motorR->run(BACKWARD);
 }
