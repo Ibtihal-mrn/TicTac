@@ -13,7 +13,7 @@ int baseSpeed = 140; // vitesse de base
 float Kp = 0.5;      // gain correction trajectoire
 
 int trimL = 0;
-int trimR = -2;
+int trimR = -4;
 
 void motors_init(void) {
   Wire.begin();

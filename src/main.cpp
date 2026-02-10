@@ -14,28 +14,48 @@ void setup()
 
 void loop()
 {
-  static bool runSequence = true;  
+  // static bool runSequence = true;  
 
-  if (!runSequence) {
-    return; 
-  }
+  // if (!runSequence) {
+  //   return; 
+  // }
 
   robot_move_distance(1000, 140);
-  Serial.print("ticksL="); Serial.print(ticksL);
-  Serial.print(" ticksR="); Serial.println(ticksR);
-  delay(2000);
 
-  bras_deployer();
-  delay(2000);
+  long l, r ; 
+  encoders_read(&l, &r);
 
-  robot_rotate(-230, 140);
-  delay(2000);
+  static long lastL = 0, lastR = 0;
+
+  Serial.print("dTicksL="); Serial.print(l - lastL);
+  Serial.print(" dTicksR="); Serial.println(r - lastR);
   
 
-  robot_move_distance(1000, 140);
-  delay(2000);
+  lastL = ticksL;
+  lastR = ticksR;
 
-  bras_retracter();
+  delay(2000);
+  // Serial.print("ticksL="); Serial.print(ticksL);
+  // Serial.print(" ticksR="); Serial.println(ticksR);
+
+  // Serial.print(digitalRead(ENC_R_A));
+  // Serial.print(" ");
+  // Serial.println(digitalRead(ENC_R_B));
+  // delay(50);
+
+  // delay(2000);
+
+  // bras_deployer();
+  // delay(2000);
+
+  // robot_rotate(-230, 140);
+  // delay(2000);
+  
+
+  // robot_move_distance(1000, 140);
+  // delay(2000);
+
+  // bras_retracter();
   
   
 
@@ -50,7 +70,7 @@ void loop()
   // bras_retracter();
   // delay(2000);
 
-  robot_stop();
+  // robot_stop();
 
-  runSequence = false; 
+  // runSequence = false; 
 }
