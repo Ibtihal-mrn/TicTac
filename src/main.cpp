@@ -4,6 +4,7 @@
 #include "control.h"
 #include "robot.h"
 #include "bras.h"
+#include "imu.h"
 
 void setup()
 {
@@ -14,27 +15,43 @@ void setup()
 
 void loop()
 {
-  // static bool runSequence = true;  
+  static bool runSequence = true;  
 
-  // if (!runSequence) {
-  //   return; 
-  // }
+  if (!runSequence) {
+    return; 
+  }
 
-  robot_move_distance(1000, 140);
+  // robot_move_distance(1000, 140);
 
-  long l, r ; 
-  encoders_read(&l, &r);
+  // long l, r ; 
+  // encoders_read(&l, &r);
 
-  static long lastL = 0, lastR = 0;
+  // static long lastL = 0, lastR = 0;
 
-  Serial.print("dTicksL="); Serial.print(l - lastL);
-  Serial.print(" dTicksR="); Serial.println(r - lastR);
+  // Serial.print("dTicksL="); Serial.print(l - lastL);
+  // Serial.print(" dTicksR="); Serial.println(r - lastR);
   
 
-  lastL = ticksL;
-  lastR = ticksR;
+  // lastL = ticksL;
+  // lastR = ticksR;
 
-  delay(2000);
+  // Carré
+  // delay(2000);
+  // robot_rotate(120, 140);
+  // delay(2000);
+  // robot_move_distance(1000, 140);
+  // delay(2000);
+  // robot_rotate(120, 140);
+  // delay(2000);
+  // robot_move_distance(1000, 140);
+  // delay(2000);
+  // robot_rotate(120, 140);
+  // delay(2000);
+  // robot_move_distance(1000, 140);
+  // delay(2000);
+  // robot_rotate(120, 140);
+  
+
   // Serial.print("ticksL="); Serial.print(ticksL);
   // Serial.print(" ticksR="); Serial.println(ticksR);
 
@@ -48,7 +65,7 @@ void loop()
   // bras_deployer();
   // delay(2000);
 
-  // robot_rotate(-230, 140);
+  // robot_rotate(235, 140);
   // delay(2000);
   
 
@@ -56,21 +73,23 @@ void loop()
   // delay(2000);
 
   // bras_retracter();
-  
+
   
 
 
   // bras_deployer();
   // delay(2000);
 
-  //robot_rotate(110, 140);
+  // robot_rotate(110, 140);
 
   // robot_move_distance(1000, 140);
 
   // bras_retracter();
   // delay(2000);
 
-  // robot_stop();
+  robot_rotate_gyro(180, 150);
 
-  // runSequence = false; 
-}
+  robot_stop();
+
+  runSequence = false; 
+} 

@@ -3,10 +3,21 @@
 #include "motors.h"
 #include "control.h"
 #include "kinematics.h"
+#include "imu.h"
 
 void robot_init() {
   motors_init();
   encoders_init();
+
+  // IMU
+  if (!imu_init()) {
+    // optionnel: print erreur
+    // Serial.println("IMU init FAIL");
+  } else {
+    delay(200);
+    imu_calibrate(600, 2); // ~1.2s, robot immobile
+    // Serial.println("IMU calibrated");
+  }
 }
 
 void robot_step() { // On va aussi plus l'utiliser normalement
@@ -27,33 +38,126 @@ void robot_stop(){
 }
 
 void robot_rotate(float angle_deg, int speed){
-    long targetTicks = ticks_for_rotation_deg(angle_deg);
+  //   long targetTicks = ticks_for_rotation_deg(angle_deg);
 
-    long startL, startR;
-    encoders_read(&startL, &startR);
+  //   long startL, startR;
+  //   encoders_read(&startL, &startR);
 
-    // choix du sens
-    if (angle_deg > 0) {
-        motors_rotateRight(speed);   // droite = angle positif
-    } else {
-        motors_rotateLeft(speed);    // gauche = angle négatif
-    }
+  //   // choix du sens
+  //   if (angle_deg > 0) {
+  //       motors_rotateRight(speed);   // droite = angle positif
+  //   } else {
+  //       motors_rotateLeft(speed);    // gauche = angle négatif
+  //   }
 
-    while (true) {
-        long curL, curR;
-        encoders_read(&curL, &curR);
+  //   while (true) {
+  //       long curL, curR;
+  //       encoders_read(&curL, &curR);
 
-        long dL = labs(curL - startL);
-        long dR = labs(curR - startR);
+  //       long dL = labs(curL - startL);
+  //       long dR = labs(curR - startR);
 
-        if ((dL + dR) / 2 >= labs(targetTicks)) {
-        break;
-        }
-    }
+  //       if ((dL + dR) / 2 >= labs(targetTicks)) {
+  //       break;
+  //       }
+  //   }
+
+  // motors_stop();
+  const uint16_t DT_MS = 10;
+  unsigned long tPrev = micros();
+
+  long targetTicks = ticks_for_rotation_deg(angle_deg);
+
+  long startL, startR;
+  encoders_read(&startL, &startR);
+
+  if (angle_deg > 0) motors_rotateRight(speed);
+  else              motors_rotateLeft(speed);
+
+  while (true) {
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    long curL, curR;
+    encoders_read(&curL, &curR);
+
+    long dL = labs(curL - startL);
+    long dR = labs(curR - startR);
+
+    if ((dL + dR) / 2 >= labs(targetTicks)) break;
+  }
 
   motors_stop();
 }
 
+void robot_rotate_gyro(float target_deg, int pwmMax) {
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
+
+  // Gains (départs, à tuner)
+  const float KP = 2.2f;   // PWM par degré d'erreur
+  const float KD = 0.25f;  // PWM par (deg/s) pour amortir
+
+  const int PWM_MIN = 55;   // PWM mini qui fait tourner (à ajuster)
+  const int DEAD_PWM = 0;   // laisse 0 ou PWM_MIN selon ton robot
+
+  // Conditions d'arrêt
+  const float ANGLE_TOL = 1.5f;   // degrés
+  const float RATE_TOL  = 8.0f;   // deg/s
+  const uint16_t STABLE_MS = 120; // durée stable avant stop
+
+  // Rampe PWM max (évite patinage)
+  const int RAMP_STEP = 8; // par 10ms
+
+  // Signe: + target => tourne à droite (comme ton code)
+  float angle = 0.0f;
+  unsigned long tPrev = micros();
+  unsigned long stableStart = 0;
+
+  int pwmLimit = 0;
+
+  while (true) {
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    // lecture gyro
+    float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
+    angle += rate * dt;
+
+    float err = target_deg - angle;
+
+    // Rampe de la limite PWM
+    if (pwmLimit < pwmMax) pwmLimit = min(pwmLimit + RAMP_STEP, pwmMax);
+
+    // PD
+    float u = KP * err - KD * rate;
+
+    int pwm = (int)fabs(u);
+    pwm = constrain(pwm, 0, pwmLimit);
+
+    if (pwm > 0) pwm = max(pwm, PWM_MIN);
+    else pwm = DEAD_PWM;
+
+    // applique sens selon u
+    if (u > 0) motors_rotateRight(pwm);
+    else       motors_rotateLeft(pwm);
+
+    // arrêt : proche de la cible ET vitesse faible pendant STABLE_MS
+    if (fabs(err) < ANGLE_TOL && fabs(rate) < RATE_TOL) {
+      if (stableStart == 0) stableStart = millis();
+      if (millis() - stableStart >= STABLE_MS) break;
+    } else {
+      stableStart = 0;
+    }
+
+    // (optionnel) sécurité timeout
+    // if (millis() - startMs > 4000) break;
+  }
+
+  motors_stop();
+}
 
 void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // // on garde ton système : control_computeSpeeds utilise baseSpeed

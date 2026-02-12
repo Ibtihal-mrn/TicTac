@@ -18,7 +18,7 @@ void control_computeSpeeds(long dL, long dR, int &speedL, int &speedR) {
 // --------- TUNING (démarre avec ça) ----------
 static const int PWM_MAX = 255;
 static const int PWM_MIN = 40;      // PWM mini qui fait bouger (à ajuster)
-static const int RAMP_STEP = 3;     // PWM par cycle (si dt=10ms => ~300 PWM/s)
+static const int RAMP_STEP = 6;     // PWM par cycle (si dt=10ms => ~300 PWM/s)
 
 static const float K_HEADING = 0.03;  // gain cap (ticks -> "ticks/s" de correction)
 
@@ -37,7 +37,7 @@ static const float VEL_TRIM_R = 0.9985f;  // = 1 / 1.0015 environ
 
 // facteur grossier pour convertir PWM -> vitesse cible (ticks/s)
 // tu pourras le recalibrer ensuite
-static const float PWM_TO_TICKS_PER_SEC = 6.0;
+static const float PWM_TO_TICKS_PER_SEC = 8.0;
 
 // --------------------------------------------
 
@@ -100,4 +100,6 @@ void control_driveStraight_PI(
 
   if (pwmL > 0) pwmL = max(pwmL, PWM_MIN);
   if (pwmR > 0) pwmR = max(pwmR, PWM_MIN);
+
+  
 }
