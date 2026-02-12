@@ -128,7 +128,7 @@ void loop() {
     }
 
     // --- Déplacer robot 1 ---
-    if (!moveDistanceSafe(1000, 140)) return;
+    if (!moveDistanceSafe(2000, 140)) return;
 
     Serial.print("ticksL="); Serial.print(ticksL);
     Serial.print(" ticksR="); Serial.println(ticksR);
