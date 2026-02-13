@@ -34,7 +34,7 @@ static bool readBytes(uint8_t reg, uint8_t* buf, uint8_t len) {
 }
 
 bool imu_init() {
-  Wire.begin();
+  // Wire.begin();
 
   // Réveil
   if (!writeReg(REG_PWR_MGMT_1, 0x00)) return false;

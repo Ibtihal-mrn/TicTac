@@ -8,18 +8,17 @@
 #include "ultrasonic.h"
 
 void robot_init() {
-  motors_init();
+  // motors_init();
   encoders_init();
   ultrasonic_init(13, 10);  // trig, echo
   safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
 
   // IMU
-  if (!imu_init()) {
-    // optionnel: print erreur
-    // Serial.println("IMU init FAIL");
+  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
   } else {
     delay(200);
+    Serial.println("MPU6050 connected.");
     imu_calibrate(600, 2); // ~1.2s, robot immobile
     // Serial.println("IMU calibrated");
   }
@@ -35,11 +34,11 @@ void robot_step() { // On va aussi plus l'utiliser normalement
   int speedL, speedR;
   control_computeSpeeds(dL, dR, speedL, speedR);
 
-  motors_applySpeeds(speedL, speedR);
+  // motors_applySpeeds(speedL, speedR);
 }
 
 void robot_stop(){
-    motors_stop();
+    // motors_stop();
 }
 
 void robot_rotate(float angle_deg, int speed){
@@ -76,8 +75,8 @@ void robot_rotate(float angle_deg, int speed){
   long startL, startR;
   encoders_read(&startL, &startR);
 
-  if (angle_deg > 0) motors_rotateRight(speed);
-  else              motors_rotateLeft(speed);
+  // if (angle_deg > 0) motors_rotateRight(speed);
+  // else              motors_rotateLeft(speed);
 
   
 
@@ -88,7 +87,7 @@ void robot_rotate(float angle_deg, int speed){
 
     safety_update();
     if (safety_isTriggered()) {
-      motors_stop();
+      // motors_stop();
       return;   // arrêt immédiat
     }
 
@@ -102,7 +101,7 @@ void robot_rotate(float angle_deg, int speed){
     if ((dL + dR) / 2 >= labs(targetTicks)) break;
   }
 
-  motors_stop();
+  // motors_stop();
 }
 
 void robot_rotate_gyro(float target_deg, int pwmMax) {
@@ -138,7 +137,7 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
 
     safety_update();
     if (safety_isTriggered()) {
-      motors_stop();
+      // motors_stop();
       return;   // arrêt immédiat
     }
 
@@ -162,8 +161,8 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     else pwm = DEAD_PWM;
 
     // applique sens selon u
-    if (u > 0) motors_rotateRight(pwm);
-    else       motors_rotateLeft(pwm);
+    // if (u > 0) motors_rotateRight(pwm);
+    // else       motors_rotateLeft(pwm);
 
     // arrêt : proche de la cible ET vitesse faible pendant STABLE_MS
     if (fabs(err) < ANGLE_TOL && fabs(rate) < RATE_TOL) {
@@ -177,7 +176,7 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     // if (millis() - startMs > 4000) break;
   }
 
-  motors_stop();
+  // motors_stop();
 }
 
 void robot_move_distance(float dist_mm, int pwmBaseTarget) {
@@ -243,7 +242,7 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
     safety_update();
     if (safety_isTriggered()) {
-      motors_stop();
+      // motors_stop();
 
       while(safety_isTriggered()){
         safety_update();
@@ -270,8 +269,13 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
     int pwmL, pwmR;
     control_driveStraight_PI(st, headingErr, dL, dR, pwmBaseTarget, dt, pwmL, pwmR);
 
-    motors_applySpeeds(pwmL, pwmR);
+    // motors_applySpeeds(pwmL, pwmR);
   }
 
-  motors_stop();
+  // motors_stop();
 }
+
+
+
+
+

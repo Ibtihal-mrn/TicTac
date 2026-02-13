@@ -1,4 +1,8 @@
 #include <Arduino.h>
+#include <Wire.h>
+
+#include "config.h"
+#include "globals.h"
 #include "encoders.h"
 #include "motors.h"
 #include "control.h"
@@ -8,18 +12,29 @@
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
+  Wire.begin(6,7); // SDA, SCL
+  Wire.setClock(100000);
+  delay(1000);
+  
+
+  // Instanciate Drivers
   robot_init();
-  bras_init();
+  // bras_init();
+
+
+  Serial.println("Setup Done.");
 }
 
 void loop()
 {
   static bool runSequence = true;  
 
-  if (!runSequence) {
-    return; 
-  }
+  static unsigned long millis_print = 0;
+  if(millis() - millis_print >= 2000) { Serial.println("I'm alive"); millis_print = millis(); }
+  
+
+  if (!runSequence) { return; }
 
   // -----------------------------------
   // --------- Carré sans gyro ---------
@@ -95,34 +110,33 @@ void loop()
   // --------- Séquence de test 2 ---------
   // -----------------------------------
 
-  bras_deployer();
+  // bras_deployer();
 
-  robot_move_distance(1000, 140);
-  delay(2000);
+  // robot_move_distance(1000, 140);
+  // delay(2000);
  
-  bras_retracter();
-  delay(2000);
-
+  // bras_retracter();
+  // delay(2000);
+// 
   // robot_move_distance(-200, 140);
   // delay(2000);
 
-  robot_rotate_gyro(-180, 160);
-  delay(2000);
+  // robot_rotate_gyro(-180, 160);
+  // delay(2000);
 
-  robot_move_distance(800, 140);
-  delay(2000);
+  // robot_move_distance(800, 140);
+  // delay(2000);
 
   // bras_retracter();
   // delay(2000);
 
-  robot_stop();
-
-
- 
-
-
+  // robot_stop();
 
   runSequence = false; 
+
+  
+
+
 } 
 
 

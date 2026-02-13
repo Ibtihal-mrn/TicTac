@@ -1,17 +1,25 @@
 #include "control.h"
-#include "motors.h"   // pour baseSpeed, Kp, trimL, trimR
+#include "../motors/motors.h"   // pour baseSpeed, Kp, trimL, trimR
+
+int Kp = 1;
+int trimL = 0;
+int trimR = 0;  // TODO should be imported from motors.h
+
 
 void control_computeSpeeds(long dL, long dR, int &speedL, int &speedR) {
   // erreur basée sur la vitesse, PAS la position totale
   long error = dL - dR;
 
+  
   int correction = error * Kp;
 
   // limite la correction pour éviter les crashs
   correction = constrain(correction, -60, 60);
 
-  speedL = constrain(baseSpeed - correction + trimL, 0, 255);
-  speedR = constrain(baseSpeed + correction + trimR, 0, 255);
+  // speedL = constrain(baseSpeed - correction + trimL, 0, 255);
+  // speedR = constrain(baseSpeed + correction + trimR, 0, 255);
+  speedL = 0;
+  speedR = 0;
 }
 
 

@@ -1,8 +1,8 @@
 #include "bras.h"
 
 // Création des deux objets servo
-Servo brasGauche;
-Servo brasDroit;
+// Servo brasGauche;
+// Servo brasDroit;
 
 // --- CONFIGURATION ---
 const int PIN_DROIT  = 12;   // bras droit
@@ -14,20 +14,20 @@ int angleInitialdroit  = 100;
 int angleFinaldroit    = 20;
 
 void bras_init() {
-  brasGauche.attach(PIN_GAUCHE);
-  brasDroit.attach(PIN_DROIT);
+  // brasGauche.attach(PIN_GAUCHE);
+  // brasDroit.attach(PIN_DROIT);
 
   // Position de départ
-  brasGauche.write(angleInitialgauche);
-  brasDroit.write(angleInitialdroit);
+  // brasGauche.write(angleInitialgauche);
+  // brasDroit.write(angleInitialdroit);
 }
 
 void bras_deployer() {
-  brasGauche.write(angleFinalgauche);
-  brasDroit.write(angleFinaldroit);
+  // brasGauche.write(angleFinalgauche);
+  // brasDroit.write(angleFinaldroit);
 }
 
 void bras_retracter() {
-  brasGauche.write(angleInitialgauche);
-  brasDroit.write(angleInitialdroit);
+  // brasGauche.write(angleInitialgauche);
+  // brasDroit.write(angleInitialdroit);
 }
