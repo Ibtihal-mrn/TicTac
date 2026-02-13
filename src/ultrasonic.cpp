@@ -20,13 +20,13 @@ int ultrasonic_readDistance() {
     digitalWrite(PIN_TRIG, LOW);
 
     // Lecture du retour
-    long duree = pulseIn(PIN_ECHO, HIGH, 30000); // timeout 30ms (sécurité)
+    long duree = pulseIn(PIN_ECHO, HIGH, 4000UL); // timeout 30ms (sécurité)
 
     if (duree == 0) {
         return -1; // Pas de mesure valide
     }
 
-    int distance = duree * 0.034 / 2;
+    int distance = (int)(duree / 58UL);
     return distance;
 }
 

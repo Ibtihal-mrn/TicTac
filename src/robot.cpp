@@ -4,10 +4,15 @@
 #include "control.h"
 #include "kinematics.h"
 #include "imu.h"
+#include "safety.h"
+#include "ultrasonic.h"
 
 void robot_init() {
   motors_init();
   encoders_init();
+  ultrasonic_init(13, 10);  // trig, echo
+  safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
+
 
   // IMU
   if (!imu_init()) {
@@ -74,10 +79,19 @@ void robot_rotate(float angle_deg, int speed){
   if (angle_deg > 0) motors_rotateRight(speed);
   else              motors_rotateLeft(speed);
 
+  
+
   while (true) {
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
+
+    safety_update();
+    if (safety_isTriggered()) {
+      motors_stop();
+      return;   // arrêt immédiat
+    }
+
 
     long curL, curR;
     encoders_read(&curL, &curR);
@@ -121,6 +135,13 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
+
+    safety_update();
+    if (safety_isTriggered()) {
+      motors_stop();
+      return;   // arrêt immédiat
+    }
+
 
     // lecture gyro
     float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
@@ -219,6 +240,18 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
+
+    safety_update();
+    if (safety_isTriggered()) {
+      motors_stop();
+
+      while(safety_isTriggered()){
+        safety_update();
+        safety_clearIfSafe();
+        delay(20);
+      }
+    }
+
 
     long curL, curR;
     encoders_read(&curL, &curR);

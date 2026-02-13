@@ -72,3 +72,15 @@ void motors_rotateLeft(int speed) {
   motorL->run(FORWARD);
   motorR->run(BACKWARD);
 }
+
+
+void motors_backward(int speedL, int speedR) {
+  speedL = constrain(speedL, 0, 255);
+  speedR = constrain(speedR, 0, 255);
+
+  motorL->setSpeed(speedL);
+  motorR->setSpeed(speedR);
+
+  motorL->run(BACKWARD);
+  motorR->run(BACKWARD);
+}

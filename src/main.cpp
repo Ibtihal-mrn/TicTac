@@ -75,7 +75,7 @@ void loop()
 
   // robot_move_distance(1255, 140);
   // delay(2000);
-
+ 
   // bras_deployer();
   // delay(2000);
 
@@ -90,7 +90,32 @@ void loop()
 
   // robot_stop();
 
-  
+
+  // -----------------------------------
+  // --------- Séquence de test 2 ---------
+  // -----------------------------------
+
+  bras_deployer();
+
+  robot_move_distance(1000, 140);
+  delay(2000);
+ 
+  bras_retracter();
+  delay(2000);
+
+  // robot_move_distance(-200, 140);
+  // delay(2000);
+
+  robot_rotate_gyro(-180, 160);
+  delay(2000);
+
+  robot_move_distance(800, 140);
+  delay(2000);
+
+  // bras_retracter();
+  // delay(2000);
+
+  robot_stop();
 
 
  
