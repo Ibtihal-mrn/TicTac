@@ -17,7 +17,7 @@ void control_computeSpeeds(long dL, long dR, int &speedL, int &speedR) {
 
 // --------- TUNING (démarre avec ça) ----------
 static const int PWM_MAX = 255;
-static const int PWM_MIN = 40;      // PWM mini qui fait bouger (à ajuster)
+static const int PWM_MIN = 40;      // PWM mini qui fait bouger 
 static const int RAMP_STEP = 6;     // PWM par cycle (si dt=10ms => ~300 PWM/s)
 
 static const float K_HEADING = 0.03;  // gain cap (ticks -> "ticks/s" de correction)
