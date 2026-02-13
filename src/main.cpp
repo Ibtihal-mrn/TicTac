@@ -6,7 +6,7 @@
 #include "bras.h"
 #include "kinematics.h"
 #include "emergencyButton.h"
-#include "ultrasonic.h"   // Capteur ultrason
+#include "ultrasonic.h"  // 3 capteurs NewPing pins 7,10,13 ANTI-ACCOUPS
 
 // Dernières positions des encodeurs
 static long last_left = 0;
@@ -24,7 +24,7 @@ void setup() {
     robot_init();
     bras_init();
     emergencyButton_init();
-    ultrasonic_init(13, 10);  // trig, echo
+    ultrasonic_init();  // Pins 7,10,13 filtré anti-bruit
 
     encoders_read(&last_left, &last_right);
 }
@@ -36,21 +36,26 @@ bool moveDistanceSafe(float dist_mm, int speed) {
     encoders_read(&startL, &startR);
     prevL = startL;
     prevR = startR;
+    
+    static unsigned long lastUSCheck = 0;  // ANTI-INTERFERENCE
 
     while (true) {
         long curL, curR;
         encoders_read(&curL, &curR);
 
-        // Lire la distance une seule fois
-        int distance = ultrasonic_readDistance();
-        bool stopObstacle = (distance > 0 && distance <= SEUIL_OBSTACLE);
+        // Check US 100ms seulement (10Hz anti-bruit)
+        bool stopObstacle = false;
+        if (millis() - lastUSCheck > 100) {
+            stopObstacle = ultrasonic_isObstacle(SEUIL_OBSTACLE);
+            lastUSCheck = millis();
+        }
 
         // Vérification d'urgence
         if (emergencyButton_isPressed() || stopObstacle) {
             robot_stop();
             emergencyStopActive = emergencyButton_isPressed();
             obstacleStopActive = stopObstacle;
-            return false;  // déplacement interrompu
+            return false;
         }
 
         long distTicksL = labs(curL - startL);
@@ -78,21 +83,26 @@ bool rotateSafe(float angle_deg, int speed) {
 
     if (angle_deg > 0) motors_rotateRight(speed);
     else motors_rotateLeft(speed);
+    
+    static unsigned long lastUSCheck = 0;  // ANTI-INTERFERENCE
 
     while (true) {
         long curL, curR;
         encoders_read(&curL, &curR);
 
-        // Lire la distance une seule fois
-        int distance = ultrasonic_readDistance();
-        bool stopObstacle = (distance > 0 && distance <= SEUIL_OBSTACLE);
+        // Check US 100ms seulement
+        bool stopObstacle = false;
+        if (millis() - lastUSCheck > 100) {
+            stopObstacle = ultrasonic_isObstacle(SEUIL_OBSTACLE);
+            lastUSCheck = millis();
+        }
 
         // Vérification d'urgence
         if (emergencyButton_isPressed() || stopObstacle) {
             robot_stop();
             emergencyStopActive = emergencyButton_isPressed();
             obstacleStopActive = stopObstacle;
-            return false; // rotation interrompue
+            return false;
         }
 
         long dL = labs(curL - startL);
@@ -105,51 +115,52 @@ bool rotateSafe(float angle_deg, int speed) {
 }
 
 void loop() {
-    static bool runSequence = true;  
+    static bool runSequence = true; 
+    static unsigned long lastUSCheck = 0;  // ANTI-INTERFERENCE
 
     if (!runSequence) return;
 
-    // Vérification d'urgence avant toute action
-    int distance = ultrasonic_readDistance();
+    // Vérification d'urgence (100ms)
+    bool stopObstacle = false;
+    if (millis() - lastUSCheck > 100) {
+        stopObstacle = ultrasonic_isObstacle(SEUIL_OBSTACLE);
+        lastUSCheck = millis();
+    }
     emergencyStopActive = emergencyButton_isPressed();
-    obstacleStopActive = (distance > 0 && distance <= SEUIL_OBSTACLE);
 
-    if (emergencyStopActive || obstacleStopActive) {
+    if (emergencyStopActive || stopObstacle) {
         robot_stop();
-        // Rester arrêté tant que bouton ou obstacle présent
-        while (emergencyButton_isPressed() || (ultrasonic_readDistance() > 0 && ultrasonic_readDistance() <= SEUIL_OBSTACLE)) {
+        while (emergencyButton_isPressed() || ultrasonic_isObstacle(SEUIL_OBSTACLE)) {
             delay(50);
         }
-        // Réinitialisation
         emergencyStopActive = false;
         obstacleStopActive = false;
         encoders_read(&last_left, &last_right);
         return;
     }
 
-    // --- Déplacer robot 1 ---
-    if (!moveDistanceSafe(2000, 140)) return;
+    // Debug (optionnel)
+    Serial.print("Dist[0,1,2]: ");
+    Serial.print(ultrasonic_readDistance(0)); Serial.print(",");
+    Serial.print(ultrasonic_readDistance(1)); Serial.print(",");
+    Serial.println(ultrasonic_readDistance(2));
 
+    // Sequence robot intacte...
+    if (!moveDistanceSafe(2000, 140)) return;
     Serial.print("ticksL="); Serial.print(ticksL);
     Serial.print(" ticksR="); Serial.println(ticksR);
     delay(2000);
 
-    // --- Déployer bras ---
     bras_deployer();
     delay(2000);
 
-    // --- Rotation ---
     if (!rotateSafe(-230, 140)) return;
     delay(2000);
 
-    // --- Déplacer robot 2 ---
     if (!moveDistanceSafe(1000, 140)) return;
     delay(2000);
 
-    // --- Rétracter bras ---
     bras_retracter();
-
-    // Arrêt final
     robot_stop();
     runSequence = false;
 }
