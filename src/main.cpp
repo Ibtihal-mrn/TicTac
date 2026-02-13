@@ -3,6 +3,8 @@
 
 #include "config.h"
 #include "globals.h"
+#include "utils.h"
+
 #include "encoders.h"
 #include "motors.h"
 #include "control.h"
@@ -17,6 +19,10 @@ void setup()
   Wire.setClock(100000);
   delay(1000);
   
+  // Utils.h
+  printEsp32Info();
+  i2c_scanner();
+
 
   // Instanciate Drivers
   robot_init();
@@ -35,7 +41,7 @@ void loop()
   
 
   if (!runSequence) { return; }
-
+  robot_test(); 
   // -----------------------------------
   // --------- Carré sans gyro ---------
   // -----------------------------------

@@ -3,6 +3,50 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <L298NX2.h>  // Motor Driver
+
+class Motors {
+public:
+    Motors(uint8_t ena, uint8_t in1, uint8_t in2,
+            uint8_t enb, uint8_t in3, uint8_t in4);
+
+    void startForward(float distanceCm);
+    void startRotate(float angleDeg);
+
+    void forward(int speed);
+    void backward(int speed);
+    void rotateRight(int speed);
+    void rotateLeft(int speed);
+    
+
+    // void update(const SensorsData &sensors);
+    bool isDone() const;
+    void stopMotors();
+    // void setDistancePID(float kp, float ki, float kd);
+    // void setAnglePID(float kp, float ki, float kd);
+
+private:
+    L298NX2 motors;
+
+    // PID pidDistance;
+    // PID pidAngle;
+
+    // MovementTarget target;
+
+    unsigned long lastUpdateUs;
+    float startDistance, startYaw;
+
+    // void resetPID(PID &pid);
+    // float computePID(PID &pid, float error, float dt, 
+    //         float &pTerm, float &iTerm, float &dTerm);
+
+    void applyMotorOutputs(float leftCmd, float rightCmd);
+    
+};
+
+
+
+
 // #include <Adafruit_MotorShield.h>
 
 // ---------- MOTEURS ADATRUFS ----------

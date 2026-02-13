@@ -1,18 +1,24 @@
 #include "robot.h"
+#include "../../src/config.h"
+#include "../../src/globals.h"
+
 #include "encoders.h"
 #include "motors.h"
 #include "control.h"
 #include "kinematics.h"
 #include "imu.h"
+#include "utils.h"
 #include "safety.h"
 #include "ultrasonic.h"
 
+Motors motors(IN1, IN2, ENA, IN3, IN4, ENB);
+
+
 void robot_init() {
   // motors_init();
-  encoders_init();
-  ultrasonic_init(13, 10);  // trig, echo
-  safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
-
+  // encoders_init();
+  // ultrasonic_init(13, 10);  // trig, echo
+  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
   if (!imu_init()) { Serial.println("MPU6050 FAIL.");
@@ -23,6 +29,14 @@ void robot_init() {
     // Serial.println("IMU calibrated");
   }
 }
+
+void robot_test() {
+
+  motors.forward(150);
+  delay(2000);
+}
+
+
 
 void robot_step() { // On va aussi plus l'utiliser normalement
   long left, right;
