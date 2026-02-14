@@ -7,33 +7,33 @@
 #include "control.h"
 #include "kinematics.h"
 #include "imu.h"
-#include "utils.h"
 #include "safety.h"
 #include "ultrasonic.h"
+#include "utils.h"
+#include "Debug.h"
 
 Motors motors(IN1, IN2, ENA, IN3, IN4, ENB);
 
 
 void robot_init() {
-  // motors_init();
-  // encoders_init();
+  encoders_init();
   // ultrasonic_init(13, 10);  // trig, echo
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
-  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
-  } else {
-    delay(200);
-    Serial.println("MPU6050 connected.");
-    imu_calibrate(600, 2); // ~1.2s, robot immobile
-    // Serial.println("IMU calibrated");
-  }
+  // if (!imu_init()) { Serial.println("MPU6050 FAIL.");
+  // } else {
+  //   delay(200);
+  //   Serial.println("MPU6050 connected.");
+  //   imu_calibrate(600, 2); // ~1.2s, robot immobile
+  //   // Serial.println("IMU calibrated");
+  // }
 }
 
 void robot_test() {
-
   motors.forward(150);
   delay(2000);
+  motors.stopMotors();
 }
 
 
@@ -51,9 +51,7 @@ void robot_step() { // On va aussi plus l'utiliser normalement
   // motors_applySpeeds(speedL, speedR);
 }
 
-void robot_stop(){
-    // motors_stop();
-}
+void robot_stop(){ motors.stopMotors(); }
 
 void robot_rotate(float angle_deg, int speed){
   //   long targetTicks = ticks_for_rotation_deg(angle_deg);
@@ -288,6 +286,139 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
   // motors_stop();
 }
+
+
+
+// ===========
+
+void hardware_init(Context& ctx) {
+  // To be called in setup() in main.cpp
+
+  // motors_init();
+  // encoders_init();
+  // ultrasonic_init(13, 10);  // trig, echo
+  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
+
+  // IMU
+  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
+  } else {
+    delay(200);
+    Serial.println("MPU6050 connected.");
+    imu_calibrate(600, 2); // ~1.2s, robot immobile
+    // Serial.println("IMU calibrated");
+  }
+
+  // Init Match Timer
+  ctx.matchActive = false;
+  ctx.matchDurationMs = MATCH_DURATION_MS;
+  ctx.matchStartMs = 0;
+    debugPrintf(DBG_FSM, "FSM -> INIT");
+    ctx.currentAction = Robot::INIT;
+}
+
+void startMatchTimer(Context& ctx) {
+    ctx.matchActive = true;
+    ctx.matchStartMs = millis();
+    ctx.stateStartMs = millis();
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+}
+void checkMatchTimer(Context& ctx) {
+    if (ctx.matchActive && millis() - ctx.matchStartMs >= ctx.matchDurationMs) {
+        ctx.matchActive = false;
+        debugPrintf(DBG_FSM, "Match timer elapsed -> TIMER_END");
+        ctx.currentAction = Robot::TIMER_END;
+    }
+}
+
+
+
+
+void robot_step(Context& ctx) {
+
+    // Periodic Checks
+    checkMatchTimer(ctx);
+
+
+
+    // Main step.
+    switch (ctx.currentAction) {
+        case Robot::INIT:
+            // robot_init();  CALLED IN SETUP()
+            // ctx.commandQueue.push({RobotCommandType::TUNE_PID, (float)TUNE_BOTH});
+            debugPrintf(DBG_FSM, "FSM -> IDLE");
+            ctx.currentAction = Robot::IDLE;
+            break;
+
+        case Robot::IDLE:
+            // ADD LaunchTrigger HERE
+
+            // start 100sec timer
+            startMatchTimer(ctx);
+
+            debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
+            ctx.currentAction = Robot::DISPATCH_CMD;
+            break;
+
+        case Robot::DISPATCH_CMD:
+            // parse command and set next action (e.g. EXEC_MOVE, EXEC_ROTATE, etc.)
+
+            // 1. Empty Queue
+            // if (ctx.commandQueue.empty()) { break; }
+
+            // 2. Get next command
+            // ctx.currentCommand = ctx.commandQueue.front();
+            // ctx.commandQueue.pop();
+
+            // 3. Dispatch to movement
+            // switch (ctx.currentCommand.type) {
+            //     case  RobotCommandType::MOVE_FORWARD_CM:
+            //         movement.startForward(ctx.currentCommand.value);
+            //         fsmChangeAction(ctx, FsmAction::EXEC_MOVE);
+            //         break;
+
+            //     case RobotCommandType::ROTATE_DEG:
+            //         movement.startRotate(ctx.currentCommand.value);
+            //         fsmChangeAction(ctx, FsmAction::EXEC_ROTATE);
+            //         break;
+
+            //     case RobotCommandType::TUNE_PID:
+            //         fsmChangeAction(ctx, FsmAction::TUNE_PID);
+            //         break;
+
+            //     // case STEPPER_UP:
+
+            //     default: fsmChangeAction(ctx, FsmAction::DISPATCH_CMD); break;
+            // }
+            // break;
+          // }
+            break;
+
+        case Robot::EXEC_MOVE:
+            
+            break;
+
+        case Robot::EXEC_ROTATE:
+            // robot_rotate(...);
+            break;
+
+
+        case Robot::TUNE_PID:
+            // adjust PID parameters
+            break;
+
+        case Robot::TIMER_END:
+            motors.stopMotors();
+            break;
+
+        case Robot::EMERGENCY_STOP:
+            motors.stopMotors();
+            break;
+    }
+}
+
+
+
+
 
 
 

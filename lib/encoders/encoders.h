@@ -2,12 +2,13 @@
 #define ENCODERS_H
 
 #include <Arduino.h>
+#include "../../src/config.h"
 
 // ---------- ENCODEURS ----------
-#define ENC_L_A 2   // interruption
-#define ENC_L_B 5
-#define ENC_R_A 3  // interruption
-#define ENC_R_B 9
+// #define ENC_L_A 2   // in config.h
+// #define ENC_L_B 5
+// #define ENC_R_A 3
+// #define ENC_R_B 9
 
 extern volatile long ticksL;
 extern volatile long ticksR;

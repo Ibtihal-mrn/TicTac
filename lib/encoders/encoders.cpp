@@ -10,19 +10,15 @@ long prevR = 0;
 void ISR_left(void) {
   bool A = digitalRead(ENC_L_A);
   bool B = digitalRead(ENC_L_B);
-  if (A == B)
-    ticksL++;
-  else
-    ticksL--;
+  if (A == B) ticksL++;
+  else ticksL--;
 }
 
 void ISR_right(void) {
   bool A = digitalRead(ENC_R_A);
   bool B = digitalRead(ENC_R_B);
-  if (A == B)
-    ticksR--;
-  else
-    ticksR++;
+  if (A == B) ticksR--;
+  else ticksR++;
 }
 
 void encoders_init(void) {

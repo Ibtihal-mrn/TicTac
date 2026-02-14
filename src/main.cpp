@@ -4,6 +4,7 @@
 #include "config.h"
 #include "globals.h"
 #include "utils.h"
+#include "Debug.h"
 
 #include "encoders.h"
 #include "motors.h"
@@ -12,16 +13,40 @@
 #include "bras.h"
 #include "imu.h"
 
+// ========================
+
+
+void printEncodersVal() {
+  long left, right;
+  encoders_read(&left, &right);
+  Serial.print("Encoders: L=");
+  Serial.print(left);
+  Serial.print(" R=");
+  Serial.println(right);
+}
+
+
+// ========================
 void setup()
 {
-  Serial.begin(115200);
-  Wire.begin(6,7); // SDA, SCL
+  debugInit(115200,    // does Serial.begin()
+    DBG_FSM | 
+    DBG_MOTORS
+    // DBG_TASKMANAGER     // comment DBG_ to deactivate its related prints
+    // DBG_SENSORS |
+    // DBG_COMMS |
+    // DBG_ENCODER |
+    // DBG_LAUNCH_TGR
+  );
+
+  // I2C Init.
+  Wire.begin(6, 7); // SDA, SCL
   Wire.setClock(100000);
-  delay(1000);
+  delay(200);
   
   // Utils.h
   printEsp32Info();
-  i2c_scanner();
+  // i2c_scanner();
 
 
   // Instanciate Drivers
@@ -32,16 +57,25 @@ void setup()
   Serial.println("Setup Done.");
 }
 
+
+
 void loop()
 {
   static bool runSequence = true;  
 
   static unsigned long millis_print = 0;
-  if(millis() - millis_print >= 2000) { Serial.println("I'm alive"); millis_print = millis(); }
+  if(millis() - millis_print >= 2000) { 
+    Serial.println("I'm alive"); 
+    millis_print = millis(); 
+    printEncodersVal();
+  
+  }
+  
   
 
   if (!runSequence) { return; }
-  robot_test(); 
+  // robot_test();
+  // robot_move_distance(1255, 140);
   // -----------------------------------
   // --------- Carré sans gyro ---------
   // -----------------------------------
@@ -96,7 +130,7 @@ void loop()
 
   // robot_move_distance(1255, 140);
   // delay(2000);
- 
+
   // bras_deployer();
   // delay(2000);
 
@@ -120,7 +154,7 @@ void loop()
 
   // robot_move_distance(1000, 140);
   // delay(2000);
- 
+
   // bras_retracter();
   // delay(2000);
 // 
@@ -144,26 +178,3 @@ void loop()
 
 
 } 
-
-
-// Print 
-// Serial.print("ticksL="); Serial.print(ticksL);
-// Serial.print(" ticksR="); Serial.println(ticksR);
-
-// Serial.print(digitalRead(ENC_R_A));
-// Serial.print(" ");
-// Serial.println(digitalRead(ENC_R_B));
-// delay(50);
-
-
-// long l, r ; 
-// encoders_read(&l, &r);
-
-// static long lastL = 0, lastR = 0;
-
-// Serial.print("dTicksL="); Serial.print(l - lastL);
-// Serial.print(" dTicksR="); Serial.println(r - lastR);
-
-
-// lastL = ticksL;
-// lastR = ticksR;

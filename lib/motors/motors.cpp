@@ -3,7 +3,7 @@
 
 
 
-// Constructor
+// ---------- Constructor -----------
 Motors::Motors(uint8_t enaPin, uint8_t in1Pin, uint8_t in2Pin,uint8_t enbPin, uint8_t in3Pin, uint8_t in4Pin)
     : motors(enaPin, in1Pin, in2Pin, enbPin, in3Pin, in4Pin) // pins
       // pidDistance(DISTANCE_PID_DEFAULT.kp, DISTANCE_PID_DEFAULT.ki, DISTANCE_PID_DEFAULT.kd), // default values from config.h
@@ -12,9 +12,6 @@ Motors::Motors(uint8_t enaPin, uint8_t in1Pin, uint8_t in2Pin,uint8_t enbPin, ui
     // target.active = false;
     lastUpdateUs = micros();
 }
-
-
-
 
 // ----------------------------
 void Motors::stopMotors() { motors.stop(); }

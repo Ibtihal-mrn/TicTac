@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include "EmergencyButton.h"
+#include "../../src/config.h"
+#include "../../src/globals.h"
 
-#define EBTN_PIN 7
+// #define EBTN_PIN 7 // in config.h
 #define STABLE_READS 3  // pour debounce simple si besoin
 
 static bool lastState = false;   // état précédent lu

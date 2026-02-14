@@ -37,9 +37,7 @@ void safety_update() {
   }
 }
 
-bool safety_isTriggered() {
-  return g_triggered;
-}
+bool safety_isTriggered() { return g_triggered; }
 
 void safety_clearIfSafe() {
   if (!emergencyButton_isPressed() &&
