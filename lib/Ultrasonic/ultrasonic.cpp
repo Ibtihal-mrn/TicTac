@@ -1,4 +1,8 @@
 #include "ultrasonic.h"
+#include <Ultrasonic.h>
+#include "../../src/config.h"
+
+Ultrasonic us(US_TRIG_PIN, US_ECHO_PIN, US_TIMEOUT);
 
 static int PIN_TRIG;
 static int PIN_ECHO;

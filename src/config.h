@@ -88,8 +88,8 @@
 
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-// #define US_TRIG_PIN 12
-// #define US_ECHO_PIN 13
+#define US_TRIG_PIN 1
+#define US_ECHO_PIN 2
 
 
 

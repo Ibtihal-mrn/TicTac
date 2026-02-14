@@ -49,9 +49,12 @@ void setup()
 
 
   // Instanciate Drivers
+  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
+  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
+  bras_init();            // must run FIRST
   robot_init();
-    Serial.println("Robot Init Done.");
-  bras_init();
+
+  
 
   Serial.println("Setup Done.");
 }
@@ -65,10 +68,10 @@ void loop()
   imAlive();
   printEncodersVal();
 
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
+  bras_deployer();
+  delay(2000);
+  bras_retracter();
+  delay(2000);
 
   if (!runSequence) { return; }
   // robot_test();
