@@ -16,6 +16,9 @@ public:
     void forward(int speed);
     void backward(int speed);
     void rotateRight(int speed);
+    void rotateLeft(int speed);
+    // void rotateRight(int leftSpeed, int rightSpeed);
+    // void rotateLeft(int leftSpeed, int rightSpeed);
     
     
 
@@ -27,8 +30,8 @@ public:
 
 private:
     L298NX2 motors; // ONLY pass IN pins, not EN (library bug)
-    uint8_t ENA;
-    uint8_t ENB;
+    uint8_t enaPin_;
+    uint8_t enbPin_;
     // PID pidDistance;
     // PID pidAngle;
 

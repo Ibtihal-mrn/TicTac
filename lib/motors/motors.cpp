@@ -7,17 +7,16 @@
 // ---------- Constructor -----------
 Motors::Motors(uint8_t enaPin, uint8_t in1Pin, uint8_t in2Pin,uint8_t enbPin, uint8_t in3Pin, uint8_t in4Pin)
     : motors(in1Pin, in2Pin, in3Pin, in4Pin), // pins
-      ENA(enaPin), ENB(enbPin)
+      enaPin_(enaPin), enbPin_(enbPin)
       // pidDistance(DISTANCE_PID_DEFAULT.kp, DISTANCE_PID_DEFAULT.ki, DISTANCE_PID_DEFAULT.kd), // default values from config.h
       // pidAngle(ANGLE_PID_DEFAULT.kp, ANGLE_PID_DEFAULT.ki, ANGLE_PID_DEFAULT.kd)
 {
     // target.active = false;
-    pinMode(ENA, OUTPUT);
-    pinMode(ENB, OUTPUT);
+    pinMode(enaPin_, OUTPUT);
+    pinMode(enbPin_, OUTPUT);
 
-    digitalWrite(ENA, HIGH);  // start HIGH (full speed by default)
-    digitalWrite(ENB, HIGH);
-
+    digitalWrite(enaPin_, HIGH);  // start HIGH (full speed by default)
+    digitalWrite(enbPin_, HIGH);
     lastUpdateUs = micros();
 }
 
