@@ -13,20 +13,18 @@
 #include "bras.h"
 #include "imu.h"
 
-// ========================
-
-
-void printEncodersVal() {
-  long left, right;
-  encoders_read(&left, &right);
-  Serial.print("Encoders: L=");
-  Serial.print(left);
-  Serial.print(" R=");
-  Serial.println(right);
+// ------ helpers ------
+void imAlive() {
+  static unsigned long millis_print = 0;
+  if(millis() - millis_print >= 2000) { 
+    Serial.println("I'm alive"); 
+    millis_print = millis(); 
+  }
 }
 
 
-// ========================
+
+// ========= SETUP ===============
 void setup()
 {
   debugInit(115200,    // does Serial.begin()
@@ -63,15 +61,13 @@ void loop()
 {
   static bool runSequence = true;  
 
-  static unsigned long millis_print = 0;
-  if(millis() - millis_print >= 2000) { 
-    Serial.println("I'm alive"); 
-    millis_print = millis(); 
-    printEncodersVal();
-  
-  }
-  
-  
+  imAlive();
+  printEncodersVal();
+
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
 
   if (!runSequence) { return; }
   // robot_test();

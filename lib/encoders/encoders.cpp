@@ -45,3 +45,20 @@ void encoders_computeDelta(long left, long right, long *dL, long *dR) {
   prevL = left;
   prevR = right;
 }
+
+
+// ------ Debug ------
+void printEncodersVal() {
+  static unsigned long millis_print = 0;
+  if(millis() - millis_print >= 2000) { 
+    long left, right;
+    encoders_read(&left, &right);
+    Serial.print("Encoders: L=");
+    Serial.print(left);
+    Serial.print(" R=");
+    Serial.println(right);
+
+    millis_print = millis(); 
+  }
+}
+

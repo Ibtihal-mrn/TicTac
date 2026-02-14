@@ -9,8 +9,8 @@
 #define MATCH_DURATION_MS 50000 
 
 // =================== ACTUATORS PINS ======================
-#define LAUNCH_TRIGGER_PIN A0
-#define TEAM_SWITCH_PIN A2
+// #define LAUNCH_TRIGGER_PIN A0
+// #define TEAM_SWITCH_PIN A2
 #define EBTN_PIN 8
 
 // ===================== MOTORS ============================
@@ -35,15 +35,8 @@
 
 
 // ==================== STEPPER ============================
-// #define STEPPER_M1_PIN1 8
-// #define STEPPER_M1_PIN2 10
-// #define STEPPER_M1_PIN3 9
-// #define STEPPER_M1_PIN4 11
-
-// #define STEPPER_M2_PIN1 4
-// #define STEPPER_M2_PIN2 6
-// #define STEPPER_M2_PIN3 5
-// #define STEPPER_M2_PIN4 7
+#define SERVO_RIGHT 4  // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
+#define SERVO_LEFT 5
 
 
 

@@ -24,4 +24,7 @@ void encoders_computeDelta(long left, long right, long *dL, long *dR);
 void ISR_left(void);
 void ISR_right(void);
 
+// Debug
+void printEncodersVal();
+
 #endif
