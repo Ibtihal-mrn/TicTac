@@ -1,47 +1,38 @@
 #include "motors.h"
+#include "../../src/config.h"
 
 
 
 
 // ---------- Constructor -----------
 Motors::Motors(uint8_t enaPin, uint8_t in1Pin, uint8_t in2Pin,uint8_t enbPin, uint8_t in3Pin, uint8_t in4Pin)
-    : motors(enaPin, in1Pin, in2Pin, enbPin, in3Pin, in4Pin) // pins
+    : motors(in1Pin, in2Pin, in3Pin, in4Pin), // pins
+      ENA(enaPin), ENB(enbPin)
       // pidDistance(DISTANCE_PID_DEFAULT.kp, DISTANCE_PID_DEFAULT.ki, DISTANCE_PID_DEFAULT.kd), // default values from config.h
       // pidAngle(ANGLE_PID_DEFAULT.kp, ANGLE_PID_DEFAULT.ki, ANGLE_PID_DEFAULT.kd)
 {
     // target.active = false;
+    pinMode(ENA, OUTPUT);
+    pinMode(ENB, OUTPUT);
+
+    digitalWrite(ENA, HIGH);  // start HIGH (full speed by default)
+    digitalWrite(ENB, HIGH);
+
     lastUpdateUs = micros();
 }
 
 // ----------------------------
-void Motors::stopMotors() { motors.stop(); }
 
-void Motors::startForward(float distanceCm) {
-    // target.distanceCm = distanceCm;
-    // target.angleDeg = 0.0f;
-    // target.active = true;
-
-    // startDistance = 0;
-    // startYaw = 0;
-
-    // resetPID(pidDistance);
-    // resetPID(pidAngle);
+void Motors::stopMotors() { 
+  motors.stop();
+  digitalWrite(ENA, LOW);    // stops PWM on EN
+  digitalWrite(ENB, LOW);
 }
 
-void Motors::startRotate(float angleDeg) {
-    // target.distanceCm = 0.0f;
-    // target.angleDeg = angleDeg;
-    // target.active = true;
 
-    // startDistance = 0;
-    // startYaw = 0;
+void Motors::forward(int speed) { 
 
-    // resetPID(pidDistance);
-    // resetPID(pidAngle);
-}
-
-void Motors::forward(int speed) {
-    applyMotorOutputs(speed, speed);
+  applyMotorOutputs(speed, speed); 
 }
 
 void Motors::backward(int speed) {
@@ -79,11 +70,40 @@ void Motors::applyMotorOutputs(float leftCmd, float rightCmd)
     else
         motors.stopB();
     
+    // apply to EN pins
+    analogWrite(ENA, leftPWM);
+    analogWrite(ENB, rightPWM);
+
+
     // ---- Debug prints ----
     // if (leftPWM == 255 || rightPWM == 255) { debugPrintF(DBG_MOVEMENT, F("PWM SATURATION")); }
 }
 
 
+// LATER : auto PID control 
+void Motors::startForward(float distanceCm) {
+    // target.distanceCm = distanceCm;
+    // target.angleDeg = 0.0f;
+    // target.active = true;
+
+    // startDistance = 0;
+    // startYaw = 0;
+
+    // resetPID(pidDistance);
+    // resetPID(pidAngle);
+}
+
+void Motors::startRotate(float angleDeg) {
+    // target.distanceCm = 0.0f;
+    // target.angleDeg = angleDeg;
+    // target.active = true;
+
+    // startDistance = 0;
+    // startYaw = 0;
+
+    // resetPID(pidDistance);
+    // resetPID(pidAngle);
+}
 
 
 

@@ -16,7 +16,7 @@ public:
     void forward(int speed);
     void backward(int speed);
     void rotateRight(int speed);
-    void rotateLeft(int speed);
+    
     
 
     // void update(const SensorsData &sensors);
@@ -26,8 +26,9 @@ public:
     // void setAnglePID(float kp, float ki, float kd);
 
 private:
-    L298NX2 motors;
-
+    L298NX2 motors; // ONLY pass IN pins, not EN (library bug)
+    uint8_t ENA;
+    uint8_t ENB;
     // PID pidDistance;
     // PID pidAngle;
 
