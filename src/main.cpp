@@ -27,6 +27,7 @@ void imAlive() {
 // ========= SETUP ===============
 void setup()
 {
+  // Serial.begin(115200);
   debugInit(115200,    // does Serial.begin()
     DBG_FSM | 
     DBG_MOTORS
@@ -37,7 +38,7 @@ void setup()
     // DBG_LAUNCH_TGR
   );
 
-  // I2C Init.
+  // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
   Wire.setClock(100000);
   delay(200);
@@ -49,8 +50,8 @@ void setup()
 
   // Instanciate Drivers
   robot_init();
-  // bras_init();
-
+    Serial.println("Robot Init Done.");
+  bras_init();
 
   Serial.println("Setup Done.");
 }
@@ -70,7 +71,7 @@ void loop()
   // delay(2000);
 
   if (!runSequence) { return; }
-  robot_test();
+  // robot_test();
   // robot_move_distance(1255, 140);
   // -----------------------------------
   // --------- Carré sans gyro ---------

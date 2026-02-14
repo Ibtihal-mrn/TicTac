@@ -1,39 +1,54 @@
 #include "bras.h"
 #include "../../src/config.h"
+#include <ESP32Servo.h> 
 
 // Création des deux objets servo
 Servo brasGauche;
-Servo brasDroit;
+// Servo brasDroit;
 
 // --- CONFIGURATION ---
-const int PIN_DROIT  = SERVO_LEFT;   // bras droit
-const int PIN_GAUCHE = SERVO_RIGHT;  // bras gauche
+const int PIN_DROIT  = SERVO_LEFT;   // voir config.h
+const int PIN_GAUCHE = SERVO_RIGHT;
+static bool initialized = false;
 
-// int angleInitialgauche = -300;   // Servo (0-180° max) A REVOIR
-// int angleFinalgauche   = 90;
-// int angleInitialdroit  = 100;
-// int angleFinaldroit    = 20;
+const int MIN_US = 500;  // Servo min/max pulse width (in microseconds)
+const int MAX_US = 2400;
 
 int angleInitialgauche = 0;
 int angleFinalgauche   = 90;
 int angleInitialdroit  = 100;
 int angleFinaldroit    = 20;
 
+// int angleInitialgauche = -300;   // Servo (0-180° max) A REVOIR
+// int angleFinalgauche   = 90;
+// int angleInitialdroit  = 100;
+// int angleFinaldroit    = 20;
+
 void bras_init() {
-  brasGauche.attach(PIN_GAUCHE);
-  brasDroit.attach(PIN_DROIT);
+  if (initialized) return;
+
+  ESP32PWM::allocateTimer(0); // Alloue un timer pour chaque servos (ESP32 spécifique)
+  // ESP32PWM::allocateTimer(1); //
+  delay(50);
+
+  // Attache les servos aux pins définis dans config.h
+  brasGauche.attach(PIN_GAUCHE, MIN_US, MAX_US);
+  // brasDroit.attach(PIN_DROIT, MIN_US, MAX_US);
+  delay(50);
 
   // Position de départ
   brasGauche.write(angleInitialgauche);
-  brasDroit.write(angleInitialdroit);
+  // brasDroit.write(angleInitialdroit);
+
+  initialized = true;
 }
 
 void bras_deployer() {
   brasGauche.write(angleFinalgauche);
-  brasDroit.write(angleFinaldroit);
+  // brasDroit.write(angleFinaldroit);
 }
 
 void bras_retracter() {
   brasGauche.write(angleInitialgauche);
-  brasDroit.write(angleInitialdroit);
+  // brasDroit.write(angleInitialdroit);
 }
