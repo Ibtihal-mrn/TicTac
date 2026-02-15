@@ -74,9 +74,9 @@ void loop()
   // delay(2000);
 
   if (!runSequence) { return; }
-  robot_test();
+  // robot_test();
   // robot_move_distance(1255, 140);
-  // robot_forward_distance(500, 100);
+  driveDistancePID(500, 100);
   // -----------------------------------
   // --------- Carré sans gyro ---------
   // -----------------------------------

@@ -232,10 +232,6 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // baseSpeed = oldBase;
 
 
-  // Setup Timing
-  const uint16_t DT_MS = 10;
-  const float dt = DT_MS / 1000.0f;
-
   // Compute Tick Target
   long target = ticks_for_distance_mm(fabs(dist_mm));
   unsigned long lp1 = 0;
@@ -255,6 +251,9 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   DrivePIState st;
   control_reset(st);
 
+  // Setup Timing
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
   unsigned long tPrev = micros();
 
   // MAIN LOOP
@@ -286,8 +285,6 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
     long distTicksL = labs(curL - startL);
     long distTicksR = labs(curR - startR);
     if ((distTicksL + distTicksR) / 2 >= target) break; // Target Reached
-    static unsigned long lp4 = 0;
-    printMillis(DBG_MOTORS, "Target not reached...\n", millis(), lp4, 500);
 
     // PI CONTROL
     long dL, dR;
@@ -301,7 +298,7 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
     // motors_applySpeeds(pwmL, pwmR);
 
     static unsigned long lp5 = 0;
-    if (millis() - lp5 >= 2000) {
+    if (millis() - lp5 >= 1000) {
         Serial.print("PWM L: ");
         Serial.print(pwmL);
         Serial.print(" | PWM R: ");
@@ -309,8 +306,8 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
         lp5 = millis();
     }
 
-    // motors.forward(pwmL, pwmR);
-    motors.forward(255, 255);
+    motors.forward(pwmL, pwmR);
+    // motors.forward(255, 255);
     
   }
 
@@ -319,23 +316,27 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 }
 
 
-
-void robot_forward_distance(float dist_mm, int speed) {
+// AVANT et ARRIERE (+ , -)
+void driveDistancePID(float distance_mm, int speed) {
   
-  // Compute Tick Target
-  long target = ticks_for_distance_mm(fabs(dist_mm));
+  // --- Determine direction ---
+    bool forwardMotion = (distance_mm >= 0);
+    long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
   unsigned long lp1 = 0;
   printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
 
-  // Encoder Read
+
+  // --- Encoder Read Start Values ---
   long startL, startR;
   encoders_read(&startL, &startR);
+  prevL = startL;
+  prevR = startR;
   unsigned long lp2 = 0;
   printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
 
-  // reset deltas encodeurs pour la vitesse
-  prevL = startL;
-  prevR = startR;
+  // --- PID Setup ---
+  DrivePIState st;
+  control_reset(st);
 
   // Setup Timing
   const uint16_t DT_MS = 10;
@@ -348,17 +349,48 @@ void robot_forward_distance(float dist_mm, int speed) {
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    motors.forward(150,150);
-
+    // --- Read Current encoders Values ---
     long curL, curR;
     encoders_read(&curL, &curR);
 
+    // --- Compute distance traveled ---
     long distTicksL = labs(curL - startL);
     long distTicksR = labs(curR - startR);
+    long avgDist = (distTicksL + distTicksR) / 2;
+    if (avgDist >= targetTicks) break; // Target Reached
 
-    if ((distTicksL + distTicksR) / 2 >= target) break;
+    // --- Compute deltas for PID ---
+    long dL, dR;
+    encoders_computeDelta(curL, curR, &dL, &dR);
+
+    // Heading error (cumulative) - erreur de cap cumulée (position)
+    long headingErr = (curL - startL) - (curR - startR);
+    int pwmL=0, pwmR=0;
+    control_driveStraight_PI(st, headingErr, dL, dR, speed, dt, pwmL, pwmR);
+
+    // Automatically handle direction
+        if (!forwardMotion) { pwmL = -pwmL; pwmR = -pwmR; } //invers PWM pour marche arriere
+
+    // Moteurs PWM vitesse
+    motors.applyMotorOutputs(pwmL, pwmR);
+      // Debug print every 1s
+        static unsigned long Lpwm = 0;
+        if (DBG_MOTORS && millis() - Lpwm >= 1000) {
+            Serial.print("PWM L: ");
+            Serial.print(pwmL);
+            Serial.print(" | PWM R: ");
+            Serial.println(pwmR);
+            Lpwm = millis();
+        }
+
   }
+  motors.stopMotors();
+    debugPrintf(DBG_MOTORS, "Target reached\n");
 }
+
+
+
+
 
 // ===========
 
