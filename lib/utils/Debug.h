@@ -44,3 +44,12 @@ inline void debugPrintF(uint8_t feature, const __FlashStringHelper* msg) {
   if (!(debugMask & feature)) return;
   Serial.println(msg);
 }
+
+
+inline void printMillis(uint8_t feature, const char* text, unsigned long t, unsigned long& lastPrint, unsigned long interval = 2000) {
+    if (!(debugMask & feature)) return;
+    if (t - lastPrint >= interval) {
+        Serial.print(text);
+        lastPrint = t;
+    }
+}

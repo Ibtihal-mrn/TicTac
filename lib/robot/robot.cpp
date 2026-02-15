@@ -12,7 +12,7 @@
 #include "utils.h"
 #include "Debug.h"
 
-Motors motors(IN1, IN2, ENA, IN3, IN4, ENB);
+Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
 
 void robot_init() {
@@ -31,9 +31,11 @@ void robot_init() {
 }
 
 void robot_test() {
-  motors.forward(150);
+  motors.forward(150, 150);
   delay(2000);
   motors.stopMotors();
+
+  // while(true);
 }
 
 
@@ -229,34 +231,47 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // motors_stop();
   // baseSpeed = oldBase;
 
+
+  // Setup Timing
   const uint16_t DT_MS = 10;
   const float dt = DT_MS / 1000.0f;
 
+  // Compute Tick Target
   long target = ticks_for_distance_mm(fabs(dist_mm));
+  unsigned long lp1 = 0;
+  printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
 
+  // Encoder Read
   long startL, startR;
   encoders_read(&startL, &startR);
+  unsigned long lp2 = 0;
+  printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
 
   // reset deltas encodeurs pour la vitesse
   prevL = startL;
   prevR = startR;
 
+  // Reset Controller State
   DrivePIState st;
   control_reset(st);
 
   unsigned long tPrev = micros();
 
+  // MAIN LOOP
   while (true) {
-    // période fixe
+    // Fixed 10ms while Loop
     unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
     tPrev += (unsigned long)DT_MS * 1000UL;
 
+    // STOP MOTOR CONDITIONS
     safety_update();
     if (safety_isTriggered()) {
-      // motors_stop();
-
+      motors.stopMotors();
+      // Blocking Loop
       while(safety_isTriggered()){
+        static unsigned long lp3 = 0;
+        printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 2000);
         safety_update();
         safety_clearIfSafe();
         delay(20);
@@ -264,30 +279,86 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
     }
 
 
+    // Encoders Update
     long curL, curR;
     encoders_read(&curL, &curR);
 
     long distTicksL = labs(curL - startL);
     long distTicksR = labs(curR - startR);
-    if ((distTicksL + distTicksR) / 2 >= target) break;
+    if ((distTicksL + distTicksR) / 2 >= target) break; // Target Reached
+    static unsigned long lp4 = 0;
+    printMillis(DBG_MOTORS, "Target not reached...\n", millis(), lp4, 500);
 
-    // deltas (vitesse)
+    // PI CONTROL
     long dL, dR;
-    encoders_computeDelta(curL, curR, &dL, &dR);
+    encoders_computeDelta(curL, curR, &dL, &dR); // deltas (vitesse)
 
     // erreur de cap cumulée (position)
     long headingErr = (curL - startL) - (curR - startR);
-
     int pwmL, pwmR;
     control_driveStraight_PI(st, headingErr, dL, dR, pwmBaseTarget, dt, pwmL, pwmR);
 
     // motors_applySpeeds(pwmL, pwmR);
+
+    static unsigned long lp5 = 0;
+    if (millis() - lp5 >= 2000) {
+        Serial.print("PWM L: ");
+        Serial.print(pwmL);
+        Serial.print(" | PWM R: ");
+        Serial.println(pwmR);
+        lp5 = millis();
+    }
+
+    // motors.forward(pwmL, pwmR);
+    motors.forward(255, 255);
+    
   }
 
-  // motors_stop();
+  // Default (target reached when outside while loop).
+  motors.stopMotors();
 }
 
 
+
+void robot_forward_distance(float dist_mm, int speed) {
+  
+  // Compute Tick Target
+  long target = ticks_for_distance_mm(fabs(dist_mm));
+  unsigned long lp1 = 0;
+  printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
+
+  // Encoder Read
+  long startL, startR;
+  encoders_read(&startL, &startR);
+  unsigned long lp2 = 0;
+  printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
+
+  // reset deltas encodeurs pour la vitesse
+  prevL = startL;
+  prevR = startR;
+
+  // Setup Timing
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
+  unsigned long tPrev = micros();
+
+  while (true) {
+
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    motors.forward(150,150);
+
+    long curL, curR;
+    encoders_read(&curL, &curR);
+
+    long distTicksL = labs(curL - startL);
+    long distTicksR = labs(curR - startR);
+
+    if ((distTicksL + distTicksR) / 2 >= target) break;
+  }
+}
 
 // ===========
 

@@ -1,80 +1,27 @@
-#ifndef MOTORS_H
-#define MOTORS_H
-
+// motors.h
+#pragma once
 #include <Arduino.h>
-#include <Wire.h>
-#include <L298NX2.h>  // Motor Driver
 
 class Motors {
 public:
-    Motors(uint8_t ena, uint8_t in1, uint8_t in2,
-            uint8_t enb, uint8_t in3, uint8_t in4);
+    // Constructor: pass EN/IN pins
+    Motors(uint8_t enaPin, uint8_t in1Pin, uint8_t in2Pin,
+            uint8_t enbPin, uint8_t in3Pin, uint8_t in4Pin);
 
-    void startForward(float distanceCm);
-    void startRotate(float angleDeg);
-
-    void forward(int speed);
-    void backward(int speed);
-    void rotateRight(int speed);
-    void rotateLeft(int speed);
-    // void rotateRight(int leftSpeed, int rightSpeed);
-    // void rotateLeft(int leftSpeed, int rightSpeed);
-    
-    
-
-    // void update(const SensorsData &sensors);
-    bool isDone() const;
+    // Control functions
     void stopMotors();
-    // void setDistancePID(float kp, float ki, float kd);
-    // void setAnglePID(float kp, float ki, float kd);
+    void forward(float leftSpeed, float rightSpeed);
+    void backward(float leftSpeed, float rightSpeed);
+    void rotateRight(float speed);
+    void rotateLeft(float speed);
+
+    // Directly apply PID/other outputs
+    void applyMotorOutputs(float leftCmd, float rightCmd);
 
 private:
-    L298NX2 motors; // ONLY pass IN pins, not EN (library bug)
-    uint8_t enaPin_;
-    uint8_t enbPin_;
-    // PID pidDistance;
-    // PID pidAngle;
+    uint8_t enaPin_, enbPin_;
+    uint8_t in1_, in2_, in3_, in4_;
 
-    // MovementTarget target;
-
-    unsigned long lastUpdateUs;
-    float startDistance, startYaw;
-
-    // void resetPID(PID &pid);
-    // float computePID(PID &pid, float error, float dt, 
-    //         float &pTerm, float &iTerm, float &dTerm);
-
-    void applyMotorOutputs(float leftCmd, float rightCmd);
-    
+    void setMotorLeftSpeed(float speed);
+    void setMotorRightSpeed(float speed);
 };
-
-
-
-
-// #include <Adafruit_MotorShield.h>
-
-// ---------- MOTEURS ADATRUFS ----------
-// extern Adafruit_MotorShield AFMS;
-// extern Adafruit_DCMotor *motorL;
-// extern Adafruit_DCMotor *motorR;
-
-// // inverser si nécessaire
-// extern bool invertLeft;
-// extern bool invertRight;
-
-// // ---------- PARAMETRES ----------
-// extern int baseSpeed;  // vitesse de base
-// extern float Kp;       // gain correction trajectoire
-
-// extern int trimL;
-// extern int trimR;
-
-// void motors_init(void);
-// void motors_applySpeeds(int speedL, int speedR);
-// void motors_forward(int speedL, int speedR);
-// void motors_backward(int speedL, int speedR);
-// void motors_stop();
-// void motors_rotateRight(int speed);
-// void motors_rotateLeft(int speed);
-
-#endif
