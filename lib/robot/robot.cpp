@@ -2,13 +2,17 @@
 #include "../../src/config.h"
 #include "../../src/globals.h"
 
-#include "encoders.h"
+
 #include "motors.h"
+#include "encoders.h"
+#include "ultrasonic.h"
+#include "EmergencyButton.h"
+#include "imu.h"
+
 #include "control.h"
 #include "kinematics.h"
-#include "imu.h"
 #include "safety.h"
-#include "ultrasonic.h"
+
 #include "utils.h"
 #include "Debug.h"
 
@@ -16,8 +20,11 @@ Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
 
 void robot_init() {
+  // Encoders
   encoders_init();
-  // ultrasonic_init(13, 10);  // trig, echo
+  // Ultrasonic init fait dans ultrasonic.cpp
+  
+  emergencyButton_init();
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
@@ -30,6 +37,9 @@ void robot_init() {
   // }
 }
 
+void robot_stop(){ 
+  motors.stopMotors(); 
+}
 void robot_test() {
   motors.forward(150, 150);
   delay(2000);
@@ -38,8 +48,99 @@ void robot_test() {
   // while(true);
 }
 
+// AVANT et ARRIERE (+ , -)
+void driveDistancePID(float distance_mm, int speed) {
+  
+  // --- Determine direction ---
+    bool forwardMotion = (distance_mm >= 0);
+    long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
+  unsigned long lp1 = 0;
+  printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
 
 
+  // --- Encoder Read Start Values ---
+  long startL, startR;
+  encoders_read(&startL, &startR);
+  prevL = startL;
+  prevR = startR;
+  unsigned long lp2 = 0;
+  printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
+
+  // --- riveDistancePID(-1000, 254);PID Setup ---
+  DrivePIState st;
+  control_reset(st);
+
+  // Setup Timing
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
+  unsigned long tPrev = micros();
+
+  while (true) {
+
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    // STOP MOTOR CONDITIONS
+    if (safety_update()) {
+      motors.stopMotors();
+      // Blocking Loop
+      while(safety_update()){
+        static unsigned long lp3 = 0; printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 1000);
+        // safety_update();
+        // safety_clearIfSafe();
+        // delay(20);
+      }
+    }
+
+
+
+    // --- Read Current encoders Values ---
+    long curL, curR;
+    encoders_read(&curL, &curR);
+
+    // --- Compute distance traveled ---
+    long distTicksL = labs(curL - startL);
+    long distTicksR = labs(curR - startR);
+    long avgDist = (distTicksL + distTicksR) / 2;
+    if (avgDist >= targetTicks) break; // Target Reached
+
+    // --- Compute deltas for PID ---
+    long dL, dR;
+    encoders_computeDelta(curL, curR, &dL, &dR);
+
+    // Heading error (cumulative) - erreur de cap cumulée (position)
+    long headingErr = (curL - startL) - (curR - startR);
+    int pwmL=0, pwmR=0;
+    control_driveStraight_PI(st, headingErr, dL, dR, speed, dt, pwmL, pwmR);
+
+    // Automatically handle direction
+        if (!forwardMotion) { pwmL = -pwmL; pwmR = -pwmR; } //invers PWM pour marche arriere
+
+    // Moteurs PWM vitesse
+    motors.applyMotorOutputs(pwmL, pwmR);
+      // Debug print every 1s
+        static unsigned long Lpwm = 0;
+        if (DBG_MOTORS && millis() - Lpwm >= 1000) {
+            Serial.print("PWM L: ");
+            Serial.print(pwmL);
+            Serial.print(" | PWM R: ");
+            Serial.println(pwmR);
+            Lpwm = millis();
+        }
+
+  }
+  
+  // Movement complete - stop motors
+  motors.stopMotors();
+    debugPrintf(DBG_MOTORS, "Target reached\n");
+}
+
+
+
+
+
+// -------------
 void robot_step() { // On va aussi plus l'utiliser normalement
   long left, right;
   encoders_read(&left, &right);
@@ -52,8 +153,6 @@ void robot_step() { // On va aussi plus l'utiliser normalement
 
   // motors_applySpeeds(speedL, speedR);
 }
-
-void robot_stop(){ motors.stopMotors(); }
 
 void robot_rotate(float angle_deg, int speed){
   //   long targetTicks = ticks_for_rotation_deg(angle_deg);
@@ -314,81 +413,6 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // Default (target reached when outside while loop).
   motors.stopMotors();
 }
-
-
-// AVANT et ARRIERE (+ , -)
-void driveDistancePID(float distance_mm, int speed) {
-  
-  // --- Determine direction ---
-    bool forwardMotion = (distance_mm >= 0);
-    long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
-  unsigned long lp1 = 0;
-  printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
-
-
-  // --- Encoder Read Start Values ---
-  long startL, startR;
-  encoders_read(&startL, &startR);
-  prevL = startL;
-  prevR = startR;
-  unsigned long lp2 = 0;
-  printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
-
-  // --- PID Setup ---
-  DrivePIState st;
-  control_reset(st);
-
-  // Setup Timing
-  const uint16_t DT_MS = 10;
-  const float dt = DT_MS / 1000.0f;
-  unsigned long tPrev = micros();
-
-  while (true) {
-
-    unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
-    tPrev += (unsigned long)DT_MS * 1000UL;
-
-    // --- Read Current encoders Values ---
-    long curL, curR;
-    encoders_read(&curL, &curR);
-
-    // --- Compute distance traveled ---
-    long distTicksL = labs(curL - startL);
-    long distTicksR = labs(curR - startR);
-    long avgDist = (distTicksL + distTicksR) / 2;
-    if (avgDist >= targetTicks) break; // Target Reached
-
-    // --- Compute deltas for PID ---
-    long dL, dR;
-    encoders_computeDelta(curL, curR, &dL, &dR);
-
-    // Heading error (cumulative) - erreur de cap cumulée (position)
-    long headingErr = (curL - startL) - (curR - startR);
-    int pwmL=0, pwmR=0;
-    control_driveStraight_PI(st, headingErr, dL, dR, speed, dt, pwmL, pwmR);
-
-    // Automatically handle direction
-        if (!forwardMotion) { pwmL = -pwmL; pwmR = -pwmR; } //invers PWM pour marche arriere
-
-    // Moteurs PWM vitesse
-    motors.applyMotorOutputs(pwmL, pwmR);
-      // Debug print every 1s
-        static unsigned long Lpwm = 0;
-        if (DBG_MOTORS && millis() - Lpwm >= 1000) {
-            Serial.print("PWM L: ");
-            Serial.print(pwmL);
-            Serial.print(" | PWM R: ");
-            Serial.println(pwmR);
-            Lpwm = millis();
-        }
-
-  }
-  motors.stopMotors();
-    debugPrintf(DBG_MOTORS, "Target reached\n");
-}
-
-
 
 
 

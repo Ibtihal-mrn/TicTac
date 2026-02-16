@@ -1,17 +1,19 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#include "config.h"
-#include "globals.h"
-#include "utils.h"
-#include "Debug.h"
-
-#include "encoders.h"
-#include "motors.h"
-#include "control.h"
+// Hardware
 #include "robot.h"
 #include "bras.h"
-#include "imu.h"
+
+// Debug prints
+#include "encoders.h"
+#include "ultrasonic.h"
+#include "utils.h"
+#include "Debug.h"
+#include "config.h"
+
+
+
 
 // ------ helpers ------
 void imAlive() {
@@ -30,10 +32,9 @@ void setup()
   // Serial.begin(115200);
   debugInit(115200,    // does Serial.begin()
     DBG_FSM | 
-    DBG_MOTORS
-    // DBG_TASKMANAGER     // comment DBG_ to deactivate its related prints
-    // DBG_SENSORS |
-    // DBG_COMMS |
+    DBG_MOTORS |
+    DBG_SENSORS 
+    // DBG_COMMS |        // comment DBG_ to deactivate its related prints
     // DBG_ENCODER |
     // DBG_LAUNCH_TGR
   );
@@ -65,7 +66,9 @@ void loop()
 
   imAlive();
   printEncodersVal();
+  printUltrasonicVal();
 
+  if (true) return;
   if (!runSequence) { return; }
 
   // Servo Test

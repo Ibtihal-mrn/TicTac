@@ -3,13 +3,21 @@
 
 #include <Arduino.h>
 
-// Initialisation du capteur
-void ultrasonic_init(int trigPin, int echoPin);
 
-// Lecture de la distance en cm
-int ultrasonic_readDistance();
+bool ultrasonic_isObstacle();
 
-// Test si obstacle sous un seuil
-bool ultrasonic_isObstacle(int distance, int threshold);
+int8_t ultrasonic_read();
+
+// ------ Debug ------
+void printUltrasonicVal();
+
+// // Initialisation du capteur
+// void ultrasonic_init(int trigPin, int echoPin);
+
+// // Lecture de la distance en cm
+// int ultrasonic_readDistance();
+
+// // Test si obstacle sous un seuil
+// bool ultrasonic_isObstacle(int distance, int threshold);
 
 #endif
