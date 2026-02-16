@@ -48,10 +48,10 @@ void setup()
   // i2c_scanner();
 
 
-  // Instanciate Drivers
-  // ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
-  // ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
-  // bras_init();            // must run FIRST
+  // Init Hardware et Robot
+  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
+  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
+  bras_init();            // must run FIRST
   robot_init();
 
   Serial.println("Setup Done.");
@@ -66,17 +66,20 @@ void loop()
   imAlive();
   printEncodersVal();
 
+  if (!runSequence) { return; }
 
   // Servo Test
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
+  bras_deployer();
+  delay(2000);
+  bras_retracter();
+  delay(2000);
+  bras_deployer();
+  delay(2000);
+  bras_retracter();
+  delay(2000);
 
-  if (!runSequence) { return; }
-  // robot_test();
-  // robot_move_distance(1255, 140);
-  driveDistancePID(500, 100);
+  driveDistancePID(-1000, 254);
+  driveDistancePID(500, 254);
   // -----------------------------------
   // --------- Carré sans gyro ---------
   // -----------------------------------

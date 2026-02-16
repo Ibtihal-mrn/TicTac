@@ -47,10 +47,6 @@
 //      AVOID STRAP_45 (VDD_SPI) and STRAP_46 (boot mode/ROM print) : never pull HIGH at power-up, avoid strong pull-ups
 
 
-
-
-
-
 // 
 #define MATCH_DURATION_MS 50000 
 
