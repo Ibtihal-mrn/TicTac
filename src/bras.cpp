@@ -9,7 +9,7 @@ const int PIN_DROIT  = 12;   // bras droit
 const int PIN_GAUCHE = 8;  // bras gauche
 
 int angleInitialgauche = -300;
-int angleFinalgauche   = 70;
+int angleFinalgauche   = 90;
 int angleInitialdroit  = 100;
 int angleFinaldroit    = 20;
 
