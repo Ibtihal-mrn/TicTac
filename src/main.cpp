@@ -7,6 +7,7 @@
 #include "kinematics.h"
 #include "emergencyButton.h"
 #include "ultrasonic.h"   // Capteur ultrason
+#include "relaisRobot.h"
 
 // Dernières positions des encodeurs
 static long last_left = 0;
@@ -25,6 +26,8 @@ void setup() {
     bras_init();
     emergencyButton_init();
     ultrasonic_init(13, 10);  // trig, echo
+    relaisRobot_init(6, true); // broche 2, active LOW
+
 
     encoders_read(&last_left, &last_right);
 }
@@ -106,6 +109,7 @@ bool rotateSafe(float angle_deg, int speed) {
 
 void loop() {
     static bool runSequence = true;  
+    static bool relaisAllume = false; // état du relais
 
     if (!runSequence) return;
 
@@ -116,11 +120,9 @@ void loop() {
 
     if (emergencyStopActive || obstacleStopActive) {
         robot_stop();
-        // Rester arrêté tant que bouton ou obstacle présent
         while (emergencyButton_isPressed() || (ultrasonic_readDistance() > 0 && ultrasonic_readDistance() <= SEUIL_OBSTACLE)) {
             delay(50);
         }
-        // Réinitialisation
         emergencyStopActive = false;
         obstacleStopActive = false;
         encoders_read(&last_left, &last_right);
@@ -138,13 +140,27 @@ void loop() {
     bras_deployer();
     delay(2000);
 
-    // --- Rotation ---
+    // --- Première rotation ---
     if (!rotateSafe(-230, 140)) return;
-    delay(2000);
 
-    // --- Déplacer robot 2 ---
+    // Allumer le relais après la première rotation
+    if (!relaisAllume) {
+        relaisRobot_on();
+        relaisAllume = true;
+    }
+
+    // --- Déplacer robot intermédiaire ---
     if (!moveDistanceSafe(1000, 140)) return;
     delay(2000);
+
+    // --- Deuxième rotation ---
+    if (!rotateSafe(-230, 140)) return;
+
+    // Éteindre le relais après la deuxième rotation
+    if (relaisAllume) {
+        relaisRobot_off();
+        relaisAllume = false;
+    }
 
     // --- Rétracter bras ---
     bras_retracter();
