@@ -8,17 +8,17 @@ long prevR = 0;
 
 // ---------- INTERRUPTIONS ----------
 void ISR_left(void) {
-  //if (digitalRead(ENC_L_A))
-  ticksL++;
-  // else
-  //   ticksL--;
+  bool A = digitalRead(ENC_L_A);
+  bool B = digitalRead(ENC_L_B);
+  if (A == B) ticksL++;
+  else ticksL--;
 }
 
 void ISR_right(void) {
-  // if (digitalRead(ENC_R_A))
-  ticksR++;
-  // else
-  //   ticksR--;
+  bool A = digitalRead(ENC_R_A);
+  bool B = digitalRead(ENC_R_B);
+  if (A == B) ticksR--;
+  else ticksR++;
 }
 
 void encoders_init(void) {
@@ -45,3 +45,20 @@ void encoders_computeDelta(long left, long right, long *dL, long *dR) {
   prevL = left;
   prevR = right;
 }
+
+
+// ------ Debug ------
+void printEncodersVal() {
+  static unsigned long millis_print = 0;
+  if(millis() - millis_print >= 2000) { 
+    long left, right;
+    encoders_read(&left, &right);
+    Serial.print("Encoders: L=");
+    Serial.print(left);
+    Serial.print(" R=");
+    Serial.println(right);
+
+    millis_print = millis(); 
+  }
+}
+

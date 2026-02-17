@@ -1,171 +1,86 @@
 #include <Arduino.h>
-#include "encoders.h"
-#include "motors.h"
-#include "control.h"
+#include <Wire.h>
+
+// Hardware
 #include "robot.h"
 #include "bras.h"
-#include "kinematics.h"
-#include "emergencyButton.h"
-#include "ultrasonic.h"   // Capteur ultrason
-#include "relaisRobot.h"
 
-// Dernières positions des encodeurs
-static long last_left = 0;
-static long last_right = 0;
+// Debug prints
+#include "encoders.h"
+#include "ultrasonic.h"
+#include "utils.h"
+#include "Debug.h"
+#include "config.h"
 
-// Latch d'arrêt d'urgence
-static bool emergencyStopActive = false;
+// ------ helpers ------
+// void imAlive()
+// {
+//   static unsigned long millis_print = 0;
+//   if (millis() - millis_print >= 2000)
+//   {
+//     Serial.println("I'm alive");
+//     millis_print = millis();
+//   }
+// }
 
-// Latch arrêt obstacle
-static bool obstacleStopActive = false;
-const int SEUIL_OBSTACLE = 40; // cm
+// ========= SETUP ===============
+void setup()
+{
+  // Serial.begin(115200);
+  debugInit(115200, // does Serial.begin()
+            DBG_FSM |
+                DBG_MOTORS |
+                DBG_SENSORS
+            // DBG_COMMS |        // comment DBG_ to deactivate its related prints
+            // DBG_ENCODER |
+            // DBG_LAUNCH_TGR
+  );
 
-void setup() {
-    Serial.begin(9600);
-    robot_init();
-    bras_init();
-    emergencyButton_init();
-    ultrasonic_init(13, 10);  // trig, echo
-    relaisRobot_init(6, true); // broche 2, active LOW
+  // // I2C Init.
+  Wire.begin(6, 7); // SDA, SCL
+  Wire.setClock(100000);
+  delay(200);
 
+  // Utils.h
+  printEsp32Info();
+  // i2c_scanner();
 
-    encoders_read(&last_left, &last_right);
+  // Init Hardware et Robot
+  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
+  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
+  bras_init();                // must run FIRST
+  robot_init();
+
+  Serial.println("Setup Done.");
 }
 
-// --- WRAPPER pour déplacement avec interruption d'urgence ---
-bool moveDistanceSafe(float dist_mm, int speed) {
-    long target = ticks_for_distance_mm(abs(dist_mm));
-    long startL, startR;
-    encoders_read(&startL, &startR);
-    prevL = startL;
-    prevR = startR;
+void loop()
+{
+  static bool runSequence = true;
 
-    while (true) {
-        long curL, curR;
-        encoders_read(&curL, &curR);
+  // imAlive();
+  // printEncodersVal();
+  // printUltrasonicVal();
 
-        // Lire la distance une seule fois
-        int distance = ultrasonic_readDistance();
-        bool stopObstacle = (distance > 0 && distance <= SEUIL_OBSTACLE);
+  // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
+  if (!runSequence)
+  {
+    return;
+  }
 
-        // Vérification d'urgence
-        if (emergencyButton_isPressed() || stopObstacle) {
-            robot_stop();
-            emergencyStopActive = emergencyButton_isPressed();
-            obstacleStopActive = stopObstacle;
-            return false;  // déplacement interrompu
-        }
+  // Servo Test
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
 
-        long distTicksL = labs(curL - startL);
-        long distTicksR = labs(curR - startR);
-        if ((distTicksL + distTicksR) / 2 >= target) break;
+  driveDistancePID(-1000, 254);
+  driveDistancePID(500, 254);
 
-        long dL, dR;
-        encoders_computeDelta(curL, curR, &dL, &dR);
 
-        int speedL, speedR;
-        control_computeSpeeds(dL, dR, speedL, speedR);
-
-        motors_applySpeeds(speedL, speedR);
-        delay(40);
-    }
-    motors_stop();
-    return true;
-}
-
-// --- WRAPPER pour rotation avec interruption d'urgence ---
-bool rotateSafe(float angle_deg, int speed) {
-    long targetTicks = ticks_for_rotation_deg(angle_deg);
-    long startL, startR;
-    encoders_read(&startL, &startR);
-
-    if (angle_deg > 0) motors_rotateRight(speed);
-    else motors_rotateLeft(speed);
-
-    while (true) {
-        long curL, curR;
-        encoders_read(&curL, &curR);
-
-        // Lire la distance une seule fois
-        int distance = ultrasonic_readDistance();
-        bool stopObstacle = (distance > 0 && distance <= SEUIL_OBSTACLE);
-
-        // Vérification d'urgence
-        if (emergencyButton_isPressed() || stopObstacle) {
-            robot_stop();
-            emergencyStopActive = emergencyButton_isPressed();
-            obstacleStopActive = stopObstacle;
-            return false; // rotation interrompue
-        }
-
-        long dL = labs(curL - startL);
-        long dR = labs(curR - startR);
-        if ((dL + dR) / 2 >= labs(targetTicks)) break;
-        delay(40);
-    }
-    motors_stop();
-    return true;
-}
-
-void loop() {
-    static bool runSequence = true;  
-    static bool relaisAllume = false; // état du relais
-
-    if (!runSequence) return;
-
-    // Vérification d'urgence avant toute action
-    int distance = ultrasonic_readDistance();
-    emergencyStopActive = emergencyButton_isPressed();
-    obstacleStopActive = (distance > 0 && distance <= SEUIL_OBSTACLE);
-
-    if (emergencyStopActive || obstacleStopActive) {
-        robot_stop();
-        while (emergencyButton_isPressed() || (ultrasonic_readDistance() > 0 && ultrasonic_readDistance() <= SEUIL_OBSTACLE)) {
-            delay(50);
-        }
-        emergencyStopActive = false;
-        obstacleStopActive = false;
-        encoders_read(&last_left, &last_right);
-        return;
-    }
-
-    // --- Déplacer robot 1 ---
-    if (!moveDistanceSafe(2000, 140)) return;
-
-    Serial.print("ticksL="); Serial.print(ticksL);
-    Serial.print(" ticksR="); Serial.println(ticksR);
-    delay(2000);
-
-    // --- Déployer bras ---
-    bras_deployer();
-    delay(2000);
-
-    // --- Première rotation ---
-    if (!rotateSafe(-230, 140)) return;
-
-    // Allumer le relais après la première rotation
-    if (!relaisAllume) {
-        relaisRobot_on();
-        relaisAllume = true;
-    }
-
-    // --- Déplacer robot intermédiaire ---
-    if (!moveDistanceSafe(1000, 140)) return;
-    delay(2000);
-
-    // --- Deuxième rotation ---
-    if (!rotateSafe(-230, 140)) return;
-
-    // Éteindre le relais après la deuxième rotation
-    if (relaisAllume) {
-        relaisRobot_off();
-        relaisAllume = false;
-    }
-
-    // --- Rétracter bras ---
-    bras_retracter();
-
-    // Arrêt final
-    robot_stop();
-    runSequence = false;
+  runSequence = false;
 }
