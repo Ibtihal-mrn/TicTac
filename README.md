@@ -30,8 +30,8 @@ White : Encoder B output.
 
 Todo :
 
-- Encoders
-- Steppers
+- Encoders ok
+- Steppers ok
 - Ultrasonic sensors x3
 - LiDars
 

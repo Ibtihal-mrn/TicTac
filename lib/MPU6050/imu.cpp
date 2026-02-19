@@ -13,7 +13,6 @@ static const uint8_t REG_GYRO_ZOUT_H = 0x47;
 
 // Sensibilité gyro pour ±250°/s : 131 LSB/(deg/s)
 static const float GYRO_SENS_250 = 131.0f;
-
 static float gyroZ_bias_dps = 0.0f;
 
 static bool writeReg(uint8_t reg, uint8_t val) {
@@ -85,3 +84,6 @@ float imu_readGyroZ_dps() {
   float dps = raw / GYRO_SENS_250;
   return dps - gyroZ_bias_dps;
 }
+
+
+

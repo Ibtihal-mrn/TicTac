@@ -28,13 +28,13 @@ void robot_init() {
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
-  // if (!imu_init()) { Serial.println("MPU6050 FAIL.");
-  // } else {
-  //   delay(200);
-  //   Serial.println("MPU6050 connected.");
-  //   imu_calibrate(600, 2); // ~1.2s, robot immobile
-  //   // Serial.println("IMU calibrated");
-  // }
+  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
+  } else {
+    delay(200);
+    Serial.println("MPU6050 connected.");
+    imu_calibrate(600, 2); // ~1.2s, robot immobile
+    // Serial.println("IMU calibrated");
+  }
 }
 
 void robot_stop(){ 

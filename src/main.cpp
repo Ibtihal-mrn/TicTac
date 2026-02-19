@@ -68,7 +68,7 @@ void loop()
   printEncodersVal();
   printUltrasonicVal();
 
-  if (true) return;
+  if (false) return;
   if (!runSequence) { return; }
 
   // Servo Test

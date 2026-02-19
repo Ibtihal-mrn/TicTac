@@ -15,6 +15,7 @@
 #define PSRAM_IO35 35  // reserved for Octal SPI PSRAM
 #define PSRAM_IO36 36
 #define PSRAM_IO37 37
+
 #define STRAP_45 45   // Strapping: VDD_SPI voltage. NEVER pull HIGH at power-up.
 #define STRAP_46 46   // Strapping: boot mode/ROM print. Avoid strong pull-ups.
 #define IO47_1V8  47
