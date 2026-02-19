@@ -81,15 +81,19 @@ void driveDistancePID(float distance_mm, int speed) {
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
     tPrev += (unsigned long)DT_MS * 1000UL;
 
+    Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : "."); 
+
     // STOP MOTOR CONDITIONS
-    if (safety_update()) {
+    static bool safeFlag = safety_update();
+    if (safeFlag) {
+      Serial.println("*** DRIVE SAFETY STOP ***");
       motors.stopMotors();
       // Blocking Loop
-      while(safety_update()){
+      while(safeFlag){
         static unsigned long lp3 = 0; printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 1000);
-        // safety_update();
+        safeFlag = safety_update();
         // safety_clearIfSafe();
-        // delay(20);
+        delay(20);
       }
     }
 
@@ -248,11 +252,11 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    safety_update();
-    if (safety_isTriggered()) {
-      // motors_stop();
-      return;   // arrêt immédiat
-    }
+    // safety_update();
+    // if (safety_isTriggered()) {
+    //   // motors_stop();
+    //   return;   // arrêt immédiat
+    // }
 
 
     // lecture gyro

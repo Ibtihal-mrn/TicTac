@@ -12,16 +12,27 @@ static int us_read_delay_ms = 500; // délai entre lectures du sonar (throttling
 
 
 
-bool safety_update() {
-  // 1. bouton (rapide)
-  if (emergencyButton_isPressed()) return true;
+// bool safety_update() {
+//   // 1. bouton (rapide)
+//   if (emergencyButton_isPressed()) return true;
 
-  // 2. ultrason (lent → throttling)
-  if (millis() - us_millis >= us_read_delay_ms && ultrasonic_isObstacle()) {  // print distance si DBG_SENSORS dans setup()
-    us_millis = millis(); 
-    return true;
-  }
-  return false;
+//   // 2. ultrason (lent → throttling)
+//   if (millis() - us_millis >= us_read_delay_ms && ultrasonic_isObstacle()) {  // print distance si DBG_SENSORS dans setup()
+//     us_millis = millis(); 
+//     return true;
+//   }
+//   return false;
+// }
+
+bool safety_update() {
+    if (emergencyButton_isPressed()) return true;
+    
+    static unsigned long lastUS = 0;
+    if (millis() - lastUS >= 100) {  // ← 10Hz
+        lastUS = millis();
+        return ultrasonic_isObstacle();
+    }
+    return false;
 }
 
 

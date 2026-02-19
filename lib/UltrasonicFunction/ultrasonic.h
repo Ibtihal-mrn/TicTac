@@ -2,6 +2,7 @@
 #define ULTRASONIC_H
 
 #include <Arduino.h>
+#include <NewPing.h>
 
 
 bool ultrasonic_isObstacle();
