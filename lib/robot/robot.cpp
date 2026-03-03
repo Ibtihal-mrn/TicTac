@@ -28,13 +28,13 @@ void robot_init() {
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
-  // if (!imu_init()) { Serial.println("MPU6050 FAIL.");
-  // } else {
-  //   delay(200);
-  //   Serial.println("MPU6050 connected.");
-  //   imu_calibrate(600, 2); // ~1.2s, robot immobile
-  //   // Serial.println("IMU calibrated");
-  // }
+  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
+  } else {
+    delay(200);
+    Serial.println("MPU6050 connected.");
+    imu_calibrate(600, 2); // ~1.2s, robot immobile
+    // Serial.println("IMU calibrated");
+  }
 }
 
 void robot_stop(){ 
@@ -76,22 +76,31 @@ void driveDistancePID(float distance_mm, int speed) {
   unsigned long tPrev = micros();
 
   while (true) {
-
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
     tPrev += (unsigned long)DT_MS * 1000UL;
 
+    // Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : "."); 
+
     // STOP MOTOR CONDITIONS
     if (safety_update()) {
+      static unsigned long lp3 = 0; 
+      printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 2000);
       motors.stopMotors();
-      // Blocking Loop
-      while(safety_update()){
-        static unsigned long lp3 = 0; printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 1000);
-        // safety_update();
-        // safety_clearIfSafe();
-        // delay(20);
-      }
+      continue;
     }
+    // static bool safeFlag = safety_update();
+    // if (safeFlag) {
+    //   Serial.println("*** DRIVE SAFETY STOP ***");
+    //   motors.stopMotors();
+    //   // Blocking Loop
+    //   while(safeFlag){
+    //     static unsigned long lp3 = 0; printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 1000);
+    //     safeFlag = safety_update();
+    //     // safety_clearIfSafe();
+    //     delay(20);
+    //   }
+    // }
 
 
 
@@ -128,7 +137,6 @@ void driveDistancePID(float distance_mm, int speed) {
             Serial.println(pwmR);
             Lpwm = millis();
         }
-
   }
   
   // Movement complete - stop motors
@@ -248,11 +256,11 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    safety_update();
-    if (safety_isTriggered()) {
-      // motors_stop();
-      return;   // arrêt immédiat
-    }
+    // safety_update();
+    // if (safety_isTriggered()) {
+    //   // motors_stop();
+    //   return;   // arrêt immédiat
+    // }
 
 
     // lecture gyro

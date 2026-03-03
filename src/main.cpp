@@ -28,6 +28,15 @@ void imAlive()
     millis_print = millis();
   }
 }
+void imAlive()
+{
+  static unsigned long millis_print = 0;
+  if (millis() - millis_print >= 2000)
+  {
+    Serial.println("I'm alive");
+    millis_print = millis();
+  }
+}
 
 // ========= SETUP ===============
 // const int RELAY_PIN = 41;
@@ -88,7 +97,7 @@ void loop()
 
   imAlive();
   printEncodersVal();
-  printUltrasonicVal();
+  //printUltrasonicVal();
 
   // <<<<<<< HEAD
   //   if (false) return;
@@ -131,11 +140,7 @@ void loop()
   lastSwitchState = currentSwitchState;
 }
 
-  // Servo Test
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
+  //Servo Test
   // bras_deployer();
   // delay(2000);
   // bras_retracter();
