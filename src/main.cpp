@@ -4,6 +4,7 @@
 // Hardware
 #include "robot.h"
 #include "bras.h"
+#include "Relais.h"
 
 // Debug prints
 #include "encoders.h"
@@ -24,6 +25,14 @@
 // }
 
 // ========= SETUP ===============
+const int RELAY_PIN = 41;
+const bool RELAY_ACTIVE_LOW = true;
+
+const int SWITCH_PIN = 2;
+
+bool lastSwitchState = HIGH;   // INPUT_PULLUP
+bool sequenceDone = false;     // Pour éviter répétition
+
 void setup()
 {
   // Serial.begin(115200);
@@ -35,6 +44,13 @@ void setup()
             // DBG_ENCODER |
             // DBG_LAUNCH_TGR
   );
+
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
+  lastSwitchState = digitalRead(SWITCH_PIN);
+  relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
+
+  // Relais ON au démarrage
+  relais_on();
 
   // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
@@ -63,10 +79,33 @@ void loop()
   // printUltrasonicVal();
 
   // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  if (!runSequence)
+  //if (!runSequence)
+  //{
+    //return;
+  //}
+  if (sequenceDone) return;
+
+  bool currentSwitchState = digitalRead(SWITCH_PIN);
+
+  // Détection appui (HIGH → LOW)
+  if (lastSwitchState == HIGH && currentSwitchState == LOW)
   {
-    return;
+      Serial.println("Switch activé !");
+
+      // ➜ Avancer 10 cm
+      driveDistancePID(100, 200);
+
+      //  Relais OFF
+      relais_off();
+
+      // ➜ Avancer encore 10 cm
+      driveDistancePID(100, 200);
+
+      sequenceDone = true; // éviter répétition
   }
+
+  lastSwitchState = currentSwitchState;
+}
 
   // Servo Test
   // bras_deployer();
@@ -78,9 +117,8 @@ void loop()
   // bras_retracter();
   // delay(2000);
 
-  driveDistancePID(-1000, 254);
-  driveDistancePID(500, 254);
+  //driveDistancePID(-1000, 254);
+  //driveDistancePID(500, 254);
 
 
-  runSequence = false;
-}
+  //runSequence = false;
