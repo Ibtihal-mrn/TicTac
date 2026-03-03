@@ -1,5 +1,5 @@
-#ifndef ULTRASONIC_H
-#define ULTRASONIC_H
+#ifndef ULTRASONIC_FUNCTION_H
+#define ULTRASONIC_FUNCTION_H
 
 #include <Arduino.h>
 // #include <NewPing.h>

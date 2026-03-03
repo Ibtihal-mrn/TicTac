@@ -1,7 +1,8 @@
-#include "ultrasonic.h"
+#include "ultrasonic_function.h"
 #include <Ultrasonic.h>
 #include "../../src/config.h"
 #include "../utils/Debug.h"
+#include "BLEBridge.h"
 
 
 // static int PIN_TRIG = US_TRIG_PIN;
@@ -101,9 +102,9 @@ void printUltrasonicVal()
     if (millis() - millis_print >= 2000)
     {
         int8_t val = ultrasonic_read();
-        Serial.print("Ultrasonic: ");
-        Serial.print(val);
-        Serial.println(" cm");
+        bleSerial.print("Ultrasonic: ");
+        bleSerial.print(val);
+        bleSerial.println(" cm");
 
         millis_print = millis();
     }

@@ -1,4 +1,5 @@
 #include "encoders.h"
+#include "BLEBridge.h"
 
 volatile long ticksL = 0;
 volatile long ticksR = 0;
@@ -53,10 +54,10 @@ void printEncodersVal() {
   if(millis() - millis_print >= 2000) { 
     long left, right;
     encoders_read(&left, &right);
-    Serial.print("Encoders: L=");
-    Serial.print(left);
-    Serial.print(" R=");
-    Serial.println(right);
+    bleSerial.print("Encoders: L=");
+    bleSerial.print(left);
+    bleSerial.print(" R=");
+    bleSerial.println(right);
 
     millis_print = millis(); 
   }

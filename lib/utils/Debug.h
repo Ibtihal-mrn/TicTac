@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include "BLEBridge.h"
 
 // Feature bits (one byte)
 #define DBG_FSM           (1<<0)
@@ -31,25 +32,25 @@ inline void debugDisable(uint8_t bits) { debugMask &= ~bits; }
 // Minimum safe formatted print for AVR
 inline void debugPrintf(uint8_t feature, const char *fmt, ...) {
   if (!(debugMask & feature)) return;
-  char buf[48]; // keep small — UNO RAM is tight
+  char buf[128];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
-  Serial.println(buf);
+  bleSerial.println(buf);
 }
 
 // Simple F() friendly print (no formatting)
 inline void debugPrintF(uint8_t feature, const __FlashStringHelper* msg) {
   if (!(debugMask & feature)) return;
-  Serial.println(msg);
+  bleSerial.println(msg);
 }
 
 
 inline void printMillis(uint8_t feature, const char* text, unsigned long t, unsigned long& lastPrint, unsigned long interval = 2000) {
     if (!(debugMask & feature)) return;
     if (t - lastPrint >= interval) {
-        Serial.print(text);
+        bleSerial.print(text);
         lastPrint = t;
     }
 }

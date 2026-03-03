@@ -1,11 +1,12 @@
 #include "robot.h"
 #include "../../src/config.h"
 #include "../../src/globals.h"
+#include "BLEBridge.h"
 
 
 #include "motors.h"
 #include "encoders.h"
-#include "ultrasonic.h"
+#include "ultrasonic_function.h"
 #include "EmergencyButton.h"
 #include "imu.h"
 
@@ -131,10 +132,10 @@ void driveDistancePID(float distance_mm, int speed) {
       // Debug print every 1s
         static unsigned long Lpwm = 0;
         if (DBG_MOTORS && millis() - Lpwm >= 1000) {
-            Serial.print("PWM L: ");
-            Serial.print(pwmL);
-            Serial.print(" | PWM R: ");
-            Serial.println(pwmR);
+            bleSerial.print("PWM L: ");
+            bleSerial.print(pwmL);
+            bleSerial.print(" | PWM R: ");
+            bleSerial.println(pwmR);
             Lpwm = millis();
         }
   }
@@ -406,10 +407,10 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
     static unsigned long lp5 = 0;
     if (millis() - lp5 >= 1000) {
-        Serial.print("PWM L: ");
-        Serial.print(pwmL);
-        Serial.print(" | PWM R: ");
-        Serial.println(pwmR);
+        bleSerial.print("PWM L: ");
+        bleSerial.print(pwmL);
+        bleSerial.print(" | PWM R: ");
+        bleSerial.println(pwmR);
         lp5 = millis();
     }
 
@@ -435,10 +436,10 @@ void hardware_init(Context& ctx) {
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
-  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
+  if (!imu_init()) { bleSerial.println("MPU6050 FAIL.");
   } else {
     delay(200);
-    Serial.println("MPU6050 connected.");
+    bleSerial.println("MPU6050 connected.");
     imu_calibrate(600, 2); // ~1.2s, robot immobile
     // Serial.println("IMU calibrated");
   }

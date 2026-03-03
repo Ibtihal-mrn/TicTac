@@ -2,6 +2,7 @@
 #include "EmergencyButton.h"
 #include "../../src/config.h"
 #include "../../src/globals.h"
+#include "BLEBridge.h"
 
 // #define EBTN_PIN 7 // in config.h
 #define STABLE_READS 3  // pour debounce simple si besoin
@@ -32,10 +33,10 @@ bool emergencyButton_isPressed() {
             changeCount++;
 
             if (changeCount % 2 == 1) {
-                Serial.println("Button pressed");
+                bleSerial.println("Button pressed");
                 return true; // état logique = pressed
             } else {
-                Serial.println("Button released");
+                bleSerial.println("Button released");
                 return false; // état logique = released
             }
         }

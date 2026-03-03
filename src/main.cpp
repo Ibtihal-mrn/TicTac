@@ -1,13 +1,16 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+// ── BLE Bridge (réception logs sur PC via BLE) ──────────────────────────────
+#include "BLEBridge.h"
+
 // Hardware
 #include "robot.h"
 #include "bras.h"
 
 // Debug prints
 #include "encoders.h"
-#include "ultrasonic.h"
+#include "ultrasonic_function.h"
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
@@ -25,7 +28,7 @@ void imAlive()
   static unsigned long millis_print = 0;
   if (millis() - millis_print >= 2000)
   {
-    Serial.println("I'm alive");
+    bleSerial.println("I'm alive");
     millis_print = millis();
   }
 }
@@ -43,6 +46,9 @@ void setup()
             // DBG_LAUNCH_TGR
   );
 
+  // ── BLE Bridge : démarrer EN PREMIER pour que la queue existe ──────────────
+  bleBridge.begin(BLE_DEVICE_NAME);
+
   // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
   Wire.setClock(100000);
@@ -58,12 +64,15 @@ void setup()
   bras_init();                // must run FIRST
   robot_init();
 
-  Serial.println("Setup Done.");
+  bleSerial.println("Setup Done.");
 }
 
 void loop()
 {
   static bool runSequence = true;
+
+  // ── BLE Bridge : flush logs en attente vers le PC ──────────────────────────
+  bleBridge.update();
 
   imAlive();
   printEncodersVal();
