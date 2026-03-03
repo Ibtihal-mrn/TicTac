@@ -85,24 +85,10 @@ void driveDistancePID(float distance_mm, int speed) {
     // STOP MOTOR CONDITIONS
     if (safety_update()) {
       static unsigned long lp3 = 0; 
-      printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 2000);
       motors.stopMotors();
+      if (DBG_MOTORS) Serial0.print("Safety triggered\n");
       continue;
     }
-    // static bool safeFlag = safety_update();
-    // if (safeFlag) {
-    //   Serial.println("*** DRIVE SAFETY STOP ***");
-    //   motors.stopMotors();
-    //   // Blocking Loop
-    //   while(safeFlag){
-    //     static unsigned long lp3 = 0; printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 1000);
-    //     safeFlag = safety_update();
-    //     // safety_clearIfSafe();
-    //     delay(20);
-    //   }
-    // }
-
-
 
     // --- Read Current encoders Values ---
     long curL, curR;
@@ -141,37 +127,95 @@ void driveDistancePID(float distance_mm, int speed) {
   
   // Movement complete - stop motors
   motors.stopMotors();
-    debugPrintf(DBG_MOTORS, "Target reached\n");
+    debugPrintf(DBG_MOTORS, "Target distance reached\n");
 }
 
+
 void rotateAnglePID(float angle_deg, int speed) {
+  // Important : 
+  //    - this is a PD controller, rate is dirctly used as D-term (gyro rate = damping).
 
-  // INIT
+  // ----- Setup Timing -----
+  const uint16_t DT_MS = 10;           // Loop runs every 10ms
+  const float dt = DT_MS / 1000.0f;   // dt = 0.01s
+  unsigned long tPrev = micros();    // Control freq = 100Hz
+
+  // ----- Variables -------
   float angle = 0.0f;
+  int pwmLimit = 0;
+  unsigned long stableStart = 0;
 
-    // Setup Timing
-  const uint16_t DT_MS = 10;
-  const float dt = DT_MS / 1000.0f;
-  unsigned long tPrev = micros();
+  // ---- Parameters (à ajuster) ------
+  const float KP = 2.2f;
+  const float KD = 0.25f;
 
+  const int PWM_MIN = 55;
+  const int RAMP_STEP = 8;
+
+  const float ANGLE_TOL = 1.5f;
+  const float RATE_TOL  = 8.0f;
+  const uint16_t STABLE_MS = 120;
+
+  // ----- Control Loop -----
   while (true) {
+    // Fixed 100Hz timing -----
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    // lecture gyro
-    float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
-    angle += rate * dt;
+    // Read Gyro -----
+    float rate = imu_readGyroZ_dps();   // deg/s
+    angle += rate * dt;                 // integrate
 
     if (DBG_MOTORS) { Serial.print("Angle: "); Serial.print(angle); Serial.print(" | Rate: "); Serial.println(rate); }
 
+    // Compute Error -----
+    float error = angle_deg - angle;
 
+    // Ramp PWM Limit -----
+    if (pwmLimit < speed)
+        pwmLimit = min(pwmLimit + RAMP_STEP, speed);
 
+    // PD Control -----
+    float control = KP * error - KD * rate;
 
+    // Convert to PWM -----
+    int pwm = (int)fabs(control);
+    pwm = constrain(pwm, 0, pwmLimit);
+    if (pwm > 0) pwm = max(pwm, PWM_MIN);
 
+    // ----- Apply Direction -----
+    if (control > 0)
+        motors.applyMotorOutputs(0, pwm);
+    else
+        motors.applyMotorOutputs(pwm, 0);
 
+    // ----- Debug -----
+    if (DBG_MOTORS)
+    {
+        Serial.print("Angle: "); Serial.print(angle);
+        Serial.print(" | Error: "); Serial.print(error);
+        Serial.print(" | Rate: "); Serial.print(rate);
+        Serial.print(" | PWM: "); Serial.println(pwm);
+    }
 
-  }
+    // ----- Stop Condition -----
+    if (fabs(error) < ANGLE_TOL && fabs(rate) < RATE_TOL)
+    {
+        if (stableStart == 0)
+            stableStart = millis();
+
+        if (millis() - stableStart >= STABLE_MS)
+            break;
+    }
+    else
+    {
+        stableStart = 0;
+    }
+    }
+  // Movement complete - stop motors
+  motors.stopMotors();
+    debugPrintf(DBG_MOTORS, "Target Angle reached\n");
 }
 
 
@@ -320,6 +364,80 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     } else {
       stableStart = 0;
     }
+void robot_rotate_gyro(float target_deg, int pwmMax) {
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
+
+  // Gains (départs, à tuner)
+  const float KP = 2.2f;   // PWM par degré d'erreur
+  const float KD = 0.25f;  // PWM par (deg/s) pour amortir
+
+  const int PWM_MIN = 55;   // PWM mini qui fait tourner (à ajuster)
+  const int DEAD_PWM = 0;   // laisse 0 ou PWM_MIN selon ton robot
+
+  // Conditions d'arrêt
+  const float ANGLE_TOL = 1.5f;   // degrés
+  const float RATE_TOL  = 8.0f;   // deg/s
+  const uint16_t STABLE_MS = 120; // durée stable avant stop
+
+  // Rampe PWM max (évite patinage)
+  const int RAMP_STEP = 8; // par 10ms
+
+  // Signe: + target => tourne à droite (comme ton code)
+  float angle = 0.0f;
+  unsigned long tPrev = micros();
+  unsigned long stableStart = 0;
+
+  int pwmLimit = 0;
+
+  while (true) {
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    // safety_update();
+    // if (safety_isTriggered()) {
+    //   // motors_stop();
+    //   return;   // arrêt immédiat
+    // }
+
+
+    // lecture gyro
+    float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
+    angle += rate * dt;
+
+    float err = target_deg - angle;
+
+    // Rampe de la limite PWM
+    if (pwmLimit < pwmMax) pwmLimit = min(pwmLimit + RAMP_STEP, pwmMax);
+
+    // PD
+    float u = KP * err - KD * rate;
+
+    int pwm = (int)fabs(u);
+    pwm = constrain(pwm, 0, pwmLimit);
+
+    if (pwm > 0) pwm = max(pwm, PWM_MIN);
+    else pwm = DEAD_PWM;
+
+    // applique sens selon u
+    // if (u > 0) motors_rotateRight(pwm);
+    // else       motors_rotateLeft(pwm);
+
+    // arrêt : proche de la cible ET vitesse faible pendant STABLE_MS
+    if (fabs(err) < ANGLE_TOL && fabs(rate) < RATE_TOL) {
+      if (stableStart == 0) stableStart = millis();
+      if (millis() - stableStart >= STABLE_MS) break;
+    } else {
+      stableStart = 0;
+    }
+
+    // (optionnel) sécurité timeout
+    // if (millis() - startMs > 4000) break;
+  }
+
+  // motors_stop();
+}
 
     // (optionnel) sécurité timeout
     // if (millis() - startMs > 4000) break;
