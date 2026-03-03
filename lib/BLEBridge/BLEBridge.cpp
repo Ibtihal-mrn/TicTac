@@ -70,10 +70,10 @@ void BLEBridge::begin(const char* deviceName) {
     // Service NUS
     service_ = server_->createService(NUS_SERVICE_UUID);
 
-    // Caractéristique TX (ESP32 → PC) : NOTIFY
+    // Caractéristique TX (ESP32 → PC) : NOTIFY + READ (Windows compat)
     txChar_ = service_->createCharacteristic(
         NUS_TX_CHAR_UUID,
-        NIMBLE_PROPERTY::NOTIFY
+        NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ
     );
 
     // Caractéristique RX (PC → ESP32) : WRITE
@@ -96,16 +96,16 @@ void BLEBridge::begin(const char* deviceName) {
 }
 
 // ── Callbacks connexion ──────────────────────────────────────────────────────
-void BLEBridge::onConnect(NimBLEServer* pServer) {
+void BLEBridge::onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
     connected_ = true;
-    Serial.println("[BLEBridge] Client PC connecté via BLE");
-    // Ré-advertiser pour accepter d'autres connexions si besoin
-    // NimBLEDevice::startAdvertising();
+    connHandle_ = desc->conn_handle;
+    Serial.printf("[BLEBridge] Client connecté (conn=%d)\n", connHandle_);
 }
 
-void BLEBridge::onDisconnect(NimBLEServer* pServer) {
+void BLEBridge::onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
     connected_ = false;
-    Serial.println("[BLEBridge] Client PC déconnecté — reprise advertising");
+    connHandle_ = 0xFFFF;
+    Serial.println("[BLEBridge] Client déconnecté — reprise advertising");
     NimBLEDevice::startAdvertising();
 }
 
@@ -140,14 +140,24 @@ void BLEBridge::update() {
 
 // ── flushQueue_() ────────────────────────────────────────────────────────────
 void BLEBridge::flushQueue_() {
-    if (!txChar_ || !logQueue_) return;
+    if (!txChar_ || !logQueue_ || connHandle_ == 0xFFFF) return;
 
     char buf[BLE_MAX_MSG_LEN];
+    uint16_t attrHandle = txChar_->getHandle();
+
     // Vider toute la file en une passe de loop()
     while (xQueueReceive(logQueue_, buf, 0) == pdTRUE) {
-        txChar_->setValue(reinterpret_cast<uint8_t*>(buf),
-                          (uint16_t)strnlen(buf, BLE_MAX_MSG_LEN));
-        txChar_->notify();
+        size_t len = strnlen(buf, BLE_MAX_MSG_LEN);
+
+        // Envoi direct via l'API bas-niveau NimBLE.
+        // Cela contourne le check m_subscribedVec de NimBLE-Arduino
+        // qui peut rester vide sous Windows/WinRT (CCCD non détecté).
+        os_mbuf *om = ble_hs_mbuf_from_flat(
+            reinterpret_cast<uint8_t*>(buf), len);
+        if (om) {
+            ble_gattc_notify_custom(connHandle_, attrHandle, om);
+        }
+
         // Petit délai pour ne pas saturer la liaison BLE
         vTaskDelay(pdMS_TO_TICKS(2));
     }

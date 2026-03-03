@@ -296,11 +296,10 @@ class EurobotBLEViewer(tk.Tk):
                         await asyncio.sleep(RECONNECT_DELAY_S)
                         continue
 
-                    self._push(
-                        f"[UI] Abonné aux notifications : {tx_char.uuid}\n")
-
-                    # ── Callback de notification ──────────────────────────
+                    # ── Callback de notification ──────────────────────
                     def _on_notify(_sender, data: bytearray):
+                        print(f"[DBG] notify {len(data)}B: "
+                              f"{data[:60]}")  # stdout debug
                         text = data.decode("utf-8", errors="replace")
                         for line in text.splitlines(keepends=True):
                             if line.strip():
@@ -308,7 +307,9 @@ class EurobotBLEViewer(tk.Tk):
                                     line if line.endswith("\n")
                                     else line + "\n")
 
-                    await client.start_notify(tx_char.uuid, _on_notify)
+                    await client.start_notify(tx_char, _on_notify)
+                    self._push(
+                        f"[UI] Abonné aux notifications : {tx_char.uuid}\n")
 
                     # ── Maintien de la connexion ──────────────────────────
                     while (not self._stop_event.is_set()
@@ -316,7 +317,7 @@ class EurobotBLEViewer(tk.Tk):
                         await asyncio.sleep(0.5)
 
                     try:
-                        await client.stop_notify(tx_char.uuid)
+                        await client.stop_notify(tx_char)
                     except Exception:
                         pass
 

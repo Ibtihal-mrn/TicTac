@@ -66,8 +66,8 @@ public:
     bool isConnected() const { return connected_; }
 
     // ── NimBLEServerCallbacks ────────────────────────────────────────────────
-    void onConnect(NimBLEServer* pServer) override;
-    void onDisconnect(NimBLEServer* pServer) override;
+    void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override;
+    void onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override;
 
 private:
     NimBLEServer*           server_   = nullptr;
@@ -76,6 +76,7 @@ private:
     NimBLECharacteristic*   rxChar_   = nullptr;   // write ← PC
 
     volatile bool       connected_  = false;
+    uint16_t            connHandle_ = 0xFFFF;      // BLE conn handle
     QueueHandle_t       logQueue_   = nullptr;     // file thread-safe
 
     /** Extrait et transmet tous les messages en attente. */
