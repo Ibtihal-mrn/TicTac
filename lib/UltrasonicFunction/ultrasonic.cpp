@@ -1,11 +1,31 @@
 #include "ultrasonic.h"
+#include <Ultrasonic.h>
 #include "../../src/config.h"
 #include "../utils/Debug.h"
 
-static int PIN_TRIG = US_TRIG_PIN;
-static int PIN_ECHO = US_ECHO_PIN;
 
-int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM; // configurable dans config.h
+// static int PIN_TRIG = US_TRIG_PIN;
+// static int PIN_ECHO = US_ECHO_PIN;
+
+Ultrasonic us(US_TRIG_PIN, US_ECHO_PIN, US_TIMEOUT);
+
+int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM;  // configurable dans config.h
+
+// Public
+bool ultrasonic_isObstacle() {
+    int8_t distance = ultrasonic_read();
+    debugPrintf(DBG_SENSORS, "Ultrasonic distance: %d cm\n", distance);
+    return (distance > 0 && distance <= obstcle_threshold_cm);
+}
+
+// Private
+int8_t ultrasonic_read() {
+    return us.read(CM);
+}
+
+// =====
+
+
 
 // Implémentation manuelle du capteur ultrason
 // int ultrasonic_readDistance()
@@ -39,26 +59,26 @@ int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM; // configurable dans config
 // }
 
 
-#include <NewPing.h>
-static NewPing sonar(US_TRIG_PIN, US_ECHO_PIN, 400);
+// #include <NewPing.h>
+// static NewPing sonar(US_TRIG_PIN, US_ECHO_PIN, 400);
 
+// // int ultrasonic_readDistance() {
+// //     unsigned int dist = sonar.ping_cm();
+// //     return (dist > 0) ? dist : -1;
 // int ultrasonic_readDistance() {
-//     unsigned int dist = sonar.ping_cm();
-//     return (dist > 0) ? dist : -1;
-int ultrasonic_readDistance() {
-  unsigned int u = sonar.ping_cm();
-  int dist = (u > 0) ? (int)u : -1;
-  return dist;
-}
+//   unsigned int u = sonar.ping_cm();
+//   int dist = (u > 0) ? (int)u : -1;
+//   return dist;
+// }
 
 
 // Public
-bool ultrasonic_isObstacle()
-{
-    int8_t distance = ultrasonic_read();
-    debugPrintf(DBG_SENSORS, "Ultrasonic distance: %d cm\n", distance);
-    return (distance > 0 && distance <= obstcle_threshold_cm);
-}
+// bool ultrasonic_isObstacle()
+// {
+//     int8_t distance = ultrasonic_read();
+//     debugPrintf(DBG_SENSORS, "Ultrasonic distance: %d cm\n", distance);
+//     return (distance > 0 && distance <= obstcle_threshold_cm);
+// }
 
 // bool ultrasonic_isObstacle()
 // {
@@ -69,10 +89,10 @@ bool ultrasonic_isObstacle()
 
 
 // Private
-int8_t ultrasonic_read()
-{
-    return ultrasonic_readDistance();
-}
+// int8_t ultrasonic_read()
+// {
+//     return ultrasonic_readDistance();
+// }
 
 // ------ Debug ------
 void printUltrasonicVal()
