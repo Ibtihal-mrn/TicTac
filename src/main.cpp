@@ -69,30 +69,27 @@ void loop()
   printEncodersVal();
   printUltrasonicVal();
 
-<<<<<<< HEAD
+
+
+
+
   if (false) return;
   if (!runSequence) { return; }
-=======
-  // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  if (!runSequence)
-  {
-    return;
-  }
->>>>>>> BLE
 
   //Servo Test
-  bras_deployer();
-  delay(2000);
-  bras_retracter();
-  delay(2000);
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
   // bras_deployer();
   // delay(2000);
   // bras_retracter();
   // delay(2000);
 
   //driveDistancePID(-1000, 254);
-  driveDistancePID(4000, 254);
+  // driveDistancePID(4000, 254);
   // robot_rotate_gyro(90, 200);
+  rotateAnglePID(180, 200);
 
 
   runSequence = false;

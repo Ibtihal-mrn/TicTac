@@ -144,7 +144,35 @@ void driveDistancePID(float distance_mm, int speed) {
     debugPrintf(DBG_MOTORS, "Target reached\n");
 }
 
+void rotateAnglePID(float angle_deg, int speed) {
 
+  // INIT
+  float angle = 0.0f;
+
+    // Setup Timing
+  const uint16_t DT_MS = 10;
+  const float dt = DT_MS / 1000.0f;
+  unsigned long tPrev = micros();
+
+  while (true) {
+    unsigned long now = micros();
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    // lecture gyro
+    float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
+    angle += rate * dt;
+
+    if (DBG_MOTORS) { Serial.print("Angle: "); Serial.print(angle); Serial.print(" | Rate: "); Serial.println(rate); }
+
+
+
+
+
+
+
+  }
+}
 
 
 
@@ -473,6 +501,7 @@ void robot_step(Context& ctx) {
     // Periodic Checks
     checkMatchTimer(ctx);
 
+    // BLE connect
 
 
     // Main step.
@@ -496,7 +525,7 @@ void robot_step(Context& ctx) {
 
         case Robot::DISPATCH_CMD:
             // parse command and set next action (e.g. EXEC_MOVE, EXEC_ROTATE, etc.)
-
+            
             // 1. Empty Queue
             // if (ctx.commandQueue.empty()) { break; }
 

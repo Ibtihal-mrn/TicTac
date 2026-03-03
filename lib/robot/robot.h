@@ -48,3 +48,4 @@ void robot_step();
 // New
 void robot_test();
 void driveDistancePID(float distance_mm, int speed);
+void rotateAnglePID(float angle_deg, int speed);
