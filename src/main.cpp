@@ -13,22 +13,27 @@
 #include "Debug.h"
 #include "config.h"
 
+#include "EmergencyButton.h"  // ← Bouton urgence
+#include "safety.h"           // ← Safety update
+#include "motors.h"            // ← Test moteurs
+extern Motors motors;  // ← Import depuis robot.cpp
+
 // ------ helpers ------
-// void imAlive()
-// {
-//   static unsigned long millis_print = 0;
-//   if (millis() - millis_print >= 2000)
-//   {
-//     Serial.println("I'm alive");
-//     millis_print = millis();
-//   }
-// }
+void imAlive()
+{
+  static unsigned long millis_print = 0;
+  if (millis() - millis_print >= 2000)
+  {
+    Serial.println("I'm alive");
+    millis_print = millis();
+  }
+}
 
 // ========= SETUP ===============
 // const int RELAY_PIN = 41;
 const bool RELAY_ACTIVE_LOW = true;
 
-const int SWITCH_PIN = 2;
+
 
 bool lastSwitchState = HIGH;   // INPUT_PULLUP
 bool sequenceDone = false;     // Pour éviter répétition
@@ -39,7 +44,8 @@ void setup()
   debugInit(115200, // does Serial.begin()
             DBG_FSM |
                 DBG_MOTORS |
-                DBG_SENSORS
+                DBG_SENSORS |
+                DBG_MAGNET
             // DBG_COMMS |        // comment DBG_ to deactivate its related prints
             // DBG_ENCODER |
             // DBG_LAUNCH_TGR
@@ -49,7 +55,13 @@ void setup()
   lastSwitchState = digitalRead(SWITCH_PIN);
   relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
 
-  // Relais ON au démarrage
+  // Init electro-aimant
+  const bool RELAY_ACTIVE_LOW = true;
+  bool lastSwitchState = HIGH;   // INPUT_PULLUP
+  bool sequenceDone = false;     // Pour éviter répétition
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
+  lastSwitchState = digitalRead(SWITCH_PIN);
+  relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
   relais_on();
 
   // // I2C Init.
@@ -74,22 +86,25 @@ void loop()
 {
   static bool runSequence = true;
 
-  // imAlive();
-  // printEncodersVal();
-  // printUltrasonicVal();
+  imAlive();
+  printEncodersVal();
+  printUltrasonicVal();
 
-  // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  //if (!runSequence)
-  //{
-    //return;
-  //}
+  // <<<<<<< HEAD
+  //   if (false) return;
+  //   if (!runSequence) { return; }
+  // =======
+  //   // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
+  //   if (!runSequence)
+  //   {
+  //     return;
+  //   }
+  // >>>>>>> BLE
 
   delay(4000);
   relais_off();
   delay(4000);
   relais_on();
-
-
 
 
   if (sequenceDone) return;

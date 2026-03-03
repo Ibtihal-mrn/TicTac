@@ -1,5 +1,10 @@
 #include "Relais.h"
 
+#include "../utils/Debug.h"
+
+    
+
+
 // Broche et type de relais
 static int relayPin;
 static bool relayActiveLow;
@@ -22,7 +27,8 @@ void relais_init(int pin, bool activeLow) {
 void relais_on() {
     digitalWrite(relayPin, relayActiveLow ? LOW : HIGH);
     relayState = true;
-    Serial.println("Relais ON");
+    // Serial.println("Relais ON");
+    debugPrintf(DBG_MAGNET, "AIMANT ON\n");
 }
 
 void relais_off() {

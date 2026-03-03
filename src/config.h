@@ -83,7 +83,7 @@
 
 // ========= Electro Aimant ==========
 #define RELAY_PIN 1
-
+#define SWITCH_PIN 2
 
 
 

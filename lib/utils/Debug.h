@@ -13,7 +13,7 @@
 #define DBG_LAUNCH_TGR    (1<<6)
 #define DBG_STEPPER       (1<<7)
 #define DBG_SERVO         (1<<8)
-
+#define DBG_MAGNET        (1<<9)
 // Global debug mask (0 = none). You can set this at runtime.
 extern uint8_t debugMask;
 
