@@ -81,11 +81,16 @@
 #define SERVO_LEFT 5
 
 
+// ========= Electro Aimant ==========
+#define RELAY_PIN 1
+
+
+
 
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-#define US_TRIG_PIN 1
-#define US_ECHO_PIN 2
+#define US_TRIG_PIN 6
+#define US_ECHO_PIN 7
 #define US_OBSTACLE_THRESHOLD_CM 15
 
 

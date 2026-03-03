@@ -25,7 +25,7 @@
 // }
 
 // ========= SETUP ===============
-const int RELAY_PIN = 41;
+// const int RELAY_PIN = 41;
 const bool RELAY_ACTIVE_LOW = true;
 
 const int SWITCH_PIN = 2;
@@ -83,6 +83,15 @@ void loop()
   //{
     //return;
   //}
+
+  delay(4000);
+  relais_off();
+  delay(4000);
+  relais_on();
+
+
+
+
   if (sequenceDone) return;
 
   bool currentSwitchState = digitalRead(SWITCH_PIN);
