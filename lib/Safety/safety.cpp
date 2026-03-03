@@ -2,8 +2,9 @@
 
 #include "../../src/config.h"
 #include "ultrasonic.h"
-#include <Ultrasonic.h>
+// #include <Ultrasonic.h>
 #include "EmergencyButton.h"
+// #include ""
 
 
 
@@ -12,16 +13,50 @@ static int us_read_delay_ms = 500; // délai entre lectures du sonar (throttling
 
 
 
-bool safety_update() {
-  // 1. bouton (rapide)
-  if (emergencyButton_isPressed()) return true;
+// bool safety_update() {
+//   // 1. bouton (rapide)
+//   if (emergencyButton_isPressed()) return true;
 
-  // 2. ultrason (lent → throttling)
-  if (millis() - us_millis >= us_read_delay_ms && ultrasonic_isObstacle()) {  // print distance si DBG_SENSORS dans setup()
-    us_millis = millis(); 
-    return true;
-  }
-  return false;
+//   // 2. ultrason (lent → throttling)
+//   if (millis() - us_millis >= us_read_delay_ms && ultrasonic_isObstacle()) {  // print distance si DBG_SENSORS dans setup()
+//     us_millis = millis(); 
+//     return true;
+//   }
+//   return false;
+// }
+
+// bool safety_update() {
+//     if (emergencyButton_isPressed()) return true;
+    
+//     static unsigned long lastUS = 0;
+//     if (millis() - lastUS >= 100) {  // ← 10Hz
+//         lastUS = millis();
+//         return ultrasonic_isObstacle();
+//     }
+//     return false;
+// }
+
+
+bool safety_update() {
+    static bool obstacleLatched = false;
+    static unsigned long lastUS = 0;
+
+    if (emergencyButton_isPressed()) {
+        obstacleLatched = true;
+    }
+
+    if (millis() - lastUS >= 100) {
+        lastUS = millis();
+        obstacleLatched = ultrasonic_isObstacle();
+        // int dist = ultrasonic_read();
+        // if (dist > 0 && dist <= obstcle_threshold_cm) {
+        //     obstacleLatched = true;
+        // } else {
+        //     obstacleLatched = false;
+        // }
+    }
+
+    return obstacleLatched;
 }
 
 

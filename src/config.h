@@ -85,9 +85,9 @@
 
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-#define US_TRIG_PIN 1
-#define US_ECHO_PIN 2
-#define US_OBSTACLE_THRESHOLD_CM 15
+#define US_TRIG_PIN 42
+#define US_ECHO_PIN 41
+#define US_OBSTACLE_THRESHOLD_CM 20
 
 
 
