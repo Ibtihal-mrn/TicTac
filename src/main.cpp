@@ -20,15 +20,15 @@ extern Motors motors;  // ← Import depuis robot.cpp
 
 
 // ------ helpers ------
-// void imAlive()
-// {
-//   static unsigned long millis_print = 0;
-//   if (millis() - millis_print >= 2000)
-//   {
-//     Serial.println("I'm alive");
-//     millis_print = millis();
-//   }
-// }
+void imAlive()
+{
+  static unsigned long millis_print = 0;
+  if (millis() - millis_print >= 2000)
+  {
+    Serial.println("I'm alive");
+    millis_print = millis();
+  }
+}
 
 // ========= SETUP ===============
 void setup()
@@ -65,9 +65,9 @@ void loop()
 {
   static bool runSequence = true;
 
-  // imAlive();
-  // printEncodersVal();
-  // printUltrasonicVal();
+  imAlive();
+  printEncodersVal();
+  printUltrasonicVal();
 
   // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
   if (!runSequence)
