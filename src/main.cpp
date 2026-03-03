@@ -11,6 +11,8 @@
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
+#include "StartSwitch.h"
+#include "TeamSwitch.h"
 
 // ------ helpers ------
 // void imAlive()
@@ -22,6 +24,9 @@
 //     millis_print = millis();
 //   }
 // }
+
+StartSwitch startSwitch(GPIO_NUM_38);
+TeamSwitch teamSwitch(GPIO_NUM_39);
 
 // ========= SETUP ===============
 void setup()
@@ -52,11 +57,27 @@ void setup()
   robot_init();
 
   Serial.println("Setup Done.");
+
+  startSwitch.begin();
+  teamSwitch.begin();
+
+  TeamSwitchTeam team = teamSwitch.readTeam();
+
+  startSwitch.waitForStart();
 }
 
 void loop()
 {
   static bool runSequence = true;
+
+  if (teamSwitch.readTeam() == TeamSwitchTeam::A)
+  {
+    Serial.println("Equipe A");
+  }
+  else
+  {
+    Serial.println("Equipe B");
+  }
 
   // imAlive();
   // printEncodersVal();
@@ -80,7 +101,6 @@ void loop()
 
   driveDistancePID(-1000, 254);
   driveDistancePID(500, 254);
-
 
   runSequence = false;
 }
