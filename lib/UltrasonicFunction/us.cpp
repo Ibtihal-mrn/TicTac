@@ -1,4 +1,4 @@
-#include "ultrasonic.h"
+#include "us.h"
 #include <Ultrasonic.h>
 #include "../../src/config.h"
 #include "../utils/Debug.h"

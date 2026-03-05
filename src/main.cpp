@@ -8,7 +8,7 @@
 
 // Debug prints
 #include "encoders.h"
-#include "ultrasonic.h"
+#include "us.h"
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
@@ -28,15 +28,7 @@ void imAlive()
     millis_print = millis();
   }
 }
-void imAlive()
-{
-  static unsigned long millis_print = 0;
-  if (millis() - millis_print >= 2000)
-  {
-    Serial.println("I'm alive");
-    millis_print = millis();
-  }
-}
+
 
 // ========= SETUP ===============
 // const int RELAY_PIN = 41;
