@@ -130,10 +130,9 @@ void driveDistancePID(float distance_mm, int speed) {
     debugPrintf(DBG_MOTORS, "Target distance reached\n");
 }
 
-
 void rotateAnglePID(float angle_deg, int speed) {
   // Important : 
-  //    - this is a PD controller, rate is dirctly used as D-term (gyro rate = damping).
+  //    - this is a PD controller (no I-term), rate is dirctly used as D-term (gyro rate = damping).
 
   // ----- Setup Timing -----
   const uint16_t DT_MS = 10;           // Loop runs every 10ms
@@ -186,9 +185,9 @@ void rotateAnglePID(float angle_deg, int speed) {
 
     // ----- Apply Direction -----
     if (control > 0)
-        motors.applyMotorOutputs(0, pwm);
+        motors.applyMotorOutputs(-pwm, pwm);   // rotate right
     else
-        motors.applyMotorOutputs(pwm, 0);
+        motors.applyMotorOutputs(pwm, -pwm);      // rotate left
 
     // ----- Debug -----
     if (DBG_MOTORS)
@@ -220,7 +219,7 @@ void rotateAnglePID(float angle_deg, int speed) {
 
 
 
-// -------------
+// ----- LEGACY -----
 void robot_step() { // On va aussi plus l'utiliser normalement
   long left, right;
   encoders_read(&left, &right);
@@ -364,87 +363,11 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     } else {
       stableStart = 0;
     }
-void robot_rotate_gyro(float target_deg, int pwmMax) {
-  const uint16_t DT_MS = 10;
-  const float dt = DT_MS / 1000.0f;
 
-  // Gains (départs, à tuner)
-  const float KP = 2.2f;   // PWM par degré d'erreur
-  const float KD = 0.25f;  // PWM par (deg/s) pour amortir
-
-  const int PWM_MIN = 55;   // PWM mini qui fait tourner (à ajuster)
-  const int DEAD_PWM = 0;   // laisse 0 ou PWM_MIN selon ton robot
-
-  // Conditions d'arrêt
-  const float ANGLE_TOL = 1.5f;   // degrés
-  const float RATE_TOL  = 8.0f;   // deg/s
-  const uint16_t STABLE_MS = 120; // durée stable avant stop
-
-  // Rampe PWM max (évite patinage)
-  const int RAMP_STEP = 8; // par 10ms
-
-  // Signe: + target => tourne à droite (comme ton code)
-  float angle = 0.0f;
-  unsigned long tPrev = micros();
-  unsigned long stableStart = 0;
-
-  int pwmLimit = 0;
-
-  while (true) {
-    unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
-    tPrev += (unsigned long)DT_MS * 1000UL;
-
-    // safety_update();
-    // if (safety_isTriggered()) {
-    //   // motors_stop();
-    //   return;   // arrêt immédiat
-    // }
-
-
-    // lecture gyro
-    float rate = imu_readGyroZ_dps(); // deg/s (bias retiré)
-    angle += rate * dt;
-
-    float err = target_deg - angle;
-
-    // Rampe de la limite PWM
-    if (pwmLimit < pwmMax) pwmLimit = min(pwmLimit + RAMP_STEP, pwmMax);
-
-    // PD
-    float u = KP * err - KD * rate;
-
-    int pwm = (int)fabs(u);
-    pwm = constrain(pwm, 0, pwmLimit);
-
-    if (pwm > 0) pwm = max(pwm, PWM_MIN);
-    else pwm = DEAD_PWM;
-
-    // applique sens selon u
-    // if (u > 0) motors_rotateRight(pwm);
-    // else       motors_rotateLeft(pwm);
-
-    // arrêt : proche de la cible ET vitesse faible pendant STABLE_MS
-    if (fabs(err) < ANGLE_TOL && fabs(rate) < RATE_TOL) {
-      if (stableStart == 0) stableStart = millis();
-      if (millis() - stableStart >= STABLE_MS) break;
-    } else {
-      stableStart = 0;
-    }
-
-    // (optionnel) sécurité timeout
-    // if (millis() - startMs > 4000) break;
   }
-
-  // motors_stop();
+    motors.stopMotors();
 }
 
-    // (optionnel) sécurité timeout
-    // if (millis() - startMs > 4000) break;
-  }
-
-  // motors_stop();
-}
 
 void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // // on garde ton système : control_computeSpeeds utilise baseSpeed
@@ -488,21 +411,21 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   // Compute Tick Target
   long target = ticks_for_distance_mm(fabs(dist_mm));
   unsigned long lp1 = 0;
-  printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
+  // printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
 
   // Encoder Read
   long startL, startR;
-  encoders_read(&startL, &startR);
+  // encoders_read(&startL, &startR);
   unsigned long lp2 = 0;
-  printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
+  // printMillis(DBG_MOTORS, "Encoders computed\n", millis(), lp2, 1000);
 
   // reset deltas encodeurs pour la vitesse
-  prevL = startL;
-  prevR = startR;
+  // prevL = startL;
+  // prevR = startR;
 
   // Reset Controller State
   DrivePIState st;
-  control_reset(st);
+  // control_reset(st);
 
   // Setup Timing
   const uint16_t DT_MS = 10;
@@ -510,62 +433,62 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
   unsigned long tPrev = micros();
 
   // MAIN LOOP
-  while (true) {
-    // Fixed 10ms while Loop
-    unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
-    tPrev += (unsigned long)DT_MS * 1000UL;
+  // while (true) {
+  //   // Fixed 10ms while Loop
+  //   unsigned long now = micros();
+  //   if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
+  //   tPrev += (unsigned long)DT_MS * 1000UL;
 
-    // STOP MOTOR CONDITIONS
-    safety_update();
-    if (safety_isTriggered()) {
-      motors.stopMotors();
-      // Blocking Loop
-      while(safety_isTriggered()){
-        static unsigned long lp3 = 0;
-        printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 2000);
-        safety_update();
-        safety_clearIfSafe();
-        delay(20);
-      }
-    }
+  //   // STOP MOTOR CONDITIONS
+  //   safety_update();
+  //   if (safety_isTriggered()) {
+  //     motors.stopMotors();
+  //     // Blocking Loop
+  //     while(safety_isTriggered()){
+  //       static unsigned long lp3 = 0;
+  //       printMillis(DBG_MOTORS, "Safety triggered\n", millis(), lp3, 2000);
+  //       safety_update();
+  //       safety_clearIfSafe();
+  //       delay(20);
+  //     }
+  //   }
 
 
-    // Encoders Update
-    long curL, curR;
-    encoders_read(&curL, &curR);
+  //   // Encoders Update
+  //   long curL, curR;
+  //   encoders_read(&curL, &curR);
 
-    long distTicksL = labs(curL - startL);
-    long distTicksR = labs(curR - startR);
-    if ((distTicksL + distTicksR) / 2 >= target) break; // Target Reached
+  //   long distTicksL = labs(curL - startL);
+  //   long distTicksR = labs(curR - startR);
+  //   if ((distTicksL + distTicksR) / 2 >= target) break; // Target Reached
 
-    // PI CONTROL
-    long dL, dR;
-    encoders_computeDelta(curL, curR, &dL, &dR); // deltas (vitesse)
+  //   // PI CONTROL
+  //   long dL, dR;
+  //   encoders_computeDelta(curL, curR, &dL, &dR); // deltas (vitesse)
 
-    // erreur de cap cumulée (position)
-    long headingErr = (curL - startL) - (curR - startR);
-    int pwmL, pwmR;
-    control_driveStraight_PI(st, headingErr, dL, dR, pwmBaseTarget, dt, pwmL, pwmR);
+  //   // erreur de cap cumulée (position)
+  //   long headingErr = (curL - startL) - (curR - startR);
+  //   int pwmL, pwmR;
+  //   control_driveStraight_PI(st, headingErr, dL, dR, pwmBaseTarget, dt, pwmL, pwmR);
 
-    // motors_applySpeeds(pwmL, pwmR);
+  //   // motors_applySpeeds(pwmL, pwmR);
 
-    static unsigned long lp5 = 0;
-    if (millis() - lp5 >= 1000) {
-        Serial.print("PWM L: ");
-        Serial.print(pwmL);
-        Serial.print(" | PWM R: ");
-        Serial.println(pwmR);
-        lp5 = millis();
-    }
+  //   static unsigned long lp5 = 0;
+  //   if (millis() - lp5 >= 1000) {
+  //       Serial.print("PWM L: ");
+  //       Serial.print(pwmL);
+  //       Serial.print(" | PWM R: ");
+  //       Serial.println(pwmR);
+  //       lp5 = millis();
+  //   }
 
-    motors.forward(pwmL, pwmR);
-    // motors.forward(255, 255);
+  //   motors.forward(pwmL, pwmR);
+  //   // motors.forward(255, 255);
     
-  }
+  // }
 
   // Default (target reached when outside while loop).
-  motors.stopMotors();
+  // motors.stopMotors();
 }
 
 

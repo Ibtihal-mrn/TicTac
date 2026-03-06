@@ -86,10 +86,12 @@ void loop()
   // bras_retracter();
   // delay(2000);
 
-  //driveDistancePID(-1000, 254);
-  // driveDistancePID(4000, 254);
-  // robot_rotate_gyro(90, 200);
-  rotateAnglePID(180, 200);
+  driveDistancePID(500, 254);
+  delay(1000);
+  driveDistancePID(-500, 254);
+  delay(1000);
+
+  rotateAnglePID(90, 200);
 
 
   runSequence = false;
