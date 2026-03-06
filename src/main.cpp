@@ -48,6 +48,7 @@ void setup()
 
   // ── BLE Bridge : démarrer EN PREMIER pour que la queue existe ──────────────
   bleBridge.begin(BLE_DEVICE_NAME);
+  Serial.println("[DBG] BLE bridge started");
 
   // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
@@ -62,15 +63,24 @@ void setup()
   ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
   ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
   bras_init();                // must run FIRST
+  Serial.println("[DBG] bras_init done");
   robot_init();
+  Serial.println("[DBG] robot_init done");
 
   bleSerial.println("Setup Done.");
+  Serial.println("[DBG] setup() COMPLETE");
 }
 
 void loop()
 {
-  static bool runSequence = true;
+  static bool runSequence = true;  static unsigned long loopCount = 0;
 
+  // Debug : confirmer que loop() tourne
+  if (loopCount % 5000 == 0) {
+    Serial.printf("[DBG] loop #%lu  connected=%d\n",
+                  loopCount, bleBridge.isConnected());
+  }
+  loopCount++;
   // ── BLE Bridge : flush logs en attente vers le PC ──────────────────────────
   bleBridge.update();
 

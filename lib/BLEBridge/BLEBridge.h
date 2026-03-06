@@ -89,10 +89,13 @@ extern BLEBridge bleBridge;
 // ── TeeSerial : Print wrapper qui envoie vers Serial ET BLE ──────────────────
 // Utilisé pour intercepter TOUT Serial.print/println existant sans modifier
 // la logique du code. Chaque ligne complète est envoyée via bleBridge.sendLog().
+//
+// Appelle aussi bleBridge.update() à chaque fin de ligne, ce qui garantit
+// le flush BLE même dans les boucles bloquantes (driveDistancePID, etc.).
 class TeeSerial : public Print {
 public:
     size_t write(uint8_t c) override {
-        // Toujours écrire vers Serial (USB)
+        // Toujours écrire vers Serial (USB/UART0)
         Serial.write(c);
 
         // Accumuler dans le buffer ligne
@@ -105,6 +108,10 @@ public:
             lineBuf_[bufPos_] = '\0';
             bleBridge.sendLog(lineBuf_);
             bufPos_ = 0;
+
+            // Flush immédiat — crucial pour les boucles bloquantes
+            // qui n'appellent pas bleBridge.update() depuis loop().
+            bleBridge.update();
         }
         return 1;
     }

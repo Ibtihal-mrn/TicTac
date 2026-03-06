@@ -134,7 +134,42 @@ void BLEBridge::sendLog(const String& msg) {
 
 // ── update() ─────────────────────────────────────────────────────────────────
 void BLEBridge::update() {
-    if (!connected_) return;
+    // ── Diagnostic : log transition de connected_ ──
+    static bool wasConn = false;
+    if (connected_ != wasConn) {
+        Serial.printf("[BLE-DBG] connected_ %d -> %d  connHandle_=%d\n",
+                      wasConn, (int)connected_, connHandle_);
+        wasConn = connected_;
+    }
+
+    if (!connected_ || connHandle_ == 0xFFFF) return;
+
+    // ── Heartbeat direct : 1 notification brute toutes les 3 s ──
+    //    Teste le chemin BLE SANS la queue.
+    static unsigned long lastHB = 0;
+    if (millis() - lastHB >= 3000) {
+        const char hb[] = "[BLE-HB] heartbeat\n";
+        uint16_t attrH = txChar_->getHandle();
+
+        // Méthode 1 : API bas-niveau (bypass m_subscribedVec)
+        os_mbuf *om = ble_hs_mbuf_from_flat(
+            reinterpret_cast<const uint8_t*>(hb), sizeof(hb) - 1);
+        int rc1 = -99;
+        if (om) {
+            rc1 = ble_gattc_notify_custom(connHandle_, attrH, om);
+        }
+
+        // Méthode 2 : API haut-niveau NimBLE-Arduino (utilise m_subscribedVec)
+        txChar_->setValue(reinterpret_cast<const uint8_t*>(hb), sizeof(hb) - 1);
+        txChar_->notify();
+
+        Serial.printf("[BLE-DBG] HB conn=%d attr=%d rc_low=%d subs=%d\n",
+                      connHandle_, attrH, rc1,
+                      (int)txChar_->getSubscribedCount());
+
+        lastHB = millis();
+    }
+
     flushQueue_();
 }
 
@@ -144,21 +179,27 @@ void BLEBridge::flushQueue_() {
 
     char buf[BLE_MAX_MSG_LEN];
     uint16_t attrHandle = txChar_->getHandle();
+    int count = 0;
 
     // Vider toute la file en une passe de loop()
     while (xQueueReceive(logQueue_, buf, 0) == pdTRUE) {
         size_t len = strnlen(buf, BLE_MAX_MSG_LEN);
 
         // Envoi direct via l'API bas-niveau NimBLE.
-        // Cela contourne le check m_subscribedVec de NimBLE-Arduino
-        // qui peut rester vide sous Windows/WinRT (CCCD non détecté).
         os_mbuf *om = ble_hs_mbuf_from_flat(
             reinterpret_cast<uint8_t*>(buf), len);
         if (om) {
-            ble_gattc_notify_custom(connHandle_, attrHandle, om);
+            int rc = ble_gattc_notify_custom(connHandle_, attrHandle, om);
+            if (rc != 0) {
+                Serial.printf("[BLE-DBG] flush notify ERR rc=%d\n", rc);
+            }
         }
+        count++;
 
         // Petit délai pour ne pas saturer la liaison BLE
         vTaskDelay(pdMS_TO_TICKS(2));
+    }
+    if (count > 0) {
+        Serial.printf("[BLE-DBG] flushed %d msgs\n", count);
     }
 }
