@@ -7,7 +7,7 @@
 
 // Debug prints
 #include "encoders.h"
-#include "ultrasonic.h"
+#include "us.h"         // ultrasonic
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
@@ -65,6 +65,8 @@ void loop()
 {
   static bool runSequence = true;
 
+  ultrasonic_update();   // nouveau
+
   imAlive();
   printEncodersVal();
   printUltrasonicVal();
@@ -86,7 +88,7 @@ void loop()
   // delay(2000);
 
   //driveDistancePID(-1000, 254);
-  driveDistancePID(4000, 254);
+  driveDistancePID(5000, 254);
   // robot_rotate_gyro(90, 200);
 
 

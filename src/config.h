@@ -86,7 +86,11 @@
 #define US_TIMEOUT 20000UL
 #define US_TRIG_PIN 42
 #define US_ECHO_PIN 41
-#define US_OBSTACLE_THRESHOLD_CM 20
+#define US2_TRIG_PIN 40     // nouveau
+#define US2_ECHO_PIN 39   // nouveau
+#define US3_TRIG_PIN 37   // nouveau
+#define US3_ECHO_PIN 38   // nouveau
+#define US_OBSTACLE_THRESHOLD_CM 30
 
 
 

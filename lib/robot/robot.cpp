@@ -5,7 +5,7 @@
 
 #include "motors.h"
 #include "encoders.h"
-#include "ultrasonic.h"
+#include "us.h"
 #include "EmergencyButton.h"
 #include "imu.h"
 
