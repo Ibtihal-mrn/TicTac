@@ -14,16 +14,23 @@
 #include "StartSwitch.h"
 #include "TeamSwitch.h"
 
+#include "EmergencyButton.h"  // ← Bouton urgence
+#include "safety.h"           // ← Safety update
+#include "motors.h"            // ← Test moteurs
+extern Motors motors;  // ← Import depuis robot.cpp
+
+
+
 // ------ helpers ------
-// void imAlive()
-// {
-//   static unsigned long millis_print = 0;
-//   if (millis() - millis_print >= 2000)
-//   {
-//     Serial.println("I'm alive");
-//     millis_print = millis();
-//   }
-// }
+void imAlive()
+{
+  static unsigned long millis_print = 0;
+  if (millis() - millis_print >= 2000)
+  {
+    Serial.println("I'm alive");
+    millis_print = millis();
+  }
+}
 
 StartSwitch startSwitch(GPIO_NUM_38);
 TeamSwitch teamSwitch(GPIO_NUM_39);
@@ -82,14 +89,18 @@ void loop()
   // imAlive();
   // printEncodersVal();
   // printUltrasonicVal();
+  imAlive();
+  printEncodersVal();
+  printUltrasonicVal();
 
-  // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  if (!runSequence)
-  {
-    return;
-  }
 
-  // Servo Test
+
+
+
+  if (false) return;
+  if (!runSequence) { return; }
+
+  //Servo Test
   // bras_deployer();
   // delay(2000);
   // bras_retracter();
@@ -99,8 +110,46 @@ void loop()
   // bras_retracter();
   // delay(2000);
 
-  driveDistancePID(-1000, 254);
   driveDistancePID(500, 254);
+  delay(1000);
+  driveDistancePID(-500, 254);
+  delay(1000);
+
+  rotateAnglePID(90, 200);
 
   runSequence = false;
 }
+
+// void loop() {
+//     printUltrasonicVal();  // Décommente
+//     Serial.print("Obstacle? "); 
+//     Serial.println(ultrasonic_isObstacle() ? "OUI" : "NON");
+//     delay(500);
+// }
+
+// void loop() {
+//     Serial.println("=== DEBUG SAFETY ===");
+//     Serial.print("emergencyButton: "); Serial.println(emergencyButton_isPressed() ? "OUI" : "NON");
+//     Serial.print("ultrasonic obs: "); Serial.println(ultrasonic_isObstacle() ? "OUI" : "NON");
+//     Serial.print("safety_update: "); Serial.println(safety_update() ? "STOP" : "OK");
+//     delay(200);
+// }
+
+// void loop() {
+//     Serial.println("=== DEBUG DRIVE ===");
+//     Serial.print("safety_update: "); Serial.println(safety_update() ? "STOP" : "OK");
+//     if (safety_update()) Serial.println("*** WOULD STOP ***");
+//     delay(200);
+// }
+
+// void loop() {
+//     Serial.println("START MOTORS");
+//     motors.forward(150, 150);  // ← Démarre
+//     delay(3000);
+    
+//     Serial.println("STOP TEST");
+//     motors.stopMotors();       // ← Test
+//     delay(3000);
+    
+//     Serial.println("---");
+// }
