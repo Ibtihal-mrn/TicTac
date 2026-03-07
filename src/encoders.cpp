@@ -9,27 +9,27 @@ long prevR = 0;
 // ---------- INTERRUPTIONS ----------
 void ISR_left(void) {
   bool A = digitalRead(ENC_L_A);
-  bool B = digitalRead(ENC_L_B);
-  if (A == B)
-    ticksL++;
-  else
-    ticksL--;
+  // bool B = digitalRead(ENC_L_B);
+  
+  ticksL++;
+  // else
+  //   ticksL--;
 }
 
 void ISR_right(void) {
   bool A = digitalRead(ENC_R_A);
-  bool B = digitalRead(ENC_R_B);
-  if (A == B)
-    ticksR--;
-  else
-    ticksR++;
+  // bool B = digitalRead(ENC_R_B);
+  // if (A == B)
+  ticksR--;
+  // else
+  //   ticksR++;
 }
 
 void encoders_init(void) {
   pinMode(ENC_L_A, INPUT_PULLUP);
-  pinMode(ENC_L_B, INPUT_PULLUP);
+  // pinMode(ENC_L_B, INPUT_PULLUP);
   pinMode(ENC_R_A, INPUT_PULLUP);
-  pinMode(ENC_R_B, INPUT_PULLUP);
+  // pinMode(ENC_R_B, INPUT_PULLUP);
 
   attachInterrupt(digitalPinToInterrupt(ENC_L_A), ISR_left, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENC_R_A), ISR_right, CHANGE);

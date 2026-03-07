@@ -10,7 +10,7 @@
 void robot_init() {
   motors_init();
   encoders_init();
-  ultrasonic_init(13, 10);  // trig, echo
+  ultrasonic_init(6, 7);  // trig, echo
   safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
 

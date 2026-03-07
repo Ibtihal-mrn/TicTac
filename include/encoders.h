@@ -5,9 +5,9 @@
 
 // ---------- ENCODEURS ----------
 #define ENC_L_A 2   // interruption
-#define ENC_L_B 5
+// #define ENC_L_B 5
 #define ENC_R_A 3  // interruption
-#define ENC_R_B 9
+// #define ENC_R_B 9
 
 extern volatile long ticksL;
 extern volatile long ticksR;

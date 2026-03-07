@@ -3,14 +3,12 @@
 #include "motors.h"
 #include "control.h"
 #include "robot.h"
-#include "bras.h"
 #include "imu.h"
 
 void setup()
 {
   Serial.begin(9600);
   robot_init();
-  bras_init();
 }
 
 void loop()
@@ -95,13 +93,7 @@ void loop()
   // --------- Séquence de test 2 ---------
   // -----------------------------------
 
-  bras_deployer();
 
-  robot_move_distance(1000, 140);
-  delay(2000);
- 
-  bras_retracter();
-  delay(2000);
 
   // robot_move_distance(-200, 140);
   // delay(2000);

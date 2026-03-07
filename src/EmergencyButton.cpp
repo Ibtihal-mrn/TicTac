@@ -2,7 +2,7 @@
 #include "EmergencyButton.h"
 
 #define EBTN_PIN 7
-#define STABLE_READS 3  // pour debounce simple si besoin
+#define STABLE_READS 8  // pour debounce simple si besoin
 
 static bool lastState = false;   // état précédent lu
 static int changeCount = 0;      // compte les changements d'état
