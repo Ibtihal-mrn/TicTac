@@ -7,19 +7,17 @@
 
 // Debug prints
 #include "encoders.h"
-#include "ultrasonic.h"
+// #include "ultrasonic.h"
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
 #include "StartSwitch.h"
 #include "TeamSwitch.h"
 
-#include "EmergencyButton.h"  // ← Bouton urgence
-#include "safety.h"           // ← Safety update
-#include "motors.h"            // ← Test moteurs
-extern Motors motors;  // ← Import depuis robot.cpp
-
-
+#include "EmergencyButton.h" // ← Bouton urgence
+#include "safety.h"          // ← Safety update
+#include "motors.h"          // ← Test moteurs
+extern Motors motors;        // ← Import depuis robot.cpp
 
 // ------ helpers ------
 void imAlive()
@@ -32,8 +30,8 @@ void imAlive()
   }
 }
 
-StartSwitch startSwitch(GPIO_NUM_38);
-TeamSwitch teamSwitch(GPIO_NUM_39);
+// StartSwitch startSwitch(GPIO_NUM_38);
+TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // ========= SETUP ===============
 void setup()
@@ -65,64 +63,68 @@ void setup()
 
   Serial.println("Setup Done.");
 
-  startSwitch.begin();
+  // startSwitch.begin();
   teamSwitch.begin();
 
-  TeamSwitchTeam team = teamSwitch.readTeam();
-
-  startSwitch.waitForStart();
+  // startSwitch.waitForStart();
 }
 
 void loop()
 {
   static bool runSequence = true;
 
+  if (!runSequence)
+  {
+    return;
+  }
+
   if (teamSwitch.readTeam() == TeamSwitchTeam::A)
   {
     Serial.println("Equipe A");
+    driveDistancePID(500, 254);
+    delay(1000);
+    rotateAnglePID(90, 200);
+
+ 
   }
   else
   {
     Serial.println("Equipe B");
+    driveDistancePID(-500, 254);
+    delay(1000);
+    robot_rotate_gyro(-90, 200);
   }
 
   // imAlive();
   // printEncodersVal();
   // printUltrasonicVal();
-  imAlive();
-  printEncodersVal();
-  printUltrasonicVal();
+  // imAlive();
+  // printEncodersVal();
+  // printUltrasonicVal();
 
+  // Servo Test
+  //  bras_deployer();
+  //  delay(2000);
+  //  bras_retracter();
+  //  delay(2000);
+  //  bras_deployer();
+  //  delay(2000);
+  //  bras_retracter();
+  //  delay(2000);
 
+  // driveDistancePID(500, 254);
+  // delay(1000);
+  // driveDistancePID(-500, 254);
+  // delay(1000);
 
-
-
-  if (false) return;
-  if (!runSequence) { return; }
-
-  //Servo Test
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
-
-  driveDistancePID(500, 254);
-  delay(1000);
-  driveDistancePID(-500, 254);
-  delay(1000);
-
-  rotateAnglePID(90, 200);
+  // rotateAnglePID(90, 200);
 
   runSequence = false;
 }
 
 // void loop() {
 //     printUltrasonicVal();  // Décommente
-//     Serial.print("Obstacle? "); 
+//     Serial.print("Obstacle? ");
 //     Serial.println(ultrasonic_isObstacle() ? "OUI" : "NON");
 //     delay(500);
 // }
@@ -146,10 +148,10 @@ void loop()
 //     Serial.println("START MOTORS");
 //     motors.forward(150, 150);  // ← Démarre
 //     delay(3000);
-    
+
 //     Serial.println("STOP TEST");
 //     motors.stopMotors();       // ← Test
 //     delay(3000);
-    
+
 //     Serial.println("---");
 // }
