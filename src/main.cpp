@@ -102,10 +102,18 @@ void loop()
   //   }
   // >>>>>>> BLE
 
-  delay(4000);
-  relais_off();
-  delay(4000);
-  relais_on();
+  driveDistancePID(150, 200);   // avance 15 cm
+  delay(500);                   // arrêt du robot
+
+  relais_on();                  // active le relais
+  delay(5000);                  // attendre 5 secondes (robot immobile)
+
+  driveDistancePID(150, 200);   // avance 15 cm
+
+  relais_off();                 // désactive le relais
+  delay(5000);                  // attendre 5 secondes
+
+  driveDistancePID(150, 200);   // avance 15 cm
 
 
   if (sequenceDone) return;
