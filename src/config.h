@@ -87,10 +87,17 @@
 #define SERVO_RIGHT 4 // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
 #define SERVO_LEFT 5
 
+
+// ========= Electro Aimant ==========
+#define RELAY_PIN 1
+#define SWITCH_PIN 2
+
+
+
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-#define US_TRIG_PIN 42
-#define US_ECHO_PIN 41
-#define US_OBSTACLE_THRESHOLD_CM 20
+#define US_TRIG_PIN 6
+#define US_ECHO_PIN 7
+#define US_OBSTACLE_THRESHOLD_CM 15
 
 // #endif

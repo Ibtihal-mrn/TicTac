@@ -1,4 +1,9 @@
+<<<<<<< HEAD:lib/UltrasonicFunction/ultrasonic.cpp
 #include "ultrasonic.h"
+=======
+#include "us.h"
+#include <Ultrasonic.h>
+>>>>>>> origin/chay:lib/UltrasonicFunction/us.cpp
 #include "../../src/config.h"
 #include "../utils/Debug.h"
 

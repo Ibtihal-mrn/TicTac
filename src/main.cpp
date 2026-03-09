@@ -4,6 +4,7 @@
 // Hardware
 #include "robot.h"
 #include "bras.h"
+#include "Relais.h"
 
 // Debug prints
 #include "encoders.h"
@@ -34,17 +35,39 @@ void imAlive()
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // ========= SETUP ===============
+// const int RELAY_PIN = 41;
+const bool RELAY_ACTIVE_LOW = true;
+
+
+
+bool lastSwitchState = HIGH;   // INPUT_PULLUP
+bool sequenceDone = false;     // Pour éviter répétition
+
 void setup()
 {
   // Serial.begin(115200);
   debugInit(115200, // does Serial.begin()
             DBG_FSM |
                 DBG_MOTORS |
-                DBG_SENSORS
+                DBG_SENSORS |
+                DBG_MAGNET
             // DBG_COMMS |        // comment DBG_ to deactivate its related prints
             // DBG_ENCODER |
             // DBG_LAUNCH_TGR
   );
+
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
+  lastSwitchState = digitalRead(SWITCH_PIN);
+  relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
+
+  // Init electro-aimant
+  const bool RELAY_ACTIVE_LOW = true;
+  bool lastSwitchState = HIGH;   // INPUT_PULLUP
+  bool sequenceDone = false;     // Pour éviter répétition
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
+  lastSwitchState = digitalRead(SWITCH_PIN);
+  relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
+  relais_on();
 
   // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
@@ -74,8 +97,54 @@ void loop()
   static bool runSequence = true;
 
   if (!runSequence)
+  imAlive();
+  printEncodersVal();
+  //printUltrasonicVal();
+
+  // <<<<<<< HEAD
+  //   if (false) return;
+  //   if (!runSequence) { return; }
+  // =======
+  //   // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
+  //   if (!runSequence)
+  //   {
+  //     return;
+  //   }
+  // >>>>>>> BLE
+
+  driveDistancePID(150, 200);   // avance 15 cm
+  delay(500);                   // arrêt du robot
+
+  relais_on();                  // active le relais
+  delay(5000);                  // attendre 5 secondes (robot immobile)
+
+  driveDistancePID(150, 200);   // avance 15 cm
+
+  relais_off();                 // désactive le relais
+  delay(5000);                  // attendre 5 secondes
+
+  driveDistancePID(150, 200);   // avance 15 cm
+
+
+  if (sequenceDone) return;
+
+  bool currentSwitchState = digitalRead(SWITCH_PIN);
+
+  // Détection appui (HIGH → LOW)
+  if (lastSwitchState == HIGH && currentSwitchState == LOW)
   {
-    return;
+      Serial.println("Switch activé !");
+
+      // ➜ Avancer 10 cm
+      driveDistancePID(100, 200);
+
+      //  Relais OFF
+      relais_off();
+
+      // ➜ Avancer encore 10 cm
+      driveDistancePID(100, 200);
+
+      sequenceDone = true; // éviter répétition
   }
 
   if (teamSwitch.readTeam() == TeamSwitchTeam::A)
@@ -94,6 +163,19 @@ void loop()
     delay(1000);
     robot_rotate_gyro(-90, 200);
   }
+
+  lastSwitchState = currentSwitchState;
+  runSequence = false;
+}
+
+  //Servo Test
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
+
+  //driveDistancePID(-1000, 254);
+  //driveDistancePID(500, 254);
 
   // imAlive();
   // printEncodersVal();
@@ -119,8 +201,8 @@ void loop()
 
   // rotateAnglePID(90, 200);
 
-  runSequence = false;
-}
+
+
 
 // void loop() {
 //     printUltrasonicVal();  // Décommente
@@ -155,3 +237,4 @@ void loop()
 
 //     Serial.println("---");
 // }
+  //runSequence = false;
