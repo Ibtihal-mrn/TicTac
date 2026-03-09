@@ -1,13 +1,10 @@
 #include "ultrasonic.h"
-#include <Ultrasonic.h>
 #include "../../src/config.h"
 #include "../utils/Debug.h"
 
 
-// static int PIN_TRIG = US_TRIG_PIN;
-// static int PIN_ECHO = US_ECHO_PIN;
-
-Ultrasonic us(US_TRIG_PIN, US_ECHO_PIN, US_TIMEOUT);
+static int PIN_TRIG = US_TRIG_PIN;
+static int PIN_ECHO = US_ECHO_PIN;
 
 int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM;  // configurable dans config.h
 
@@ -20,7 +17,27 @@ bool ultrasonic_isObstacle() {
 
 // Private
 int8_t ultrasonic_read() {
-    return us.read(CM);
+    static bool initialized = false;
+    if (!initialized)
+    {
+        pinMode(PIN_TRIG, OUTPUT);
+        pinMode(PIN_ECHO, INPUT);
+        initialized = true;
+    }
+
+    digitalWrite(PIN_TRIG, LOW);
+    delayMicroseconds(2);
+    digitalWrite(PIN_TRIG, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(PIN_TRIG, LOW);
+
+    long duree = pulseIn(PIN_ECHO, HIGH, US_TIMEOUT);
+    if (duree == 0)
+    {
+        return -1;
+    }
+
+    return (int8_t)(duree / 58UL);
 }
 
 // =====
