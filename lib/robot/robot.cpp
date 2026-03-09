@@ -180,6 +180,16 @@ void rotateAnglePID(float angle_deg, int speed)
   // ----- Control Loop -----
   while (true)
   {
+
+    if (safety_update())
+    {
+      static unsigned long lp3 = 0;
+      motors.stopMotors();
+      if (DBG_MOTORS)
+        Serial0.print("Safety triggered\n");
+      continue;
+    }
+
     // Fixed 100Hz timing -----
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
@@ -288,70 +298,7 @@ void robot_step()
   // motors_applySpeeds(speedL, speedR);
 }
 
-void robot_rotate(float angle_deg, int speed)
-{
-  //   long targetTicks = ticks_for_rotation_deg(angle_deg);
 
-  //   long startL, startR;
-  //   encoders_read(&startL, &startR);
-
-  //   // choix du sens
-  //   if (angle_deg > 0) {
-  //       motors_rotateRight(speed);   // droite = angle positif
-  //   } else {
-  //       motors_rotateLeft(speed);    // gauche = angle négatif
-  //   }
-
-  //   while (true) {
-  //       long curL, curR;
-  //       encoders_read(&curL, &curR);
-
-  //       long dL = labs(curL - startL);
-  //       long dR = labs(curR - startR);
-
-  //       if ((dL + dR) / 2 >= labs(targetTicks)) {
-  //       break;
-  //       }
-  //   }
-
-  // motors_stop();
-  const uint16_t DT_MS = 10;
-  unsigned long tPrev = micros();
-
-  long targetTicks = ticks_for_rotation_deg(angle_deg);
-
-  long startL, startR;
-  encoders_read(&startL, &startR);
-
-  // if (angle_deg > 0) motors_rotateRight(speed);
-  // else              motors_rotateLeft(speed);
-
-  while (true)
-  {
-    unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
-      continue;
-    tPrev += (unsigned long)DT_MS * 1000UL;
-
-    safety_update();
-    if (safety_isTriggered())
-    {
-      // motors_stop();
-      return; // arrêt immédiat
-    }
-
-    long curL, curR;
-    encoders_read(&curL, &curR);
-
-    long dL = labs(curL - startL);
-    long dR = labs(curR - startR);
-
-    if ((dL + dR) / 2 >= labs(targetTicks))
-      break;
-  }
-
-  // motors_stop();
-}
 
 void robot_rotate_gyro(float target_deg, int pwmMax)
 {
@@ -386,6 +333,16 @@ void robot_rotate_gyro(float target_deg, int pwmMax)
 
   while (true)
   {
+
+    if (safety_update())
+    {
+      static unsigned long lp3 = 0;
+      motors.stopMotors();
+      if (DBG_MOTORS)
+        Serial0.print("Safety triggered\n");
+      continue;
+    }
+    
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
     {
