@@ -1,469 +1,512 @@
 """
-ui.py  —  Eurobot BLE Log Viewer (Direct BLE via bleak)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Connexion BLE DIRECTE à l'ESP32 "Eurobot" via le Nordic UART Service (NUS).
-Affiche en temps réel tous les logs/notifications BLE.
+ui.py  —  Eurobot BLE Bridge — Dual Device
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connects to TWO ESP32 BLE devices simultaneously via Nordic UART Service.
+Each device has its own log panel and command input.
 
-Flux :
-  ESP32 (BLEBridge NUS)  ──BLE notify──►  ui.py (bleak + Tkinter)
-
-Dépendances :
-  pip install bleak
-
-Usage :
-  python ui.py                                  # scan automatique "Eurobot"
-  python ui.py --device "Eurobot"               # nom BLE personnalisé
-  python ui.py --address AA:BB:CC:DD:EE:FF      # adresse MAC directe
+Dépendances :  pip install bleak
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-import threading
-import queue
 import asyncio
-import argparse
+import queue
+import threading
+import tkinter as tk
+from tkinter import ttk
 from datetime import datetime
 
 from bleak import BleakClient, BleakScanner
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-DEFAULT_DEVICE_NAME = "Eurobot"
-RECONNECT_DELAY_S   = 3
-
-# UUIDs Nordic UART Service — identiques à ceux dans BLEBridge.h (ESP32)
+# ── BLE NUS UUIDs ─────────────────────────────────────────────────────────────
 NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-NUS_TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # ESP32 → PC (notify)
+NUS_RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # PC → ESP32
+NUS_TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # ESP32 → PC
+
+TARGET_NAMES    = ["Eurobot", "Eurobot1"]   # one per panel
+MAX_LOG_LINES   = 800
+RECONNECT_S     = 3
+
+# ── Palette (Catppuccin Mocha) ────────────────────────────────────────────────
+BG        = "#1e1e2e"
+TEXT_BG   = "#181825"
+TEXT_FG   = "#cdd6f4"
+ACCENT    = "#89b4fa"
+GREEN     = "#a6e3a1"
+RED       = "#f38ba8"
+YELLOW    = "#f9e2af"
+DIM       = "#6c7086"
+BTN_BG    = "#313244"
+TITLE_CLR = "#cba6f7"
+BORDER    = "#45475a"
 
 
-# ── Palette ───────────────────────────────────────────────────────────────────
-BG           = "#1e1e2e"
-TEXT_BG      = "#181825"
-TEXT_FG      = "#cdd6f4"
-ACCENT       = "#89b4fa"
-GREEN        = "#a6e3a1"
-RED          = "#f38ba8"
-YELLOW       = "#f9e2af"
-DIM          = "#6c7086"
-BTN_BG       = "#313244"
-TITLE_CLR    = "#cba6f7"
+# ═════════════════════════════════════════════════════════════════════════════
+#  DevicePanel — one per BLE device (log + cmd + quick buttons)
+# ═════════════════════════════════════════════════════════════════════════════
+class DevicePanel:
+    """Self-contained panel for a single BLE device."""
 
-
-class EurobotBLEViewer(tk.Tk):
-    """Fenêtre principale — connexion BLE directe via bleak."""
-
-    def __init__(self, device_name: str, device_address: str | None):
-        super().__init__()
-
-        # ── Paramètres ────────────────────────────────────────────────────────
-        self.device_name    = device_name
-        self.device_address = device_address
-
-        # ── État interne ──────────────────────────────────────────────────────
-        self._client: BleakClient | None = None
-        self._connected  = False
-        self._ble_thread: threading.Thread | None = None
-        self._stop_event = threading.Event()
-        self._log_queue: queue.Queue[str | None] = queue.Queue()
-        self._ble_loop: asyncio.AbstractEventLoop | None = None
+    def __init__(self, parent: tk.Frame, label: str, app: "App",
+                 target_name: str = "Eurobot"):
+        self.app = app
+        self.label = label
+        self.target_name = target_name
+        self.client: BleakClient | None = None
+        self.address: str | None = None
+        self.connected = False
+        self._rx_char = None
+        self._cmd_history: list[str] = []
+        self._cmd_idx = -1
         self._line_count = 0
+        self._log_queue: queue.Queue[str | None] = queue.Queue()
 
-        # ── Construction UI ───────────────────────────────────────────────────
-        self._setup_window()
-        self._build_header()
-        self._build_controls()
-        self._build_status_bar()
-        self._build_log_area()
+        # ── outer frame ──────────────────────────────────────────────────
+        self.frame = tk.LabelFrame(
+            parent, text=f"  {label} — disconnected  ",
+            bg=BG, fg=DIM, font=("Segoe UI", 11, "bold"),
+            labelanchor="n", padx=6, pady=4)
+        self.frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        # ── Polling & fermeture ───────────────────────────────────────────────
-        self._poll_id = self.after(30, self._poll_queue_loop)
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        # ── status + connect row ─────────────────────────────────────────
+        row = tk.Frame(self.frame, bg=BG)
+        row.pack(fill=tk.X, pady=(0, 4))
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  UI CONSTRUCTION
-    # ─────────────────────────────────────────────────────────────────────────
-    def _setup_window(self):
-        self.title("Eurobot — BLE Log Viewer")
-        self.geometry("920x640")
-        self.minsize(700, 450)
-        self.configure(bg=BG)
-
-    def _build_header(self):
-        f = tk.Frame(self, bg=BG, pady=8)
-        f.pack(fill=tk.X, padx=16)
-        tk.Label(f, text="Eurobot BLE Log Viewer",
-                 font=("Segoe UI", 16, "bold"), bg=BG, fg=TITLE_CLR
-                 ).pack(side=tk.LEFT)
-
-    def _build_controls(self):
-        f = tk.Frame(self, bg=BG, pady=4)
-        f.pack(fill=tk.X, padx=16)
-
-        # Device input
-        tk.Label(f, text="Device:", bg=BG, fg=TEXT_FG,
-                 font=("Segoe UI", 10)).pack(side=tk.LEFT)
-        self._device_var = tk.StringVar(
-            value=self.device_address or self.device_name)
-        tk.Entry(f, textvariable=self._device_var, width=24,
-                 bg=BTN_BG, fg=TEXT_FG, insertbackground=TEXT_FG,
-                 relief=tk.FLAT, font=("Consolas", 10)
-                 ).pack(side=tk.LEFT, padx=(4, 16))
-
-        # Bouton Scan
-        self._scan_btn = tk.Button(
-            f, text="🔍  Scan", command=self._start_scan,
-            bg=BTN_BG, fg=TEXT_FG, font=("Segoe UI", 10),
-            relief=tk.FLAT, padx=10, pady=4, cursor="hand2")
-        self._scan_btn.pack(side=tk.LEFT, padx=(0, 8))
-
-        # Bouton Connect / Disconnect
-        self._connect_btn = tk.Button(
-            f, text="⚡  Connect BLE", command=self._toggle_connection,
-            bg=ACCENT, fg=BG, font=("Segoe UI", 10, "bold"),
-            relief=tk.FLAT, padx=12, pady=4, cursor="hand2")
-        self._connect_btn.pack(side=tk.LEFT)
-
-        # Clear
-        tk.Button(f, text="🗑  Clear", command=self._clear_logs,
-                  bg=BTN_BG, fg=TEXT_FG, font=("Segoe UI", 10),
-                  relief=tk.FLAT, padx=10, pady=4, cursor="hand2"
-                  ).pack(side=tk.LEFT, padx=8)
-
-        # Autoscroll
-        self._autoscroll = tk.BooleanVar(value=True)
-        tk.Checkbutton(f, text="Auto-scroll", variable=self._autoscroll,
-                       bg=BG, fg=TEXT_FG, selectcolor=BTN_BG,
-                       activebackground=BG, font=("Segoe UI", 10)
-                       ).pack(side=tk.LEFT, padx=4)
-
-        # Timestamps
-        self._timestamps = tk.BooleanVar(value=True)
-        tk.Checkbutton(f, text="Timestamps", variable=self._timestamps,
-                       bg=BG, fg=TEXT_FG, selectcolor=BTN_BG,
-                       activebackground=BG, font=("Segoe UI", 10)
-                       ).pack(side=tk.LEFT, padx=4)
-
-    def _build_status_bar(self):
-        f = tk.Frame(self, bg=BG, pady=2)
-        f.pack(fill=tk.X, padx=16)
-
-        self._dot = tk.Label(f, text="●", font=("Segoe UI", 12),
+        self._dot = tk.Label(row, text="●", font=("Segoe UI", 11),
                              bg=BG, fg=RED)
         self._dot.pack(side=tk.LEFT)
-        self._status_lbl = tk.Label(f, text="Déconnecté",
-                                    font=("Segoe UI", 10), bg=BG, fg=RED)
+        self._status_lbl = tk.Label(row, text="Disconnected",
+                                    font=("Segoe UI", 9), bg=BG, fg=RED)
         self._status_lbl.pack(side=tk.LEFT, padx=4)
-        self._lines_lbl = tk.Label(f, text="0 lignes",
-                                   font=("Segoe UI", 9), bg=BG, fg=DIM)
-        self._lines_lbl.pack(side=tk.RIGHT)
 
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X,
-                                                        padx=16, pady=4)
+        self._lines_lbl = tk.Label(row, text="0", font=("Segoe UI", 8),
+                                   bg=BG, fg=DIM)
+        self._lines_lbl.pack(side=tk.RIGHT, padx=4)
 
-    def _build_log_area(self):
-        f = tk.Frame(self, bg=BG)
-        f.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 12))
+        self._connect_btn = tk.Button(
+            row, text="⚡ Connect", bg=ACCENT, fg=BG,
+            font=("Segoe UI", 9, "bold"), relief=tk.FLAT,
+            padx=8, pady=2, cursor="hand2",
+            command=lambda: app.schedule(self._toggle()))
+        self._connect_btn.pack(side=tk.RIGHT, padx=2)
+
+        tk.Button(row, text="🗑", bg=BTN_BG, fg=TEXT_FG,
+                  font=("Segoe UI", 9), relief=tk.FLAT, padx=6,
+                  cursor="hand2", command=self._clear_log
+                  ).pack(side=tk.RIGHT, padx=2)
+
+        # ── log area ─────────────────────────────────────────────────────
+        log_frame = tk.Frame(self.frame, bg=BG)
+        log_frame.pack(fill=tk.BOTH, expand=True)
 
         self._log = tk.Text(
-            f, bg=TEXT_BG, fg=TEXT_FG, font=("Consolas", 11),
+            log_frame, bg=TEXT_BG, fg=TEXT_FG, font=("Consolas", 10),
             relief=tk.FLAT, wrap=tk.WORD, state=tk.DISABLED,
             selectbackground=BTN_BG, insertbackground=TEXT_FG,
-            padx=8, pady=6)
+            padx=6, pady=4)
         self._log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        sb = tk.Scrollbar(f, command=self._log.yview,
+        sb = tk.Scrollbar(log_frame, command=self._log.yview,
                           bg=BTN_BG, troughcolor=BG, relief=tk.FLAT)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self._log.config(yscrollcommand=sb.set)
 
-        # Tags de coloration
-        for tag, fg in [("ts", DIM), ("normal", TEXT_FG),
-                        ("info", ACCENT), ("warn", YELLOW),
-                        ("error", RED), ("ok", GREEN)]:
-            self._log.tag_config(tag, foreground=fg)
+        for tag, fg in [("ts", DIM), ("info", TEXT_FG), ("fsm", ACCENT),
+                        ("error", RED), ("warn", YELLOW), ("ok", GREEN),
+                        ("cmd_echo", TITLE_CLR)]:
+            self._log.tag_configure(tag, foreground=fg)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  BLE SCAN
-    # ─────────────────────────────────────────────────────────────────────────
-    def _start_scan(self):
-        self._scan_btn.config(state=tk.DISABLED, text="⏳ Scanning…")
-        self._push("[UI] Scan BLE en cours (5 s)…\n")
+        # ── quick buttons ────────────────────────────────────────────────
+        qf = tk.Frame(self.frame, bg=BG)
+        qf.pack(fill=tk.X, pady=(4, 2))
 
-        def _run():
-            loop = asyncio.new_event_loop()
-            try:
-                devs = loop.run_until_complete(
-                    BleakScanner.discover(timeout=5.0))
-                if not devs:
-                    self._push("[UI] Aucun appareil BLE trouvé.\n")
-                else:
-                    self._push(f"[UI] {len(devs)} appareil(s) :\n")
-                    for d in sorted(devs,
-                                    key=lambda x: x.rssi or -999,
-                                    reverse=True):
-                        name = d.name or "?"
-                        self._push(
-                            f"  📡 {name}  [{d.address}]  RSSI={d.rssi}\n")
-            except Exception as e:
-                self._push(f"[UI] Erreur scan : {e}\n")
-            finally:
-                loop.close()
-                self.after(0, lambda: self._scan_btn.config(
-                    state=tk.NORMAL, text="🔍  Scan"))
+        for txt, clr in [("MOVE 100", ACCENT), ("ROTATE 90", ACCENT),
+                         ("STOP", RED), ("STATUS", GREEN), ("RESET", YELLOW)]:
+            tk.Button(qf, text=txt, bg=BTN_BG, fg=clr,
+                      font=("Consolas", 8), relief=tk.FLAT,
+                      padx=6, pady=1, cursor="hand2",
+                      command=lambda c=txt: self._send_quick(c)
+                      ).pack(side=tk.LEFT, padx=2)
 
-        threading.Thread(target=_run, daemon=True).start()
+        tk.Button(qf, text="PING", bg=BTN_BG, fg=TITLE_CLR,
+                  font=("Consolas", 8, "bold"), relief=tk.FLAT,
+                  padx=6, pady=1, cursor="hand2",
+                  command=self._send_ping
+                  ).pack(side=tk.LEFT, padx=2)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  BLE CONNECT / DISCONNECT
-    # ─────────────────────────────────────────────────────────────────────────
-    def _toggle_connection(self):
-        if self._connected:
-            self._disconnect()
-        else:
-            self._connect()
+        self._ping_time = None  # for RTT measurement
 
-    def _connect(self):
-        target = self._device_var.get().strip()
-        if not target:
-            messagebox.showerror("Erreur", "Entrez un nom ou une adresse MAC")
-            return
-        self._stop_event.clear()
-        self._connect_btn.config(state=tk.DISABLED, text="⏳ Connecting…")
-        self._ble_thread = threading.Thread(
-            target=self._ble_thread_entry, args=(target,), daemon=True)
-        self._ble_thread.start()
+        # ── command input ────────────────────────────────────────────────
+        cf = tk.Frame(self.frame, bg=BG)
+        cf.pack(fill=tk.X, pady=(2, 0))
 
-    def _disconnect(self):
-        self._stop_event.set()
-        if self._ble_loop and self._ble_loop.is_running():
-            self._ble_loop.call_soon_threadsafe(self._ble_loop.stop)
-        self._set_status(False)
+        tk.Label(cf, text="bleSerial >", bg=BG, fg=ACCENT,
+                 font=("Consolas", 10, "bold")).pack(side=tk.LEFT)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  BLE THREAD  (boucle asyncio dédiée)
-    # ─────────────────────────────────────────────────────────────────────────
-    def _ble_thread_entry(self, target: str):
-        """Thread dédié : sa propre boucle asyncio pour bleak."""
-        self._ble_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._ble_loop)
-        try:
-            self._ble_loop.run_until_complete(
-                self._ble_run(target))
-        except Exception as e:
-            self._push(f"[UI] Erreur fatale BLE : {e}\n")
-        finally:
-            self._ble_loop.close()
-            self._ble_loop = None
-            self._push(None)  # signal → déconnecté
+        self._cmd_var = tk.StringVar()
+        self._cmd_entry = tk.Entry(
+            cf, textvariable=self._cmd_var, bg=TEXT_BG, fg=TEXT_FG,
+            insertbackground=ACCENT, relief=tk.FLAT, font=("Consolas", 10),
+            highlightbackground=BORDER, highlightthickness=1)
+        self._cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 4))
+        self._cmd_entry.bind("<Return>", lambda _: self._send_entry())
+        self._cmd_entry.bind("<Up>", lambda _: self._hist_prev())
+        self._cmd_entry.bind("<Down>", lambda _: self._hist_next())
 
-    async def _ble_run(self, target: str):
-        """Connexion + écoute notifications, avec reconnexion automatique."""
-        while not self._stop_event.is_set():
+        tk.Button(cf, text="▶", bg=GREEN, fg=BG,
+                  font=("Segoe UI", 9, "bold"), relief=tk.FLAT,
+                  padx=8, cursor="hand2",
+                  command=self._send_entry).pack(side=tk.LEFT)
 
-            # ── Résolution de l'adresse ───────────────────────────────────
-            device = await self._resolve(target)
-            if device is None:
-                self._push(
-                    f"[UI] « {target} » introuvable — "
-                    f"retry dans {RECONNECT_DELAY_S} s\n")
-                self._push(None)
-                await asyncio.sleep(RECONNECT_DELAY_S)
-                continue
+        # ── start polling ────────────────────────────────────────────────
+        self._poll()
 
-            # ── Connexion ─────────────────────────────────────────────────
-            addr_str = device if isinstance(device, str) else device.address
-            self._push(f"[UI] Connexion BLE à {addr_str}…\n")
-            try:
-                async with BleakClient(device, timeout=20.0) as client:
-                    if not client.is_connected:
-                        raise ConnectionError("échec connexion GATT")
-
-                    self._client = client
-                    self._push(f"[UI] ✅ Connecté à {addr_str}\n")
-                    self.after(0, lambda: self._set_status(True))
-
-                    # ── Trouver la caractéristique NUS TX ─────────────────
-                    tx_char = self._find_tx_char(client)
-                    if tx_char is None:
-                        self._push(
-                            "[UI] ⚠️ Caractéristique NUS TX introuvable. "
-                            "Services disponibles :\n")
-                        for svc in client.services:
-                            self._push(f"  service {svc.uuid}\n")
-                            for c in svc.characteristics:
-                                self._push(
-                                    f"    char {c.uuid}  "
-                                    f"props={c.properties}\n")
-                        await asyncio.sleep(RECONNECT_DELAY_S)
-                        continue
-
-                    # ── Callback de notification ──────────────────────
-                    def _on_notify(_sender, data: bytearray):
-                        print(f"[DBG] notify {len(data)}B: "
-                              f"{data[:60]}")  # stdout debug
-                        text = data.decode("utf-8", errors="replace")
-                        for line in text.splitlines(keepends=True):
-                            if line.strip():
-                                self._push(
-                                    line if line.endswith("\n")
-                                    else line + "\n")
-
-                    await client.start_notify(tx_char, _on_notify)
-                    self._push(
-                        f"[UI] Abonné aux notifications : {tx_char.uuid}\n")
-
-                    # ── Maintien de la connexion ──────────────────────────
-                    while (not self._stop_event.is_set()
-                           and client.is_connected):
-                        await asyncio.sleep(0.5)
-
-                    try:
-                        await client.stop_notify(tx_char)
-                    except Exception:
-                        pass
-
-            except Exception as e:
-                self._push(f"[UI] Connexion perdue : {e}\n")
-
-            # ── Déconnexion / retry ───────────────────────────────────────
-            self._client = None
-            self._push(None)
-            self.after(0, lambda: self._set_status(False))
-
-            if not self._stop_event.is_set():
-                self._push(
-                    f"[UI] Reconnexion dans {RECONNECT_DELAY_S} s…\n")
-                await asyncio.sleep(RECONNECT_DELAY_S)
-
-    # ── Helpers BLE ───────────────────────────────────────────────────────────
-    async def _resolve(self, target: str):
-        """Nom → BLEDevice objet (ou adresse MAC brute si déjà une MAC)."""
-        if len(target) == 17 and target.count(":") == 5:
-            return target
-        self._push(f"[UI] Recherche de « {target} »…\n")
-        devs = await BleakScanner.discover(timeout=8.0, return_adv=False)
-        for d in devs:
-            if d.name and target.lower() in d.name.lower():
-                self._push(f"[UI] Trouvé : {d.name} [{d.address}]\n")
-                return d   # retourne le BLEDevice, pas juste l'adresse
-        return None
-
-    @staticmethod
-    def _find_tx_char(client: BleakClient):
-        """Cherche la caractéristique NUS TX dans les services GATT."""
-        for svc in client.services:
-            for c in svc.characteristics:
-                if c.uuid == NUS_TX_CHAR_UUID:
-                    return c
-        # Fallback : première caractéristique avec « notify »
-        for svc in client.services:
-            for c in svc.characteristics:
-                if "notify" in c.properties:
-                    return c
-        return None
-
-    # ─────────────────────────────────────────────────────────────────────────
-    #  LOG QUEUE  (thread-safe : BLE thread → main thread Tkinter)
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── log helpers ──────────────────────────────────────────────────────
     def _push(self, msg: str | None):
-        """Appelé depuis n'importe quel thread. None = signal de statut."""
         self._log_queue.put(msg)
 
-    def _poll_queue_loop(self):
-        """Vide la queue et injecte dans le widget Text (thread principal)."""
+    def _poll(self):
         try:
             while True:
                 item = self._log_queue.get_nowait()
                 if item is None:
-                    self._refresh_status()
+                    self._refresh_ui_status()
                 else:
                     self._append(item)
         except queue.Empty:
             pass
-        self._poll_id = self.after(30, self._poll_queue_loop)
+        self.frame.after(30, self._poll)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  AFFICHAGE LOGS
-    # ─────────────────────────────────────────────────────────────────────────
     def _append(self, line: str):
         self._log.config(state=tk.NORMAL)
-        if self._timestamps.get():
-            ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            self._log.insert(tk.END, f"[{ts}] ", "ts")
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        self._log.insert(tk.END, f"[{ts}] ", "ts")
         self._log.insert(tk.END,
                          line if line.endswith("\n") else line + "\n",
                          self._tag_for(line))
+        # trim old lines
+        total = int(self._log.index("end-1c").split(".")[0])
+        if total > MAX_LOG_LINES:
+            self._log.delete("1.0", f"{total - MAX_LOG_LINES}.0")
         self._log.config(state=tk.DISABLED)
+        self._log.see(tk.END)
         self._line_count += 1
-        self._lines_lbl.config(text=f"{self._line_count} lignes")
-        if self._autoscroll.get():
-            self._log.see(tk.END)
+        self._lines_lbl.config(text=str(self._line_count))
+
+    def _append_cmd(self, line: str):
+        self._log.config(state=tk.NORMAL)
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        self._log.insert(tk.END, f"[{ts}] ", "ts")
+        self._log.insert(tk.END, line + "\n", "cmd_echo")
+        self._log.config(state=tk.DISABLED)
+        self._log.see(tk.END)
+        self._line_count += 1
+        self._lines_lbl.config(text=str(self._line_count))
 
     @staticmethod
     def _tag_for(line: str) -> str:
         lo = line.lower()
-        if any(k in lo for k in ("error", "fail", "erreur")):
+        if any(k in lo for k in ("error", "fail", "emergency")):
             return "error"
-        if any(k in lo for k in ("warn", "warning", "attention")):
+        if any(k in lo for k in ("warn", "warning")):
             return "warn"
-        if any(k in lo for k in ("[ui]", "connecté", "connected", "✅")):
+        if any(k in lo for k in ("✅", "complete", "done", "ready")):
             return "ok"
-        if any(k in lo for k in ("[bt]", "[ble]", "notify", "scan")):
-            return "info"
-        return "normal"
+        if any(k in lo for k in ("[fsm]", "dispatch", "exec_")):
+            return "fsm"
+        return "info"
 
-    def _clear_logs(self):
+    def _clear_log(self):
         self._log.config(state=tk.NORMAL)
         self._log.delete("1.0", tk.END)
         self._log.config(state=tk.DISABLED)
         self._line_count = 0
-        self._lines_lbl.config(text="0 lignes")
+        self._lines_lbl.config(text="0")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  STATUT
-    # ─────────────────────────────────────────────────────────────────────────
-    def _refresh_status(self):
-        ok = self._client is not None and self._client.is_connected
-        self._set_status(ok)
-
-    def _set_status(self, connected: bool):
-        self._connected = connected
-        if connected:
-            self._dot.config(fg=GREEN)
-            self._status_lbl.config(
-                text=f"Connecté BLE — {self._device_var.get()}", fg=GREEN)
-            self._connect_btn.config(
-                text="✕  Disconnect", bg=RED, fg=BG, state=tk.NORMAL)
+    # ── BLE connection ───────────────────────────────────────────────────
+    async def _toggle(self):
+        if self.connected:
+            await self._disconnect()
         else:
-            self._dot.config(fg=RED)
-            self._status_lbl.config(text="Déconnecté", fg=RED)
+            await self._connect()
+
+    async def _connect(self):
+        self._push("[UI] Scanning…\n")
+        self._set_status("Scanning…", YELLOW)
+
+        devices = await BleakScanner.discover(timeout=5.0)
+        candidates = [d for d in devices if d.name and self.target_name in d.name]
+
+        # exclude addresses already used by the other panel
+        used = {p.address for p in self.app.panels
+                if p is not self and p.address and p.connected}
+        candidates = [d for d in candidates if d.address not in used]
+
+        if not candidates:
+            self._push("[UI] No available device found.\n")
+            self._set_status("Not found", RED)
+            return
+
+        device = candidates[0]
+        self.address = device.address
+        self._push(f"[UI] Found {device.name} [{device.address}]\n")
+        self._set_status("Connecting…", YELLOW)
+
+        try:
+            self.client = BleakClient(
+                device.address,
+                disconnected_callback=self._on_disconnect_cb)
+            await self.client.connect(timeout=15.0)
+
+            # find NUS characteristics
+            self._rx_char = None
+            for svc in self.client.services:
+                for c in svc.characteristics:
+                    if c.uuid == NUS_TX_UUID:
+                        await self.client.start_notify(c, self._on_notify)
+                        self._push(f"[UI] Subscribed to TX: {c.uuid}\n")
+                    if c.uuid == NUS_RX_UUID:
+                        self._rx_char = c
+                        self._push(f"[UI] Found RX: {c.uuid}\n")
+
+            self.connected = True
+            short = device.address[-5:]
+            self._set_status(f"Connected [{short}]", GREEN)
+            self._update_title(f"  {self.label} — {device.name} [{short}]  ")
+            self._push("[UI] ✅ Connected — type MOVE, ROTATE, STOP, STATUS, RESET\n")
+
+        except Exception as e:
+            self._push(f"[UI] Connection failed: {e}\n")
+            self._set_status("Failed", RED)
+            self.client = None
+
+    async def _disconnect(self):
+        if self.client and self.client.is_connected:
+            try:
+                await self.client.disconnect()
+            except Exception:
+                pass
+        self._cleanup()
+
+    def _on_disconnect_cb(self, _client):
+        self.frame.after(0, self._cleanup)
+        self._push("[UI] Device disconnected.\n")
+
+    def _cleanup(self):
+        self.connected = False
+        self.address = None
+        self.client = None
+        self._rx_char = None
+        self._set_status("Disconnected", RED)
+        self._update_title(f"  {self.label} — disconnected  ")
+        self._connect_btn.config(text="⚡ Connect", bg=ACCENT)
+
+    def _on_notify(self, _sender, data: bytearray):
+        text = data.decode("utf-8", errors="replace").strip()
+        if text:
+            # Measure RTT on PONG reception
+            if "[PONG]" in text and self._ping_time is not None:
+                rtt = (datetime.now() - self._ping_time).total_seconds() * 1000
+                text += f"  ← RTT: {rtt:.1f} ms"
+                self._ping_time = None
+            self._push(text + "\n")
+
+    # ── send commands ────────────────────────────────────────────────────
+    async def _ble_write(self, cmd: str):
+        if not self.client or not self.client.is_connected or not self._rx_char:
+            self._push("[UI] ⚠️ Not connected — command not sent\n")
+            return
+        try:
+            await self.client.write_gatt_char(
+                self._rx_char, (cmd + "\n").encode("utf-8"), response=False)
+        except Exception as e:
+            self._push(f"[UI] Send error: {e}\n")
+
+    def _send_ping(self):
+        """Send PING and start RTT timer."""
+        self._ping_time = datetime.now()
+        self._send_quick("PING")
+
+    def _send_quick(self, cmd: str):
+        self._append_cmd(f">>> {cmd}")
+        if self.connected:
+            self.app.schedule(self._ble_write(cmd))
+        else:
+            self._push("[UI] ⚠️ Not connected\n")
+
+    def _send_entry(self):
+        cmd = self._cmd_var.get().strip()
+        if not cmd:
+            return
+        self._cmd_history.append(cmd)
+        self._cmd_idx = -1
+        self._cmd_var.set("")
+        self._send_quick(cmd)
+
+    # ── history ──────────────────────────────────────────────────────────
+    def _hist_prev(self):
+        if not self._cmd_history:
+            return
+        if self._cmd_idx == -1:
+            self._cmd_idx = len(self._cmd_history) - 1
+        elif self._cmd_idx > 0:
+            self._cmd_idx -= 1
+        self._cmd_var.set(self._cmd_history[self._cmd_idx])
+
+    def _hist_next(self):
+        if self._cmd_idx == -1:
+            return
+        if self._cmd_idx < len(self._cmd_history) - 1:
+            self._cmd_idx += 1
+            self._cmd_var.set(self._cmd_history[self._cmd_idx])
+        else:
+            self._cmd_idx = -1
+            self._cmd_var.set("")
+
+    # ── UI state helpers ─────────────────────────────────────────────────
+    def _set_status(self, text: str, color: str):
+        self.frame.after(0, lambda: (
+            self._dot.config(fg=color),
+            self._status_lbl.config(text=text, fg=color),
             self._connect_btn.config(
-                text="⚡  Connect BLE", bg=ACCENT, fg=BG, state=tk.NORMAL)
+                text="✕ Disconnect" if self.connected else "⚡ Connect",
+                bg=RED if self.connected else ACCENT),
+        ))
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  FERMETURE PROPRE
-    # ─────────────────────────────────────────────────────────────────────────
+    def _refresh_ui_status(self):
+        ok = self.client is not None and self.connected
+        self._set_status(
+            f"Connected [{self.address[-5:]}]" if ok and self.address else "Disconnected",
+            GREEN if ok else RED)
+
+    def _update_title(self, title: str):
+        self.frame.after(0, lambda: self.frame.config(text=title))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  App — main window hosting two DevicePanels + shared async loop
+# ═════════════════════════════════════════════════════════════════════════════
+class App:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("BLE Bridge — Dual Device")
+        self.root.geometry("1280x660")
+        self.root.minsize(900, 480)
+        self.root.configure(bg=BG)
+
+        # ── toolbar ──────────────────────────────────────────────────────
+        bar = tk.Frame(self.root, bg=BG, pady=6)
+        bar.pack(fill=tk.X, padx=12)
+
+        tk.Label(bar, text="Eurobot BLE Bridge",
+                 font=("Segoe UI", 14, "bold"), bg=BG, fg=TITLE_CLR
+                 ).pack(side=tk.LEFT)
+
+        tk.Button(bar, text="⚡ Connect All", bg=ACCENT, fg=BG,
+                  font=("Segoe UI", 9, "bold"), relief=tk.FLAT,
+                  padx=10, pady=3, cursor="hand2",
+                  command=lambda: self.schedule(self._connect_all())
+                  ).pack(side=tk.LEFT, padx=(20, 4))
+
+        tk.Button(bar, text="✕ Disconnect All", bg=RED, fg=BG,
+                  font=("Segoe UI", 9, "bold"), relief=tk.FLAT,
+                  padx=10, pady=3, cursor="hand2",
+                  command=lambda: self.schedule(self._disconnect_all())
+                  ).pack(side=tk.LEFT, padx=4)
+
+        # broadcast command
+        tk.Label(bar, text="Broadcast:", bg=BG, fg=DIM,
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(16, 4))
+
+        self._broadcast_var = tk.StringVar(value="STATUS")
+        bc_entry = tk.Entry(bar, textvariable=self._broadcast_var, width=20,
+                            bg=TEXT_BG, fg=TEXT_FG, insertbackground=ACCENT,
+                            relief=tk.FLAT, font=("Consolas", 10),
+                            highlightbackground=BORDER, highlightthickness=1)
+        bc_entry.pack(side=tk.LEFT, padx=2)
+        bc_entry.bind("<Return>", lambda _: self._broadcast())
+
+        tk.Button(bar, text="▶ All", bg=GREEN, fg=BG,
+                  font=("Segoe UI", 9, "bold"), relief=tk.FLAT,
+                  padx=8, pady=3, cursor="hand2",
+                  command=self._broadcast
+                  ).pack(side=tk.LEFT, padx=4)
+
+        # scan button
+        self._scan_btn = tk.Button(
+            bar, text="🔍 Scan", bg=BTN_BG, fg=TEXT_FG,
+            font=("Segoe UI", 9), relief=tk.FLAT,
+            padx=8, pady=3, cursor="hand2",
+            command=lambda: self.schedule(self._scan()))
+        self._scan_btn.pack(side=tk.RIGHT, padx=4)
+
+        ttk.Separator(self.root, orient=tk.HORIZONTAL).pack(fill=tk.X,
+                                                              padx=12, pady=4)
+
+        # ── panels container ─────────────────────────────────────────────
+        container = tk.Frame(self.root, bg=BG)
+        container.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+
+        self.panels: list[DevicePanel] = [
+            DevicePanel(container, "Device 1", self, target_name=TARGET_NAMES[0]),
+            DevicePanel(container, "Device 2", self, target_name=TARGET_NAMES[1]),
+        ]
+
+        # ── async event loop (background thread) ─────────────────────────
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(target=self._run_loop, daemon=True).start()
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def schedule(self, coro):
+        asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    # ── bulk actions ─────────────────────────────────────────────────────
+    async def _connect_all(self):
+        for p in self.panels:
+            if not p.connected:
+                await p._connect()
+
+    async def _disconnect_all(self):
+        for p in self.panels:
+            if p.connected:
+                await p._disconnect()
+
+    async def _scan(self):
+        for p in self.panels:
+            p._push("[UI] Scanning BLE (5s)…\n")
+        devices = await BleakScanner.discover(timeout=5.0)
+        for p in self.panels:
+            if not devices:
+                p._push("[UI] No BLE devices found.\n")
+            else:
+                p._push(f"[UI] {len(devices)} device(s):\n")
+                for d in sorted(devices, key=lambda x: x.rssi or -999,
+                                reverse=True):
+                    name = d.name or "?"
+                    p._push(f"  📡 {name}  [{d.address}]  RSSI={d.rssi}\n")
+
+    def _broadcast(self):
+        cmd = self._broadcast_var.get().strip()
+        if not cmd:
+            return
+        for p in self.panels:
+            if p.connected:
+                p._append_cmd(f">>> [BROADCAST] {cmd}")
+                self.schedule(p._ble_write(cmd))
+
+    # ── run / close ──────────────────────────────────────────────────────
+    def run(self):
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.mainloop()
+
     def _on_close(self):
-        self._disconnect()
-        if self._poll_id:
-            self.after_cancel(self._poll_id)
-        self.destroy()
-
-
-# ── Entrypoint ────────────────────────────────────────────────────────────────
-def main():
-    parser = argparse.ArgumentParser(
-        description="Eurobot BLE Log Viewer (direct BLE via bleak)")
-    parser.add_argument("--device", default=DEFAULT_DEVICE_NAME,
-                        help="Nom BLE de l'appareil (défaut: Eurobot)")
-    parser.add_argument("--address", default=None,
-                        help="Adresse MAC BLE directe (ex: AA:BB:CC:DD:EE:FF)")
-    args = parser.parse_args()
-
-    app = EurobotBLEViewer(
-        device_name=args.device,
-        device_address=args.address)
-    app.mainloop()
+        for p in self.panels:
+            if p.connected and p.client:
+                self.schedule(p._disconnect())
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self.root.after(300, self.root.destroy)
 
 
 if __name__ == "__main__":
-    main()
+    App().run()

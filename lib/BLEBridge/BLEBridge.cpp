@@ -1,40 +1,27 @@
 /**
- * BLEBridge.cpp  —  ESP32-S3 side
+ * BLEBridge.cpp — ESP32 BLE Bridge (Nordic UART Service)
  *
- * Implémentation du péripérique BLE (NUS – Nordic UART Service).
- *
- * Flux de données :
- *   Serial.print() (code existant)
- *         │
- *         ▼  (appels manuels via bleBridge.sendLog())
- *   BLEBridge::sendLog()
- *         │  → copie dans logQueue_ (FreeRTOS queue, thread-safe)
- *         ▼
- *   BLEBridge::update()  ← appelé dans loop()
- *         │  → flush queue → notify(txChar_) → PC via BLE
- *         ▼
- *   BluetoothManager (PC Linux/BlueZ)
- *         │  → BackendServer (TCP)
- *         ▼
- *   UI Python
+ * Implémentation du périphérique BLE NUS.
+ * - TX (notify) : logs ESP32 → PC
+ * - RX (write)  : commandes PC → ESP32, parsées et mises en queue
  */
 
 #include "BLEBridge.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 
-// ── Singleton global ─────────────────────────────────────────────────────────
+// ── Singletons ───────────────────────────────────────────────────────────────
 BLEBridge bleBridge;
+BleSerial bleSerial;
 
-// ── Singleton TeeSerial ──────────────────────────────────────────────────────
-TeeSerial bleSerial;
+// ── Forward declaration ──────────────────────────────────────────────────────
+static void onRxWrite(NimBLECharacteristic* pChar);
 
-// ── Callback RX (PC → ESP32) — pas de commande pour l'instant, log seulement ─
+// ── Callbacks RX (PC → ESP32) ────────────────────────────────────────────────
 class RxCallback : public NimBLECharacteristicCallbacks {
     void onWrite(NimBLECharacteristic* pChar) override {
-        // Réservé pour les futures commandes
-        // Pour l'instant on ignore les données reçues
-        (void)pChar;
+        onRxWrite(pChar);
     }
 };
 static RxCallback rxCallback;
@@ -43,19 +30,19 @@ static RxCallback rxCallback;
 BLEBridge::BLEBridge() = default;
 
 BLEBridge::~BLEBridge() {
-    if (logQueue_) {
-        vQueueDelete(logQueue_);
-        logQueue_ = nullptr;
-    }
+    if (logQueue_) { vQueueDelete(logQueue_); logQueue_ = nullptr; }
+    if (cmdQueue_) { vQueueDelete(cmdQueue_); cmdQueue_ = nullptr; }
     NimBLEDevice::deinit(true);
 }
 
-// ── begin() ─────────────────────────────────────────────────────────────────
+// ── begin() ──────────────────────────────────────────────────────────────────
 void BLEBridge::begin(const char* deviceName) {
-    // Créer la file FreeRTOS (messages char[BLE_MAX_MSG_LEN])
+    // Créer les files FreeRTOS
     logQueue_ = xQueueCreate(BLE_QUEUE_DEPTH, BLE_MAX_MSG_LEN);
-    if (!logQueue_) {
-        Serial.println("[BLEBridge] ERREUR: impossible de créer la file de logs");
+    cmdQueue_ = xQueueCreate(BLE_CMD_QUEUE_DEPTH, sizeof(RobotCommand));
+
+    if (!logQueue_ || !cmdQueue_) {
+        Serial.println("[BLEBridge] ERREUR: impossible de créer les queues");
         return;
     }
 
@@ -70,7 +57,7 @@ void BLEBridge::begin(const char* deviceName) {
     // Service NUS
     service_ = server_->createService(NUS_SERVICE_UUID);
 
-    // Caractéristique TX (ESP32 → PC) : NOTIFY + READ (Windows compat)
+    // Caractéristique TX (ESP32 → PC) : NOTIFY + READ
     txChar_ = service_->createCharacteristic(
         NUS_TX_CHAR_UUID,
         NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ
@@ -114,17 +101,16 @@ void BLEBridge::sendLog(const char* msg) {
     if (!logQueue_ || !msg) return;
 
     char buf[BLE_MAX_MSG_LEN] = {};
-    // Tronquer si nécessaire, garantir terminaison '\n' pour l'UI Python
     size_t len = strnlen(msg, BLE_MAX_MSG_LEN - 2);
     memcpy(buf, msg, len);
+    // Garantir '\n' pour l'UI Python
     if (len > 0 && buf[len - 1] != '\n') {
         buf[len]     = '\n';
         buf[len + 1] = '\0';
     } else {
         buf[len] = '\0';
     }
-
-    // Envoi non bloquant depuis ISR ou tâche (0 = pas d'attente)
+    // Non-bloquant (0 = pas d'attente)
     xQueueSendToBack(logQueue_, buf, 0);
 }
 
@@ -132,44 +118,9 @@ void BLEBridge::sendLog(const String& msg) {
     sendLog(msg.c_str());
 }
 
-// ── update() ─────────────────────────────────────────────────────────────────
+// ── update() — appeler dans la tâche BLE (Core 0) ───────────────────────────
 void BLEBridge::update() {
-    // ── Diagnostic : log transition de connected_ ──
-    static bool wasConn = false;
-    if (connected_ != wasConn) {
-        Serial.printf("[BLE-DBG] connected_ %d -> %d  connHandle_=%d\n",
-                      wasConn, (int)connected_, connHandle_);
-        wasConn = connected_;
-    }
-
     if (!connected_ || connHandle_ == 0xFFFF) return;
-
-    // ── Heartbeat direct : 1 notification brute toutes les 3 s ──
-    //    Teste le chemin BLE SANS la queue.
-    static unsigned long lastHB = 0;
-    if (millis() - lastHB >= 3000) {
-        const char hb[] = "[BLE-HB] heartbeat\n";
-        uint16_t attrH = txChar_->getHandle();
-
-        // Méthode 1 : API bas-niveau (bypass m_subscribedVec)
-        os_mbuf *om = ble_hs_mbuf_from_flat(
-            reinterpret_cast<const uint8_t*>(hb), sizeof(hb) - 1);
-        int rc1 = -99;
-        if (om) {
-            rc1 = ble_gattc_notify_custom(connHandle_, attrH, om);
-        }
-
-        // Méthode 2 : API haut-niveau NimBLE-Arduino (utilise m_subscribedVec)
-        txChar_->setValue(reinterpret_cast<const uint8_t*>(hb), sizeof(hb) - 1);
-        txChar_->notify();
-
-        Serial.printf("[BLE-DBG] HB conn=%d attr=%d rc_low=%d subs=%d\n",
-                      connHandle_, attrH, rc1,
-                      (int)txChar_->getSubscribedCount());
-
-        lastHB = millis();
-    }
-
     flushQueue_();
 }
 
@@ -181,25 +132,94 @@ void BLEBridge::flushQueue_() {
     uint16_t attrHandle = txChar_->getHandle();
     int count = 0;
 
-    // Vider toute la file en une passe de loop()
     while (xQueueReceive(logQueue_, buf, 0) == pdTRUE) {
         size_t len = strnlen(buf, BLE_MAX_MSG_LEN);
 
-        // Envoi direct via l'API bas-niveau NimBLE.
-        os_mbuf *om = ble_hs_mbuf_from_flat(
+        os_mbuf* om = ble_hs_mbuf_from_flat(
             reinterpret_cast<uint8_t*>(buf), len);
         if (om) {
             int rc = ble_gattc_notify_custom(connHandle_, attrHandle, om);
             if (rc != 0) {
-                Serial.printf("[BLE-DBG] flush notify ERR rc=%d\n", rc);
+                Serial.printf("[BLE] flush notify ERR rc=%d\n", rc);
             }
         }
         count++;
+        vTaskDelay(pdMS_TO_TICKS(2));  // Ne pas saturer la liaison
+    }
+}
 
-        // Petit délai pour ne pas saturer la liaison BLE
-        vTaskDelay(pdMS_TO_TICKS(2));
+// ── Parsing des commandes reçues du PC ───────────────────────────────────────
+void BLEBridge::parseCommand_(const char* raw, size_t len) {
+    if (!cmdQueue_ || len == 0) return;
+
+    RobotCommand cmd = {};
+    // Copier le texte brut
+    size_t cpLen = (len < BLE_MAX_MSG_LEN - 1) ? len : (BLE_MAX_MSG_LEN - 1);
+    memcpy(cmd.raw, raw, cpLen);
+    cmd.raw[cpLen] = '\0';
+
+    // Trim trailing whitespace/newline
+    for (int i = cpLen - 1; i >= 0; i--) {
+        if (cmd.raw[i] == '\n' || cmd.raw[i] == '\r' || cmd.raw[i] == ' ')
+            cmd.raw[i] = '\0';
+        else
+            break;
     }
-    if (count > 0) {
-        Serial.printf("[BLE-DBG] flushed %d msgs\n", count);
+
+    // Parser la commande (case-insensitive)
+    char upper[BLE_MAX_MSG_LEN];
+    for (size_t i = 0; i <= cpLen; i++) upper[i] = toupper(cmd.raw[i]);
+
+    // Extraire le premier mot et un éventuel paramètre
+    char* space = strchr(upper, ' ');
+    float param = 0.0f;
+    if (space) {
+        *space = '\0';
+        param = atof(space + 1);
     }
+
+    if (strcmp(upper, "MOVE") == 0) {
+        cmd.type = RobotCommandType::MOVE;
+        cmd.value = param;
+    } else if (strcmp(upper, "ROTATE") == 0) {
+        cmd.type = RobotCommandType::ROTATE;
+        cmd.value = param;
+    } else if (strcmp(upper, "STOP") == 0) {
+        cmd.type = RobotCommandType::STOP;
+    } else if (strcmp(upper, "STATUS") == 0) {
+        cmd.type = RobotCommandType::STATUS;
+    } else if (strcmp(upper, "RESET") == 0) {
+        cmd.type = RobotCommandType::RESET;
+    } else if (strcmp(upper, "PING") == 0) {
+        cmd.type = RobotCommandType::PING;
+    } else {
+        // Commande inconnue — on l'envoie quand même avec NONE
+        cmd.type = RobotCommandType::NONE;
+        Serial.printf("[BLE] Commande inconnue: '%s'\n", cmd.raw);
+        // Envoyer un feedback au PC
+        char fb[BLE_MAX_MSG_LEN];
+        snprintf(fb, sizeof(fb), "[ESP32] Commande inconnue: '%s'", cmd.raw);
+        bleBridge.sendLog(fb);
+        return;
+    }
+
+    // Enqueue la commande (non-bloquant)
+    if (xQueueSendToBack(cmdQueue_, &cmd, 0) != pdTRUE) {
+        Serial.println("[BLE] Queue de commandes pleine !");
+        bleBridge.sendLog("[ESP32] ERREUR: Queue de commandes pleine !");
+    } else {
+        char fb[BLE_MAX_MSG_LEN];
+        snprintf(fb, sizeof(fb), "[ESP32] CMD reçue: '%s' (val=%.1f)", cmd.raw, cmd.value);
+        Serial.println(fb);
+        bleBridge.sendLog(fb);
+    }
+}
+
+// ── Callback RX statique ─────────────────────────────────────────────────────
+static void onRxWrite(NimBLECharacteristic* pChar) {
+    std::string val = pChar->getValue();
+    if (val.empty()) return;
+
+    Serial.printf("[BLE] RX reçu (%d bytes): %s\n", val.length(), val.c_str());
+    bleBridge.parseCommand_(val.c_str(), val.length());
 }

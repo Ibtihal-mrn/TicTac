@@ -1,4 +1,132 @@
+/**
+ * main.cpp — Point d'entrée du projet BLE_FSM
+ *
+ * Architecture dual-core ESP32 + FreeRTOS :
+ *   Core 0 : tâche BLE (advertising, notifications logs, réception commandes)
+ *   Core 1 : tâche FSM (machine à états du robot)
+ *
+ * Communication inter-cœurs :
+ *   cmdQueue (FreeRTOS queue) : commandes BLE → FSM
+ *   logQueue (dans BLEBridge) : logs FSM → BLE notify → PC
+ */
+
 #include <Arduino.h>
+#include "BLEBridge.h"
+#include "robot.h"
+
+// ── Contexte FSM (utilisé uniquement par Core 1) ────────────────────────────
+static FsmContext fsmCtx;
+
+// ── Taille des stacks FreeRTOS ───────────────────────────────────────────────
+#define BLE_TASK_STACK  4096
+#define FSM_TASK_STACK  4096
+#define BLE_TASK_PRIO   1
+#define FSM_TASK_PRIO   2    // FSM légèrement plus prioritaire
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TÂCHE BLE — Core 0
+//  Gère : advertising, flush des logs vers le PC, heartbeat
+// ═════════════════════════════════════════════════════════════════════════════
+void bleTask(void* pvParameters) {
+    bleSerial.println("[BLE_TASK] Started on Core 0");
+
+    unsigned long lastHeartbeat = 0;
+
+    for (;;) {
+        // Flush les logs en attente vers le PC via BLE notify
+        bleBridge.update();
+
+        // Heartbeat toutes les 5 secondes
+        if (millis() - lastHeartbeat >= 5000) {
+            char hb[64];
+            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus",
+                     bleBridge.isConnected(), millis() / 1000);
+            bleSerial.println(hb);
+            lastHeartbeat = millis();
+        }
+
+        // Laisser du temps aux autres tâches (NimBLE tourne aussi sur Core 0)
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TÂCHE FSM — Core 1
+//  Gère : machine à états INIT → IDLE → DISPATCH_CMD → ...
+// ═════════════════════════════════════════════════════════════════════════════
+void fsmTask(void* pvParameters) {
+    bleSerial.println("[FSM_TASK] Started on Core 1");
+
+    // Initialiser la FSM avec la queue de commandes du BLEBridge
+    fsm_init(fsmCtx, bleBridge.getCommandQueue());
+
+    for (;;) {
+        // Un pas de la FSM
+        fsm_step(fsmCtx);
+
+        // Petit yield pour ne pas affamer le watchdog
+        // Note: fsm_step() contient déjà des vTaskDelay dans certains états
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SETUP — s'exécute sur Core 1 (Arduino default)
+// ═════════════════════════════════════════════════════════════════════════════
+void setup() {
+    Serial.begin(115200);
+    delay(500);
+    Serial.println("====================================");
+    Serial.println("  ESP32 BLE_FSM — Dual Core Setup");
+    Serial.println("====================================");
+
+    // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
+    bleBridge.begin(BLE_DEVICE_NAME);
+    Serial.println("[SETUP] BLE Bridge initialized");
+    bleSerial.println("[SETUP] BLE Bridge ready");
+
+    // ── Créer la tâche BLE sur Core 0 ───────────────────────────────────────
+    xTaskCreatePinnedToCore(
+        bleTask,           // Fonction de la tâche
+        "BLE_Task",        // Nom (debug)
+        BLE_TASK_STACK,    // Taille du stack
+        NULL,              // Paramètre
+        BLE_TASK_PRIO,     // Priorité
+        NULL,              // Handle (pas besoin)
+        0                  // Core 0
+    );
+    Serial.println("[SETUP] BLE task created on Core 0");
+
+    // ── Créer la tâche FSM sur Core 1 ───────────────────────────────────────
+    xTaskCreatePinnedToCore(
+        fsmTask,           // Fonction de la tâche
+        "FSM_Task",        // Nom (debug)
+        FSM_TASK_STACK,    // Taille du stack
+        NULL,              // Paramètre
+        FSM_TASK_PRIO,     // Priorité
+        NULL,              // Handle
+        1                  // Core 1
+    );
+    Serial.println("[SETUP] FSM task created on Core 1");
+
+    bleSerial.println("[SETUP] All tasks launched. System ready.");
+    Serial.println("[SETUP] Setup complete — entering idle loop");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LOOP — quasi vide, tout tourne via FreeRTOS
+// ═════════════════════════════════════════════════════════════════════════════
+void loop() {
+    // Arduino loop() tourne aussi sur Core 1, on la laisse idle
+    vTaskDelay(pdMS_TO_TICKS(1000));
+}
+
+
+
+
+
+
+/*#include <Arduino.h>
 #include <Wire.h>
 
 // ── BLE Bridge (réception logs sur PC via BLE) ──────────────────────────────
@@ -145,3 +273,4 @@ void loop()
     
 //     Serial.println("---");
 // }
+*/

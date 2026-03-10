@@ -149,7 +149,7 @@ void driveDistancePID(float distance_mm, int speed) {
 
 
 
-// -------------
+// ----- LEGACY--------
 void robot_step() { // On va aussi plus l'utiliser normalement
   long left, right;
   encoders_read(&left, &right);
@@ -467,88 +467,163 @@ void checkMatchTimer(Context& ctx) {
 }
 
 
+#include "fsm.h"
+#include "BLEBridge.h"
+#include <Arduino.h>
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const char* fsm_state_name(FsmState state) {
+    switch (state) {
+        case FsmState::INIT:           return "INIT";
+        case FsmState::IDLE:           return "IDLE";
+        case FsmState::DISPATCH_CMD:   return "DISPATCH_CMD";
+        case FsmState::EXEC_MOVE:      return "EXEC_MOVE";
+        case FsmState::EXEC_ROTATE:    return "EXEC_ROTATE";
+        case FsmState::EXEC_STOP:      return "EXEC_STOP";
+        case FsmState::EMERGENCY_STOP: return "EMERGENCY_STOP";
+        default:                       return "UNKNOWN";
+    }
+}
+
+static void fsm_change_state(FsmContext& ctx, FsmState newState) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "[FSM] %s -> %s",
+             fsm_state_name(ctx.currentState), fsm_state_name(newState));
+    bleSerial.println(buf);
+    ctx.currentState = newState;
+    ctx.stateEntryTime = millis();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+void fsm_init(FsmContext& ctx, QueueHandle_t cmdQueue) {
+    ctx.cmdQueue       = cmdQueue;
+    ctx.currentState   = FsmState::INIT;
+    ctx.stateEntryTime = millis();
+    ctx.cmdCount       = 0;
+    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
+    bleSerial.println("[FSM] Context initialized");
+}
+
+// ── Step ─────────────────────────────────────────────────────────────────────
 
 void robot_step(Context& ctx) {
 
-    // Periodic Checks
-    checkMatchTimer(ctx);
+switch (ctx.currentState) {
 
-
-
-    // Main step.
-    switch (ctx.currentAction) {
-        case Robot::INIT:
-            // robot_init();  CALLED IN SETUP()
-            // ctx.commandQueue.push({RobotCommandType::TUNE_PID, (float)TUNE_BOTH});
-            debugPrintf(DBG_FSM, "FSM -> IDLE");
-            ctx.currentAction = Robot::IDLE;
+        // ── INIT : initialisation hardware (placeholder) ─────────────────
+        case FsmState::INIT: {
+            bleSerial.println("[FSM] INIT: Initializing robot systems...");
+            bleSerial.println("[FSM] INIT: Motors OK (simulated)");
+            bleSerial.println("[FSM] INIT: Sensors OK (simulated)");
+            bleSerial.println("[FSM] INIT: Ready !");
+            fsm_change_state(ctx, FsmState::IDLE);
             break;
+        }
 
-        case Robot::IDLE:
-            // ADD LaunchTrigger HERE
-
-            // start 100sec timer
-            startMatchTimer(ctx);
-
-            debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
-            ctx.currentAction = Robot::DISPATCH_CMD;
+        // ── IDLE : attente, on passe directement en DISPATCH ─────────────
+        case FsmState::IDLE: {
+            bleSerial.println("[FSM] IDLE: Entering command dispatch loop");
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
+        }
 
-        case Robot::DISPATCH_CMD:
-            // parse command and set next action (e.g. EXEC_MOVE, EXEC_ROTATE, etc.)
+        // ── DISPATCH_CMD : lire la prochaine commande de la queue ────────
+        case FsmState::DISPATCH_CMD: {
+            RobotCommand cmd;
 
-            // 1. Empty Queue
-            // if (ctx.commandQueue.empty()) { break; }
+            // Attendre une commande pendant 500ms max (bloquant, libère le CPU)
+            if (xQueueReceive(ctx.cmdQueue, &cmd, pdMS_TO_TICKS(500)) == pdTRUE) {
+                ctx.currentCommand = cmd;
+                ctx.cmdCount++;
 
-            // 2. Get next command
-            // ctx.currentCommand = ctx.commandQueue.front();
-            // ctx.commandQueue.pop();
+                char buf[128];
+                snprintf(buf, sizeof(buf),
+                         "[FSM] DISPATCH: cmd #%lu '%s' (type=%d, val=%.1f)",
+                         (unsigned long)ctx.cmdCount,
+                         cmd.raw,
+                         (int)cmd.type,
+                         cmd.value);
+                bleSerial.println(buf);
 
-            // 3. Dispatch to movement
-            // switch (ctx.currentCommand.type) {
-            //     case  RobotCommandType::MOVE_FORWARD_CM:
-            //         movement.startForward(ctx.currentCommand.value);
-            //         fsmChangeAction(ctx, FsmAction::EXEC_MOVE);
-            //         break;
-
-            //     case RobotCommandType::ROTATE_DEG:
-            //         movement.startRotate(ctx.currentCommand.value);
-            //         fsmChangeAction(ctx, FsmAction::EXEC_ROTATE);
-            //         break;
-
-            //     case RobotCommandType::TUNE_PID:
-            //         fsmChangeAction(ctx, FsmAction::TUNE_PID);
-            //         break;
-
-            //     // case STEPPER_UP:
-
-            //     default: fsmChangeAction(ctx, FsmAction::DISPATCH_CMD); break;
-            // }
-            // break;
-          // }
+                // Dispatch
+                switch (cmd.type) {
+                    case RobotCommandType::MOVE:
+                        fsm_change_state(ctx, FsmState::EXEC_MOVE);
+                        break;
+                    case RobotCommandType::ROTATE:
+                        fsm_change_state(ctx, FsmState::EXEC_ROTATE);
+                        break;
+                    case RobotCommandType::STOP:
+                        fsm_change_state(ctx, FsmState::EXEC_STOP);
+                        break;
+                    case RobotCommandType::STATUS: {
+                        char status[128];
+                        snprintf(status, sizeof(status),
+                                 "[FSM] STATUS: state=%s, cmdsProcessed=%lu, uptime=%lus",
+                                 fsm_state_name(ctx.currentState),
+                                 (unsigned long)ctx.cmdCount,
+                                 millis() / 1000);
+                        bleSerial.println(status);
+                        break;
+                    }
+                    case RobotCommandType::RESET:
+                        bleSerial.println("[FSM] RESET: Returning to INIT");
+                        fsm_change_state(ctx, FsmState::INIT);
+                        break;
+                    case RobotCommandType::PING: {
+                        char pong[64];
+                        snprintf(pong, sizeof(pong), "[PONG] t=%lu ms", millis());
+                        bleSerial.println(pong);
+                        break;
+                    }
+                    default:
+                        bleSerial.println("[FSM] DISPATCH: Unknown command, ignoring");
+                        break;
+                }
+            }
+            // Si pas de commande (timeout), on re-boucle en DISPATCH_CMD
             break;
+        }
 
-        case Robot::EXEC_MOVE:
-            
+        // ── EXEC_MOVE : simuler un mouvement ────────────────────────────
+        case FsmState::EXEC_MOVE: {
+            Serial.println("START MOTORS");
+            motors.forward(150, 150);
+            delay(3000)
+            motors.stopMotors(); 
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
+        }
 
-        case Robot::EXEC_ROTATE:
-            // robot_rotate(...);
+        // ── EXEC_ROTATE : simuler une rotation ──────────────────────────
+        case FsmState::EXEC_ROTATE: {
+            bras_deployer();
+            delay(2000);
+            bras_retracter();
+            delay(2000);
+
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
+        }
 
-
-        case Robot::TUNE_PID:
-            // adjust PID parameters
-            break;
-
-        case Robot::TIMER_END:
+        // ── EXEC_STOP : arrêter les moteurs ─────────────────────────────
+        case FsmState::EXEC_STOP: {
             motors.stopMotors();
+            bleSerial.println("[FSM] EXEC_STOP: Motors stopped");
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
+        }
 
-        case Robot::EMERGENCY_STOP:
+        // ── EMERGENCY_STOP : arrêt d'urgence ────────────────────────────
+        case FsmState::EMERGENCY_STOP: {
             motors.stopMotors();
+            bleSerial.println("[FSM] !!! EMERGENCY STOP !!!");
+            bleSerial.println("[FSM] All systems halted. Send RESET to recover.");
+            vTaskDelay(pdMS_TO_TICKS(1000));
             break;
+        }
     }
 }
 
