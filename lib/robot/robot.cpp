@@ -65,6 +65,18 @@ void driveDistancePID(float distance_mm, int speed) {
     tPrev += (unsigned long)DT_MS * 1000UL;
 
     // Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : "."); 
+    // COMMAND STOP BLE — check without blocking
+    {
+      RobotCommand peekCmd;
+      if (xQueuePeek(bleBridge.getCommandQueue(), &peekCmd, 0) == pdTRUE
+          && peekCmd.type == RobotCommandType::STOP) {
+        // Consume the command so the FSM doesn't re-process it
+        xQueueReceive(bleBridge.getCommandQueue(), &peekCmd, 0);
+        bleSerial.println("[DRIVE] BLE STOP received — aborting move");
+        break;
+      }
+    }
+
 
     // STOP MOTOR CONDITIONS
     if (safety_update()) {
@@ -409,45 +421,12 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
 
 // ===========
-
-void hardware_init(Context& ctx) {
-  // To be called in setup() in main.cpp
-
-  // motors_init();
-  // encoders_init();
-  // ultrasonic_init(13, 10);  // trig, echo
-  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
-
-  // IMU
-  if (!imu_init()) { bleSerial.println("MPU6050 FAIL.");
-  } else {
-    delay(200);
-    bleSerial.println("MPU6050 connected.");
-    imu_calibrate(600, 2); // ~1.2s, robot immobile
-    // Serial.println("IMU calibrated");
-  }
-
-  // Init Match Timer
-  ctx.matchActive = false;
-  ctx.matchDurationMs = MATCH_DURATION_MS;
-  ctx.matchStartMs = 0;
-    debugPrintf(DBG_FSM, "FSM -> INIT");
-    ctx.currentAction = Robot::INIT;
-}
-
-void startMatchTimer(Context& ctx) {
-    ctx.matchActive = true;
-    ctx.matchStartMs = millis();
-    ctx.stateStartMs = millis();
-    ctx.matchDurationMs = MATCH_DURATION_MS;
-}
-void checkMatchTimer(Context& ctx) {
-    if (ctx.matchActive && millis() - ctx.matchStartMs >= ctx.matchDurationMs) {
-        ctx.matchActive = false;
-        debugPrintf(DBG_FSM, "Match timer elapsed -> TIMER_END");
-        ctx.currentAction = Robot::TIMER_END;
-    }
-}
+// LEGACY — commented out (Context/Robot types removed)
+/*
+void hardware_init(Context& ctx) { ... }
+void startMatchTimer(Context& ctx) { ... }
+void checkMatchTimer(Context& ctx) { ... }
+*/
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const char* fsm_state_name(FsmState state) {
@@ -567,7 +546,7 @@ switch (ctx.currentState) {
         // ── EXEC_MOVE : simuler un mouvement ────────────────────────────
         case FsmState::EXEC_MOVE: {
             Serial.println("START MOTORS");
-            driveDistancePID(250, 150);
+            driveDistancePID(20, 254); // avancer de 500mm à vitesse 200 (placeholder)
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
@@ -575,7 +554,7 @@ switch (ctx.currentState) {
         // ── EXEC_ROTATE : simuler une rotation ──────────────────────────
         case FsmState::EXEC_ROTATE: {
             Serial.println("START ROTATE");
-            robot_rotate_gyro(90, 180); 
+            // robot_rotate_gyro(90, 180); //TODO: new function here
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
