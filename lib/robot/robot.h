@@ -14,10 +14,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include "BLEBridge.h"
-#include "robot.h"
 #include "../../src/config.h"
 #include "../../src/globals.h"
-#include "BLEBridge.h"
 
 
 #include "motors.h"

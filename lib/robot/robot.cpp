@@ -1,21 +1,4 @@
 #include "robot.h"
-#include "../../src/config.h"
-#include "../../src/globals.h"
-#include "BLEBridge.h"
-
-
-#include "motors.h"
-#include "encoders.h"
-#include "ultrasonic_function.h"
-#include "EmergencyButton.h"
-#include "imu.h"
-
-#include "control.h"
-#include "kinematics.h"
-#include "safety.h"
-
-#include "utils.h"
-#include "Debug.h"
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
@@ -465,12 +448,6 @@ void checkMatchTimer(Context& ctx) {
         ctx.currentAction = Robot::TIMER_END;
     }
 }
-
-
-#include "fsm.h"
-#include "BLEBridge.h"
-#include <Arduino.h>
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const char* fsm_state_name(FsmState state) {
@@ -508,7 +485,7 @@ void fsm_init(FsmContext& ctx, QueueHandle_t cmdQueue) {
 
 // ── Step ─────────────────────────────────────────────────────────────────────
 
-void robot_step(Context& ctx) {
+void fsm_step(FsmContext& ctx) {
 
 switch (ctx.currentState) {
 
@@ -590,27 +567,21 @@ switch (ctx.currentState) {
         // ── EXEC_MOVE : simuler un mouvement ────────────────────────────
         case FsmState::EXEC_MOVE: {
             Serial.println("START MOTORS");
-            motors.forward(150, 150);
-            delay(3000)
-            motors.stopMotors(); 
+            driveDistancePID(250, 150);
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
 
         // ── EXEC_ROTATE : simuler une rotation ──────────────────────────
         case FsmState::EXEC_ROTATE: {
-            bras_deployer();
-            delay(2000);
-            bras_retracter();
-            delay(2000);
-
+            Serial.println("START ROTATE");
+            robot_rotate_gyro(90, 180); 
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
 
         // ── EXEC_STOP : arrêter les moteurs ─────────────────────────────
         case FsmState::EXEC_STOP: {
-            motors.stopMotors();
             bleSerial.println("[FSM] EXEC_STOP: Motors stopped");
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
@@ -618,10 +589,9 @@ switch (ctx.currentState) {
 
         // ── EMERGENCY_STOP : arrêt d'urgence ────────────────────────────
         case FsmState::EMERGENCY_STOP: {
-            motors.stopMotors();
             bleSerial.println("[FSM] !!! EMERGENCY STOP !!!");
             bleSerial.println("[FSM] All systems halted. Send RESET to recover.");
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            vTaskDelay(pdMS_TO_TICKS(10000));
             break;
         }
     }
