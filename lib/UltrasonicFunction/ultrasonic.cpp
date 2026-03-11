@@ -16,6 +16,14 @@ int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM;  // configurable dans confi
 bool ultrasonic_isObstacle() {
     int8_t distance = ultrasonic_read();
     debugPrintf(DBG_SENSORS, "Ultrasonic distance: %d cm\n", distance);
+
+    // BLE log
+    static unsigned long lastMillis = 0;
+    if (millis() - lastMillis >= 500) {
+        lastMillis = millis();
+        bleSerial.print("Ultrasonic: "); bleSerial.print(distance); bleSerial.println(" cm");
+    }
+
     return (distance > 0 && distance <= obstcle_threshold_cm);
 }
 

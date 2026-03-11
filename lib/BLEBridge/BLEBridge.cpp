@@ -181,8 +181,20 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
     if (strcmp(upper, "MOVE") == 0) {
         cmd.type = RobotCommandType::MOVE;
         cmd.value = param;
+    } else if (strcmp(upper, "FORWARD") == 0) {
+        cmd.type = RobotCommandType::MOVE_FORWARD;
+        cmd.value = param;
+    } else if (strcmp(upper, "BACKWARD") == 0) {
+        cmd.type = RobotCommandType::MOVE_BACKWARD;
+        cmd.value = param;
     } else if (strcmp(upper, "ROTATE") == 0) {
         cmd.type = RobotCommandType::ROTATE;
+        cmd.value = param;
+    } else if (strcmp(upper, "LEFT") == 0) {
+        cmd.type = RobotCommandType::ROTATE_LEFT;
+        cmd.value = param;
+    } else if (strcmp(upper, "RIGHT") == 0) {
+        cmd.type = RobotCommandType::ROTATE_RIGHT;
         cmd.value = param;
     } else if (strcmp(upper, "STOP") == 0) {
         cmd.type = RobotCommandType::STOP;

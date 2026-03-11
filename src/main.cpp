@@ -216,25 +216,29 @@ void loop()
   printEncodersVal();
   printUltrasonicVal();
 
-  // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  if (!runSequence)
-  {
-    return;
-  }
+
+
+
+
+  if (false) return;
+  if (!runSequence) { return; }
 
   //Servo Test
-  bras_deployer();
-  delay(2000);
-  bras_retracter();
-  delay(2000);
+  // bras_deployer();
+  // delay(2000);
+  // bras_retracter();
+  // delay(2000);
   // bras_deployer();
   // delay(2000);
   // bras_retracter();
   // delay(2000);
 
-  //driveDistancePID(-1000, 254);
-  driveDistancePID(4000, 254);
-  // robot_rotate_gyro(90, 200);
+  driveDistancePID(500, 254);
+  delay(1000);
+  driveDistancePID(-500, 254);
+  delay(1000);
+
+  rotateAnglePID(90, 200);
 
 
   runSequence = false;

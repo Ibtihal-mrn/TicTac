@@ -118,7 +118,8 @@ class DevicePanel:
         qf = tk.Frame(self.frame, bg=BG)
         qf.pack(fill=tk.X, pady=(4, 2))
 
-        for txt, clr in [("MOVE 100", ACCENT), ("ROTATE 90", ACCENT),
+        for txt, clr in [("FORWARD 200", GREEN), ("BACKWARD 200", YELLOW),
+                         ("LEFT 90", ACCENT), ("RIGHT 90", ACCENT),
                          ("STOP", RED), ("STATUS", GREEN), ("RESET", YELLOW)]:
             tk.Button(qf, text=txt, bg=BTN_BG, fg=clr,
                       font=("Consolas", 8), relief=tk.FLAT,

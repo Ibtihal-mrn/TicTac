@@ -33,7 +33,11 @@
 enum class RobotCommandType : uint8_t {
     NONE = 0,
     MOVE,
+    MOVE_FORWARD,
+    MOVE_BACKWARD,
     ROTATE,
+    ROTATE_LEFT,
+    ROTATE_RIGHT,
     STOP,
     STATUS,
     RESET,

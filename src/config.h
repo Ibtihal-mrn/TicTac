@@ -15,6 +15,7 @@
 #define PSRAM_IO35 35  // reserved for Octal SPI PSRAM
 #define PSRAM_IO36 36
 #define PSRAM_IO37 37
+
 #define STRAP_45 45   // Strapping: VDD_SPI voltage. NEVER pull HIGH at power-up.
 #define STRAP_46 46   // Strapping: boot mode/ROM print. Avoid strong pull-ups.
 #define IO47_1V8  47
@@ -84,8 +85,8 @@
 
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-#define US_TRIG_PIN 42
-#define US_ECHO_PIN 41
+#define US_TRIG_PIN 37
+#define US_ECHO_PIN 38
 #define US_OBSTACLE_THRESHOLD_CM 20
 
 

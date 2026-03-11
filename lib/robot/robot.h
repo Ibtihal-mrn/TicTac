@@ -36,7 +36,11 @@ enum class FsmState : uint8_t {
     IDLE,
     DISPATCH_CMD,
     EXEC_MOVE,
+    EXEC_MOVE_FORWARD,
+    EXEC_MOVE_BACKWARD,
     EXEC_ROTATE,
+    EXEC_ROTATE_LEFT,
+    EXEC_ROTATE_RIGHT,
     EXEC_STOP,
     EMERGENCY_STOP,
 };
