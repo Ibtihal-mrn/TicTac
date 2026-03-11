@@ -63,6 +63,8 @@
 // #define TEAM_SWITCH_PIN A2
 #define TEAM_SWITCH_PIN 21
 #define EBTN_PIN 8
+#define EBTN_USE_INTERNAL_PULLUP 1
+#define EBTN_PRESSED_STATE LOW // Sans resistance externe: INPUT_PULLUP, bouton vers GND
 
 // ===================== MOTORS ============================
 #define ENA 14 // ordre pins : enA, 1, 2, 3, 4, enB

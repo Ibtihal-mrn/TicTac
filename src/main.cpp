@@ -31,7 +31,7 @@ void imAlive()
   }
 }
 
-// StartSwitch startSwitch(GPIO_NUM_38);
+StartSwitch startSwitch(GPIO_NUM_2);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // ========= SETUP ===============
@@ -89,82 +89,60 @@ void setup()
   // startSwitch.begin();
   teamSwitch.begin();
 
-  // startSwitch.waitForStart();
+  Serial.println("Waiting for start switch...");
+  startSwitch.waitForStart();
+  Serial.println("Starting sequence..."); 
 }
 
 void loop()
 {
-  static bool runSequence = true;
 
-  if (!runSequence)
-  imAlive();
-  printEncodersVal();
-  //printUltrasonicVal();
+  static bool runSequence = true;  
 
-  // <<<<<<< HEAD
-  //   if (false) return;
-  //   if (!runSequence) { return; }
-  // =======
-  //   // if (true) return;  // CETTE LIGNE BLOQUAIT LE CODE
-  //   if (!runSequence)
-  //   {
-  //     return;
-  //   }
-  // >>>>>>> BLE
-
-  driveDistancePID(150, 200);   // avance 15 cm
-  delay(500);                   // arrêt du robot
-
-  relais_on();                  // active le relais
-  delay(5000);                  // attendre 5 secondes (robot immobile)
-
-  driveDistancePID(150, 200);   // avance 15 cm
-
-  relais_off();                 // désactive le relais
-  delay(5000);                  // attendre 5 secondes
-
-  driveDistancePID(150, 200);   // avance 15 cm
-
-
-  if (sequenceDone) return;
-
-  bool currentSwitchState = digitalRead(SWITCH_PIN);
-
-  // Détection appui (HIGH → LOW)
-  if (lastSwitchState == HIGH && currentSwitchState == LOW)
-  {
-      Serial.println("Switch activé !");
-
-      // ➜ Avancer 10 cm
-      driveDistancePID(100, 200);
-
-      //  Relais OFF
-      relais_off();
-
-      // ➜ Avancer encore 10 cm
-      driveDistancePID(100, 200);
-
-      sequenceDone = true; // éviter répétition
+  if (!runSequence) {
+    return; 
   }
 
   if (teamSwitch.readTeam() == TeamSwitchTeam::A)
   {
     Serial.println("Equipe A");
-    driveDistancePID(500, 254);
-    delay(1000);
-    rotateAnglePID(90, 200);
+    
+    // driveDistancePID(1000, 200);   // avance 15 cm
+    // delay(1000);                   // arrêt du robot
 
- 
+    // bras_deployer();              // déploie le bras
+    // delay(1000);                   // arrêt du robot
+
+    // rotateAnglePID(180, 200);      // tourne à droite de 90°
+    // delay(1000);                   // arrêt du robot
+
+    // driveDistancePID(1000, 200);    // avance 100 cm
+    // delay(1000);                   // arrêt du robot
+
+    // driveDistancePID(-500, 200);    // recule 50 cm
+    // delay(1000);                   // arrêt du robot
+
+    // rotateAnglePID(-90, 200);      // tourne à gauche de 90°
+    // delay(1000);                   // arrêt du robot 
+
+    driveDistancePID(50000, 200);     // avance 50 cm
   }
+
   else
   {
-    Serial.println("Equipe B");
-    driveDistancePID(-500, 254);
-    delay(1000);
-    robot_rotate_gyro(-90, 200);
+    // Serial.println("Equipe B");
+    // driveDistancePID(1000, 254);
+    // delay(1000);
+    // // bras_deployer();
+    // // delay(2000);
+    // // robot_rotate_gyro(180, 200);
+    // // delay(1000);
+    // // driveDistancePID(500, 254);
+    // // delay(1000);
+    // // bras_retracter();
   }
 
-  lastSwitchState = currentSwitchState;
+
   runSequence = false;
 }
 

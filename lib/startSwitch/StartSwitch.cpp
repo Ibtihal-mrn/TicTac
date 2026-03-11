@@ -1,33 +1,67 @@
 #include "StartSwitch.h"
 
-StartSwitch::StartSwitch(gpio_num_t pin)
-: _pin(pin) {}
+namespace
+{
+    bool waitForStableState(gpio_num_t pin, bool insertedState, unsigned long stableMs)
+    {
+        unsigned long stableSince = 0;
 
-void StartSwitch::begin() {
-    pinMode(_pin, INPUT_PULLUP);
+        while (true)
+        {
+            const bool inserted = digitalRead(pin) == LOW;
+
+            if (inserted == insertedState)
+            {
+                if (stableSince == 0)
+                {
+                    stableSince = millis();
+                }
+
+                if (millis() - stableSince >= stableMs)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                stableSince = 0;
+            }
+
+            delay(5);
+        }
+    }
 }
 
-bool StartSwitch::isInserted() const {
+StartSwitch::StartSwitch(gpio_num_t pin)
+    : _pin(pin) {}
+
+void StartSwitch::begin()
+{
+    pinMode(_pin, INPUT_PULLUP);
+    delay(5);
+}
+
+bool StartSwitch::isInserted() const
+{
     // Tirette insérée = contact GND = LOW
     return digitalRead(_pin) == LOW;
 }
 
-void StartSwitch::waitForStart() {
-    Serial.println("En attente de la tirette...");
-
+void StartSwitch::waitForStart()
+{
     // attendre insertion
-    while (!isInserted()) {
+    while (!isInserted())
+    {
         delay(5);
     }
 
-    delay(20); // anti-rebond
+    waitForStableState(_pin, true, 30);
 
     // attendre retrait
-    while (isInserted()) {
+    while (isInserted())
+    {
         delay(5);
     }
 
-    delay(20); // anti-rebond
-
-    Serial.println("Tirette retiree -> DEMARRAGE !");
+    waitForStableState(_pin, false, 30);
 }
