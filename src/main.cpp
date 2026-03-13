@@ -3,7 +3,7 @@
  *
  * Architecture dual-core ESP32 + FreeRTOS :
  *   Core 0 : tâche BLE (advertising, notifications logs, réception commandes)
- *   Core 1 : tâche FSM (machine à états du robot)
+ *   Core 1 : tâche FSM (machine à états du robot) et I2C (IMU, IO Expander)
  *
  * Communication inter-cœurs :
  *   cmdQueue (FreeRTOS queue) : commandes BLE → FSM
@@ -11,8 +11,27 @@
  */
 
 #include <Arduino.h>
+#include <Wire.h>            // Bus I2C (partagé entre IMU et IO Expander)
 #include "BLEBridge.h"
 #include "robot.h"
+#include "IOExpander.h"      // Lib IO Expander (TCA9554 / PCF8574)
+#include "config.h"          // Pins, adresses, config
+#include "globals.h"         // Mutex I2C, IOExpanderData
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DÉFINITION DES GLOBALES (déclarées "extern" dans globals.h)
+// ═══════════════════════════════════════════════════════════════════════════
+//  Ces variables sont créées ICI (une seule fois) et utilisées partout
+//  via les "extern" de globals.h.
+
+SemaphoreHandle_t i2cMutex        = nullptr;  // Mutex pour protéger le bus I2C
+SemaphoreHandle_t ioExpanderMutex = nullptr;  // Mutex pour protéger ioExpanderData
+IOExpanderData    ioExpanderData  = {false, false, false};  // Données IO Expander
+
+// ── Instance IO Expander ─────────────────────────────────────────────────
+//  On crée l'objet avec l'adresse I2C définie dans config.h.
+//  L'objet est global pour être accessible si besoin (ex: queueWrite depuis la FSM).
+IOExpander ioExpander(IOEXP_I2C_ADDR);
 
 // ── Contexte FSM (utilisé uniquement par Core 1) ────────────────────────────
 static FsmContext fsmCtx;
@@ -80,10 +99,39 @@ void setup() {
     Serial.println("  ESP32 BLE_FSM — Dual Core Setup");
     Serial.println("====================================");
 
+    // ── I2C Bus — DOIT être initialisé AVANT tout périphérique I2C ──────────
+    //  Wire.begin(SDA, SCL) configure le bus I2C hardware de l'ESP32.
+    //  Tous les périphériques I2C (IMU, IO Expander) partagent ce même bus.
+    Wire.begin(I2C_SDA, I2C_SCL);  // GPIO6 = SDA, GPIO7 = SCL
+    Wire.setClock(I2C_FREQ);       // 100 kHz (standard mode)
+    Serial.println("[SETUP] I2C bus initialized (SDA=6, SCL=7, 100kHz)");
+
+    // ── Créer les mutex FreeRTOS ─────────────────────────────────────────────
+    //  Un mutex = un "verrou" : une seule tâche peut le prendre à la fois.
+    //  i2cMutex : empêche 2 tâches d'accéder au bus I2C simultanément
+    //  ioExpanderMutex : protège la struct IOExpanderData en lecture/écriture
+    i2cMutex        = xSemaphoreCreateMutex();
+    ioExpanderMutex = xSemaphoreCreateMutex();
+    Serial.println("[SETUP] I2C + IOExpander mutexes created");
+
     // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
     bleBridge.begin(BLE_DEVICE_NAME);
     Serial.println("[SETUP] BLE Bridge initialized");
     bleSerial.println("[SETUP] BLE Bridge ready");
+
+    // ── IO Expander — initialisation + configuration des pins ────────────────
+    //  begin() crée la queue interne FreeRTOS pour les commandes d'écriture.
+    //  queueWrite(0x03, ...) configure quelles pins sont input/output :
+    //    Registre 0x03 = Configuration Register du TCA9554
+    //    Chaque bit = 1 pin :  1 = input,  0 = output
+    //    0x0F = 0b00001111 → P0-P3 = input, P4-P7 = output
+    if (ioExpander.begin()) {
+        ioExpander.queueWrite(0x03, IOEXP_PIN_CONFIG);  // Configurer direction des pins
+        Serial.printf("[SETUP] IO Expander initialized (addr=0x%02X, config=0x%02X)\n",
+                      IOEXP_I2C_ADDR, IOEXP_PIN_CONFIG);
+    } else {
+        Serial.println("[SETUP] ERROR: IO Expander queue creation failed!");
+    }
 
     // ── Créer la tâche BLE sur Core 0 ───────────────────────────────────────
     xTaskCreatePinnedToCore(
@@ -109,6 +157,25 @@ void setup() {
     );
     Serial.println("[SETUP] FSM task created on Core 1");
 
+    // ── Créer la tâche IO Expander sur Core 1 ────────────────────────────────
+    //  On la met sur Core 1 (avec la FSM) car l'IMU y tourne aussi →
+    //  les accès I2C restent sur le même core, ce qui simplifie le scheduling.
+    //  La tâche run() boucle indéfiniment :
+    //    1. Traite les commandes d'écriture en queue
+    //    2. Toutes les 200ms, lit le registre 0x00 (état des pins)
+    //    3. Met à jour ioExpanderData (teamSwitch, launchTrigger)
+    //  Le paramètre &ioExpander est passé à taskEntry() qui appelle run().
+    xTaskCreatePinnedToCore(
+        IOExpander::taskEntry,  // Point d'entrée statique (appelle run())
+        "IOExp_Task",           // Nom pour le debug
+        IOEXP_TASK_STACK,       // 2048 bytes de stack (suffisant)
+        &ioExpander,            // Paramètre = pointeur vers notre instance
+        IOEXP_TASK_PRIO,        // Priorité 1 (inférieure à la FSM prio 2)
+        NULL,                   // Pas besoin du handle
+        1                       // Core 1 (avec la FSM)
+    );
+    Serial.println("[SETUP] IO Expander task created on Core 1");
+
     bleSerial.println("[SETUP] All tasks launched. System ready.");
     Serial.println("[SETUP] Setup complete — entering idle loop");
 }
@@ -126,155 +193,3 @@ void loop() {
 
 
 
-/*#include <Arduino.h>
-#include <Wire.h>
-
-// ── BLE Bridge (réception logs sur PC via BLE) ──────────────────────────────
-#include "BLEBridge.h"
-
-// Hardware
-#include "robot.h"
-#include "bras.h"
-
-// Debug prints
-#include "encoders.h"
-#include "ultrasonic_function.h"
-#include "utils.h"
-#include "Debug.h"
-#include "config.h"
-
-#include "EmergencyButton.h"  // ← Bouton urgence
-#include "safety.h"           // ← Safety update
-#include "motors.h"            // ← Test moteurs
-extern Motors motors;  // ← Import depuis robot.cpp
-
-
-
-// ------ helpers ------
-void imAlive()
-{
-  static unsigned long millis_print = 0;
-  if (millis() - millis_print >= 2000)
-  {
-    bleSerial.println("I'm alive");
-    millis_print = millis();
-  }
-}
-
-// ========= SETUP ===============
-void setup()
-{
-  // Serial.begin(115200);
-  debugInit(115200, // does Serial.begin()
-            DBG_FSM |
-                DBG_MOTORS |
-                DBG_SENSORS
-            // DBG_COMMS |        // comment DBG_ to deactivate its related prints
-            // DBG_ENCODER |
-            // DBG_LAUNCH_TGR
-  );
-
-  // ── BLE Bridge : démarrer EN PREMIER pour que la queue existe ──────────────
-  bleBridge.begin(BLE_DEVICE_NAME);
-  Serial.println("[DBG] BLE bridge started");
-
-  // // I2C Init.
-  Wire.begin(6, 7); // SDA, SCL
-  Wire.setClock(100000);
-  delay(200);
-
-  // Utils.h
-  printEsp32Info();
-  // i2c_scanner();
-
-  // Init Hardware et Robot
-  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
-  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
-  bras_init();                // must run FIRST
-  Serial.println("[DBG] bras_init done");
-  robot_init();
-  Serial.println("[DBG] robot_init done");
-
-  bleSerial.println("Setup Done.");
-  Serial.println("[DBG] setup() COMPLETE");
-}
-
-void loop()
-{
-  static bool runSequence = true;  static unsigned long loopCount = 0;
-
-  // Debug : confirmer que loop() tourne
-  if (loopCount % 5000 == 0) {
-    Serial.printf("[DBG] loop #%lu  connected=%d\n",
-                  loopCount, bleBridge.isConnected());
-  }
-  loopCount++;
-  // ── BLE Bridge : flush logs en attente vers le PC ──────────────────────────
-  bleBridge.update();
-
-  imAlive();
-  printEncodersVal();
-  printUltrasonicVal();
-
-
-
-
-
-  if (false) return;
-  if (!runSequence) { return; }
-
-  //Servo Test
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
-  // bras_deployer();
-  // delay(2000);
-  // bras_retracter();
-  // delay(2000);
-
-  driveDistancePID(500, 254);
-  delay(1000);
-  driveDistancePID(-500, 254);
-  delay(1000);
-
-  rotateAnglePID(90, 200);
-
-
-  runSequence = false;
-}
-
-// void loop() {
-//     printUltrasonicVal();  // Décommente
-//     Serial.print("Obstacle? "); 
-//     Serial.println(ultrasonic_isObstacle() ? "OUI" : "NON");
-//     delay(500);
-// }
-
-// void loop() {
-//     Serial.println("=== DEBUG SAFETY ===");
-//     Serial.print("emergencyButton: "); Serial.println(emergencyButton_isPressed() ? "OUI" : "NON");
-//     Serial.print("ultrasonic obs: "); Serial.println(ultrasonic_isObstacle() ? "OUI" : "NON");
-//     Serial.print("safety_update: "); Serial.println(safety_update() ? "STOP" : "OK");
-//     delay(200);
-// }
-
-// void loop() {
-//     Serial.println("=== DEBUG DRIVE ===");
-//     Serial.print("safety_update: "); Serial.println(safety_update() ? "STOP" : "OK");
-//     if (safety_update()) Serial.println("*** WOULD STOP ***");
-//     delay(200);
-// }
-
-// void loop() {
-//     Serial.println("START MOTORS");
-//     motors.forward(150, 150);  // ← Démarre
-//     delay(3000);
-    
-//     Serial.println("STOP TEST");
-//     motors.stopMotors();       // ← Test
-//     delay(3000);
-    
-//     Serial.println("---");
-// }
-*/

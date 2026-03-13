@@ -1,11 +1,6 @@
 #include "IOExpander.h"
 #include <Wire.h>
-
-// Forward declarations to avoid circular includes
-extern SemaphoreHandle_t i2cMutex;
-extern SemaphoreHandle_t ioExpanderMutex;
-struct IOExpanderData { bool teamSwitch; bool launchTrigger; bool ready; };
-extern IOExpanderData ioExpanderData;
+#include "../../src/globals.h"  // i2cMutex, ioExpanderMutex, IOExpanderData, ioExpanderData
 
 // queue length
 static constexpr size_t CMD_Q_LEN = 8;

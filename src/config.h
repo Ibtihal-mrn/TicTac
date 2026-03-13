@@ -83,6 +83,30 @@
 
 
 
+// ===================== I2C ============================
+#define I2C_SDA  6   // GPIO6 = SDA (câblé sur le PCB)
+#define I2C_SCL  7   // GPIO7 = SCL (câblé sur le PCB)
+#define I2C_FREQ 100000  // 100 kHz — standard mode (compatible avec tous les chips I2C)
+
+// ===================== IO EXPANDER =====================
+//  Adresse I2C du TCA9554 / PCF8574 (dépend de A0/A1/A2 sur le chip)
+//  A0=GND, A1=GND, A2=GND → 0x20. Vérifie avec un i2c_scanner() si besoin.
+#define IOEXP_I2C_ADDR   0x20
+
+//  Stack de la tâche FreeRTOS de l'IO Expander (en bytes)
+//  2048 est suffisant pour de simples lectures I2C
+#define IOEXP_TASK_STACK 2048
+#define IOEXP_TASK_PRIO  1     // même priorité que BLE (pas critique en timing)
+
+//  Registres du TCA9554 (compatible PCF8574 pour le reg 0x00)
+//  0x00 = Input Port  : lire l'état des pins
+//  0x01 = Output Port : écrire sur les pins configurées en output
+//  0x02 = Polarity    : inverser la logique (optionnel)
+//  0x03 = Config      : 1 = input, 0 = output (par pin)
+//
+//  Exemple : pins P0-P3 en input, P4-P7 en output → 0x0F
+#define IOEXP_PIN_CONFIG 0x0F
+
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
 #define US_TRIG_PIN 37
