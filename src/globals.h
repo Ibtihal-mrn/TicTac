@@ -17,9 +17,8 @@ extern SemaphoreHandle_t i2cMutex;
 //  La tâche IOExpander lit les pins toutes les 200ms et met à jour cette
 //  structure. La FSM (ou n'importe quel code) peut la lire via le mutex.
 struct IOExpanderData {
-    bool teamSwitch;     // Pin P1 : switch de sélection d'équipe
-    bool launchTrigger;  // Pin P3 : tirette de départ
-    bool ready;          // true dès que la première lecture a réussi
+    bool pin[8];  // P0–P7 : état de chaque pin (lu toutes les 200ms)
+    bool ready;   // true dès que la première lecture a réussi
 };
 extern SemaphoreHandle_t ioExpanderMutex;  // protège ioExpanderData
 extern IOExpanderData    ioExpanderData;   // données lues par la tâche IOExp

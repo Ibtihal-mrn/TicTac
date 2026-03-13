@@ -72,9 +72,10 @@ void IOExpander::run() {
       if (readReg(0x00, pinState)) {  // Read input register
         lastReadFailed = false;
         if (xSemaphoreTake(ioExpanderMutex, 0) == pdTRUE) {
-          ioExpanderData.teamSwitch = (pinState >> 1) & 1;      // Pin 1
-          ioExpanderData.launchTrigger = (pinState >> 3) & 1;   // Pin 3
-          ioExpanderData.ready = true;                          // Signal that data is valid
+          for (int i = 0; i < 8; i++) {
+            ioExpanderData.pin[i] = (pinState >> i) & 1;
+          }
+          ioExpanderData.ready = true;
           xSemaphoreGive(ioExpanderMutex);
         }
       }

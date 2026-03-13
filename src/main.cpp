@@ -26,7 +26,7 @@
 
 SemaphoreHandle_t i2cMutex        = nullptr;  // Mutex pour protéger le bus I2C
 SemaphoreHandle_t ioExpanderMutex = nullptr;  // Mutex pour protéger ioExpanderData
-IOExpanderData    ioExpanderData  = {false, false, false};  // Données IO Expander
+IOExpanderData    ioExpanderData  = {{}, false};  // Données IO Expander (pin[8] + ready)
 
 // ── Instance IO Expander ─────────────────────────────────────────────────
 //  On crée l'objet avec l'adresse I2C définie dans config.h.
