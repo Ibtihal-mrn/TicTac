@@ -551,6 +551,13 @@ void fsm_init(FsmContext& ctx, QueueHandle_t cmdQueue) {
 
 void fsm_step(FsmContext& ctx) {
 
+    // ── Emergency button check (from ANY state) ────────────────────────────
+    if (ctx.currentState != FsmState::EMERGENCY_STOP && emergencyButton_isPressed()) {
+        motors.stopMotors();
+        fsm_change_state(ctx, FsmState::EMERGENCY_STOP);
+        return;
+    }
+
 switch (ctx.currentState) {
 
         // ── INIT : initialisation hardware (placeholder) ─────────────────
@@ -700,12 +707,47 @@ switch (ctx.currentState) {
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
+        
 
-        // ── EMERGENCY_STOP : arrêt d'urgence ────────────────────────────
+        // ── EXEC_MOVE_SERVO : déplacer le servo ─────────────────────────────
+        case FsmState::EXEC_MOVE_SERVO: {
+            float dist = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 200;
+            bleSerial.println("[FSM] EXEC_MOVE_SERVO");
+            bras_deployer();
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
+            break;
+        }
+
+        // ── EXEC_RETRACT_SERVO : rétracter le servo ─────────────────────────────
+        case FsmState::EXEC_RETRACT_SERVO: {
+            float dist = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 200;
+            bleSerial.println("[FSM] EXEC_RETRACT_SERVO");
+            bras_retracter();
+            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
+            break;
+        }
+
+        // ── EMERGENCY_STOP : arrêt d'urgence — reste ici jusqu'au RESET ─
         case FsmState::EMERGENCY_STOP: {
+            motors.stopMotors();
             bleSerial.println("[FSM] !!! EMERGENCY STOP !!!");
             bleSerial.println("[FSM] All systems halted. Send RESET to recover.");
-            vTaskDelay(pdMS_TO_TICKS(10000));
+
+            // Boucle bloquante : on ne sort que sur RESET
+            while (true) {
+                motors.stopMotors();  // sécurité : moteurs coupés en permanence
+                RobotCommand cmd;
+                if (xQueueReceive(ctx.cmdQueue, &cmd, pdMS_TO_TICKS(200)) == pdTRUE) {
+                    if (cmd.type == RobotCommandType::RESET) {
+                        bleSerial.println("[FSM] RESET received — exiting EMERGENCY STOP");
+                        fsm_change_state(ctx, FsmState::INIT);
+                        return;
+                    }
+                    // Toute autre commande est ignorée
+                    bleSerial.println("[FSM] Command ignored in EMERGENCY_STOP. Send RESET.");
+                }
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
             break;
         }
     }
