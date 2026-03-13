@@ -125,7 +125,13 @@ void loop()
     // rotateAnglePID(-90, 200);      // tourne à gauche de 90°
     // delay(1000);                   // arrêt du robot 
 
-    driveDistancePID(50000, 200);     // avance 50 cm
+    driveDistancePID(500, 200);     // avance 50 cm
+    delay(1000);                   // arrêt du robot
+    bras_deployer();              // déploie le bras
+    delay(1000);                   // arrêt du robot
+    bras_retracter();             // rétracte le bras
+    delay(1000);                   // arrêt du robot
+
   }
 
   else
@@ -140,6 +146,13 @@ void loop()
     // // driveDistancePID(500, 254);
     // // delay(1000);
     // // bras_retracter();
+    relais_on();                   // active électro-aimant
+    delay(1000);                   // arrêt du robot
+    bras_deployer();              // déploie le bras
+    delay(1000);                   // arrêt du robot
+
+    relais_off();                  // désactive électro-aimant
+    delay(1000);                   // arrêt du robot
   }
 
 
