@@ -39,6 +39,8 @@ enum class RobotCommandType : uint8_t {
     ROTATE_LEFT,
     ROTATE_RIGHT,
     STOP,
+    DEPLOY_SERVO,
+    RETRACT_SERVO,
     STATUS,
     RESET,
     PING,

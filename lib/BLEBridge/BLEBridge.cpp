@@ -198,6 +198,10 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         cmd.value = param;
     } else if (strcmp(upper, "STOP") == 0) {
         cmd.type = RobotCommandType::STOP;
+    } else if (strcmp(upper, "DEPLOY") == 0) {
+        cmd.type = RobotCommandType::DEPLOY_SERVO;
+    } else if (strcmp(upper, "RETRACT") == 0) {
+        cmd.type = RobotCommandType::RETRACT_SERVO;
     } else if (strcmp(upper, "STATUS") == 0) {
         cmd.type = RobotCommandType::STATUS;
     } else if (strcmp(upper, "RESET") == 0) {

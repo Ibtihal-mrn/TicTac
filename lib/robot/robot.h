@@ -42,6 +42,8 @@ enum class FsmState : uint8_t {
     EXEC_ROTATE_LEFT,
     EXEC_ROTATE_RIGHT,
     EXEC_STOP,
+    EXEC_MOVE_SERVO,
+    EXEC_RETRACT_SERVO,
     EMERGENCY_STOP,
 };
 

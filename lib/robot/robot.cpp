@@ -77,14 +77,14 @@ void driveDistancePID(float distance_mm, int speed) {
       }
     }
 
-
-    // STOP MOTOR CONDITIONS
-    if (safety_update()) {
-      static unsigned long lp3 = 0; 
-      motors.stopMotors();
-      if (DBG_MOTORS) Serial.print("Safety triggered\n");
-      continue;
-    }
+//-------------ULTRASONS--------------------------
+    // STOP MOTOR CONDITIONS (ultrason désactivé pour le moment pour éviter un bug)
+    // if (safety_update()) {
+    //   static unsigned long lp3 = 0; 
+    //   motors.stopMotors();
+    //   if (DBG_MOTORS) Serial.print("Safety triggered\n");
+    //   continue;
+    // }
 
     // --- Read Current encoders Values ---
     long curL, curR;
@@ -285,11 +285,11 @@ void robot_rotate(float angle_deg, int speed){
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) continue;
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    safety_update();
-    if (safety_isTriggered()) {
-      // motors_stop();
-      return;   // arrêt immédiat
-    }
+    // safety_update();  // ultrason désactivé pour le moment
+    // if (safety_isTriggered()) {
+    //   // motors_stop();
+    //   return;   // arrêt immédiat
+    // }
 
 
     long curL, curR;
@@ -522,6 +522,8 @@ const char* fsm_state_name(FsmState state) {
         case FsmState::EXEC_ROTATE_LEFT:  return "EXEC_ROT_LEFT";
         case FsmState::EXEC_ROTATE_RIGHT: return "EXEC_ROT_RIGHT";
         case FsmState::EXEC_STOP:         return "EXEC_STOP";
+        case FsmState::EXEC_MOVE_SERVO:   return "EXEC_MOVE_SERVO";
+        case FsmState::EXEC_RETRACT_SERVO:return "EXEC_RETRACT_SERVO";
         case FsmState::EMERGENCY_STOP:    return "EMERGENCY_STOP";
         default:                       return "UNKNOWN";
     }
@@ -617,6 +619,12 @@ switch (ctx.currentState) {
                         break;
                     case RobotCommandType::STOP:
                         fsm_change_state(ctx, FsmState::EXEC_STOP);
+                        break;
+                    case RobotCommandType::DEPLOY_SERVO:
+                        fsm_change_state(ctx, FsmState::EXEC_MOVE_SERVO);
+                        break;
+                    case RobotCommandType::RETRACT_SERVO:
+                        fsm_change_state(ctx, FsmState::EXEC_RETRACT_SERVO);
                         break;
                     case RobotCommandType::STATUS: {
                         char status[128];
