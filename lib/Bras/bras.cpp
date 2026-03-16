@@ -1,6 +1,7 @@
 #include "bras.h"
 #include "../../src/config.h"
 #include <ESP32Servo.h> 
+#include "Debug.h"
 
 // Création des deux objets servo
 Servo brasGauche;
@@ -18,6 +19,8 @@ int angleFinalgauche   = 90;
 int angleInitialdroit  = 100;
 int angleFinaldroit    = 20;
 
+int DELAY = 1500;
+
 // int angleInitialgauche = -300;   // Servo (0-180° max) A REVOIR
 // int angleFinalgauche   = 90;
 // int angleInitialdroit  = 100;
@@ -32,6 +35,7 @@ void bras_init() {
 
   // Position de départ
   brasGauche.write(angleInitialgauche);
+  delay(DELAY);
   brasDroit.write(angleInitialdroit);
 
   initialized = true;
@@ -39,10 +43,18 @@ void bras_init() {
 
 void bras_deployer() {
   brasGauche.write(angleFinalgauche);
+  delay(DELAY);
   brasDroit.write(angleFinaldroit);
+  if (DBG_SERVO){
+    Serial.print("Bras deployé.");
+  }
 }
 
 void bras_retracter() {
   brasGauche.write(angleInitialgauche);
+  delay(DELAY);
   brasDroit.write(angleInitialdroit);
+  if (DBG_SERVO){
+    Serial.print("Bras retracté.");
+  }
 }

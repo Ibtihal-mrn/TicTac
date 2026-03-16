@@ -50,6 +50,9 @@ void setup()
             DBG_FSM |
                 DBG_MOTORS |
                 DBG_SENSORS |
+                DEBUG_TEAM_SWITCH |
+                DBG_SERVO |
+                DBG_ENCODER |
                 DBG_MAGNET
             // DBG_COMMS |        // comment DBG_ to deactivate its related prints
             // DBG_ENCODER |
@@ -90,7 +93,7 @@ void setup()
   teamSwitch.begin();
 
   Serial.println("Waiting for start switch...");
-  startSwitch.waitForStart();
+  // startSwitch.waitForStart();
   Serial.println("Starting sequence..."); 
 }
 
@@ -99,6 +102,7 @@ void loop()
 
   static bool runSequence = true;  
   ultrasonic_update();
+
 
   if (!runSequence) {
     return; 
@@ -126,13 +130,20 @@ void loop()
     // rotateAnglePID(-90, 200);      // tourne à gauche de 90°
     // delay(1000);                   // arrêt du robot 
 
-    driveDistancePID(500, 200);     // avance 50 cm
-    delay(100);                   // arrêt du robot
+    driveDistancePID(500, 254);     // avance 50 cm
+    delay(1000);                   // arrêt du robot
     bras_deployer();              // déploie le bras
-    delay(100);                   // arrêt du robot
+    delay(1000);                   // arrêt du robot
     bras_retracter();             // rétracte le bras
-    delay(100);                   // arrêt du robot
-
+    delay(1000);                   // arrêt du robot
+     bras_deployer();              // déploie le bras
+    delay(1000);                   // arrêt du robot
+    bras_retracter();             // rétracte le bras
+    delay(1000);  
+     bras_deployer();              // déploie le bras
+    delay(1000);                   // arrêt du robot
+    bras_retracter();             // rétracte le bras
+    delay(1000);  
   }
 
   else
