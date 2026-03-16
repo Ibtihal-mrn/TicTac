@@ -16,17 +16,10 @@
 #define PSRAM_IO36 36
 #define PSRAM_IO37 37
 
-<<<<<<< HEAD
-#define STRAP_45 45   // Strapping: VDD_SPI voltage. NEVER pull HIGH at power-up.
-#define STRAP_46 46   // Strapping: boot mode/ROM print. Avoid strong pull-ups.
-#define IO47_1V8  47
-#define IO48_1V8  48
-=======
 #define STRAP_45 45 // Strapping: VDD_SPI voltage. NEVER pull HIGH at power-up.
 #define STRAP_46 46 // Strapping: boot mode/ROM print. Avoid strong pull-ups.
 #define IO47_1V8 47
 #define IO48_1V8 48
->>>>>>> test
 
 // ======== PINS GENERAL PURPOSE (GPIOs) =======
 // 1  - 2  : GPIO
@@ -66,10 +59,10 @@
 #define ROTATE_KD 0.25f
 
 // =================== ACTUATORS PINS ======================
-// #define LAUNCH_TRIGGER_PIN A0
-// #define TEAM_SWITCH_PIN A2
-#define TEAM_SWITCH_PIN 21
-#define EBTN_PIN 8
+#define LAUNCH_TRIGGER_PIN 1 // TODO: not used here, impl in main.cpp startSwitch !
+#define TEAM_SWITCH_PIN 8
+
+// #define EBTN_PIN 8   // changed to Hardware Switch
 #define EBTN_USE_INTERNAL_PULLUP 1
 #define EBTN_PRESSED_STATE LOW // Sans resistance externe: INPUT_PULLUP, bouton vers GND
 
@@ -98,19 +91,19 @@
 
 
 // ========= Electro Aimant ==========
-#define RELAY_PIN 1
-#define SWITCH_PIN 2
+#define RELAY_PIN 38
+#define SWITCH_PIN                                                                                   
 
 
 
 // ===================== ULTRASONIC =====================
 #define US_TIMEOUT 20000UL
-#define US_TRIG_PIN 42
-#define US_ECHO_PIN 41
-#define US2_TRIG_PIN 40     // nouveau
-#define US2_ECHO_PIN 39   // nouveau
-#define US3_TRIG_PIN 8   // nouveau
-#define US3_ECHO_PIN 38   // nouveau
+#define US_TRIG_PIN 1  // US Left :  2, 42, 41, 40, 39, 38
+#define US_ECHO_PIN 2
+#define US2_TRIG_PIN 42  // US Middle :
+#define US2_ECHO_PIN 41
+#define US3_TRIG_PIN 40  // US Right :
+#define US3_ECHO_PIN 39
 #define US_OBSTACLE_THRESHOLD_CM 30
 
-// #endif
+// #endif#define US2_TRIG_PIN 40#define US2_TRIG_PIN 40#define US2_TRIG_PIN 40#define US2_TRIG_PIN 40#define US2_TRIG_PIN 40

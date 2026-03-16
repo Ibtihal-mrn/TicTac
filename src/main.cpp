@@ -31,7 +31,7 @@ void imAlive()
   }
 }
 
-StartSwitch startSwitch(GPIO_NUM_2);
+StartSwitch startSwitch(GPIO_NUM_8);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // ========= SETUP ===============
