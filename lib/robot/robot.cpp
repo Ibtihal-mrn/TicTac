@@ -4,7 +4,7 @@
 
 #include "motors.h"
 #include "encoders.h"
-// #include "ultrasonic.h"
+#include "us.h"
 #include "EmergencyButton.h"
 #include "imu.h"
 
@@ -91,6 +91,8 @@ void driveDistancePID(float distance_mm, int speed)
     tPrev += (unsigned long)DT_MS * 1000UL;
 
     // Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : ".");
+    // printUltrasonicVal();
+
 
     // STOP MOTOR CONDITIONS
     if (safety_update())
@@ -98,7 +100,8 @@ void driveDistancePID(float distance_mm, int speed)
       static unsigned long lp3 = 0;
       motors.stopMotors();
       if (DBG_MOTORS)
-        Serial.print("Safety triggered\n");
+        // 
+        // printUltrasonicVal();
       continue;
     }
 

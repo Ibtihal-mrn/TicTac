@@ -61,6 +61,8 @@
 // =================== ACTUATORS PINS ======================
 #define LAUNCH_TRIGGER_PIN 1 // TODO: not used here, impl in main.cpp startSwitch !
 #define TEAM_SWITCH_PIN 8
+#define EBTN_PIN 48
+
 
 // #define EBTN_PIN 8   // changed to Hardware Switch
 #define EBTN_USE_INTERNAL_PULLUP 1
@@ -92,7 +94,7 @@
 
 // ========= Electro Aimant ==========
 #define RELAY_PIN 38
-#define SWITCH_PIN                                                                                   
+#define SWITCH_PIN 48
 
 
 

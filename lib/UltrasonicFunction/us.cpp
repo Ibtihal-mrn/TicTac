@@ -61,10 +61,11 @@ void printUltrasonicVal() {
   static unsigned long lastPrint = 0;
   ultrasonic_update();
 
-  if (millis() - lastPrint < 300) return;
+  if (millis() - lastPrint < 500) return;
   lastPrint = millis();
 
   int16_t dmin = minValid3(dUS1, dUS2, dUS3);
+  // Serial.print("Safety triggered\n");
   Serial.print("US1: "); Serial.print(dUS1);
   Serial.print(" | US2: "); Serial.print(dUS2);
   Serial.print(" | US3: "); Serial.print(dUS3);

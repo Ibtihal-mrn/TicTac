@@ -47,21 +47,21 @@ void setup()
 {
   // Serial.begin(115200);
   debugInit(115200, // does Serial.begin()
-            DBG_FSM |
-                DBG_MOTORS |
-                DBG_SENSORS |
-                DEBUG_TEAM_SWITCH |
-                DBG_SERVO |
-                DBG_ENCODER |
-                DBG_MAGNET
+            DBG_FSM 
+                // DBG_MOTORS |
+                // DBG_SENSORS |
+                // DEBUG_TEAM_SWITCH |
+                // DBG_SERVO |
+                // DBG_ENCODER |
+                // DBG_MAGNET
             // DBG_COMMS |        // comment DBG_ to deactivate its related prints
             // DBG_ENCODER |
             // DBG_LAUNCH_TGR
   );
 
-  pinMode(SWITCH_PIN, INPUT_PULLUP);
-  lastSwitchState = digitalRead(SWITCH_PIN);
-  relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
+  // pinMode(SWITCH_PIN, INPUT_PULLUP);
+  // lastSwitchState = digitalRead(SWITCH_PIN);
+  // relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
 
   // Init electro-aimant
   const bool RELAY_ACTIVE_LOW = true;
@@ -70,7 +70,7 @@ void setup()
   pinMode(SWITCH_PIN, INPUT_PULLUP);
   lastSwitchState = digitalRead(SWITCH_PIN);
   relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
-  relais_on();
+  // relais_on();
 
   // // I2C Init.
   Wire.begin(6, 7); // SDA, SCL
@@ -112,6 +112,26 @@ void loop()
   {
     Serial.println("Equipe A");
     
+
+    // ? ROUTINE :
+    // bras_deployer();              // déploie le bras
+    // delay(1000);                   // arrêt du robot
+    // bras_retracter();             // rétracte le bras
+    // delay(1000);                   // arrêt du robot
+    
+    // bras_deployer();              // déploie le bras
+    // delay(1000);                   // arrêt du robot
+    // bras_retracter();             // rétracte le bras
+    // delay(1000);  
+
+    // driveDistancePID(900, 254);
+    driveDistancePID(900, 200);
+    // delay(200);
+    // rotateAnglePID(90, 200);
+    // delay(200);
+    // driveDistancePID(500, 200);
+
+
     // driveDistancePID(1000, 200);   // avance 15 cm
     // delay(1000);                   // arrêt du robot
 
@@ -130,16 +150,9 @@ void loop()
     // rotateAnglePID(-90, 200);      // tourne à gauche de 90°
     // delay(1000);                   // arrêt du robot 
 
-    driveDistancePID(500, 254);     // avance 50 cm
+    // driveDistancePID(500, 254);     // avance 50 cm
     delay(1000);                   // arrêt du robot
-    bras_deployer();              // déploie le bras
-    delay(1000);                   // arrêt du robot
-    bras_retracter();             // rétracte le bras
-    delay(1000);                   // arrêt du robot
-     bras_deployer();              // déploie le bras
-    delay(1000);                   // arrêt du robot
-    bras_retracter();             // rétracte le bras
-    delay(1000);  
+    
      bras_deployer();              // déploie le bras
     delay(1000);                   // arrêt du robot
     bras_retracter();             // rétracte le bras
@@ -164,13 +177,13 @@ void loop()
     relais_on();                   // active le relais
     delay(500);                   // attendre 5 secondes
 
-    driveDistancePID(500, 200);   // avance
-    delay(500);                   // ← ce delay ne sert pas d'arrêt, c'est trop long
+    // driveDistancePID(500, 200);   // avance
+    // delay(500);                   // ← ce delay ne sert pas d'arrêt, c'est trop long
 
     relais_off();                  // désactive le relais
     delay(500);
 
-    driveDistancePID(500, 200);   // avance
+    // driveDistancePID(500, 200);   // avance
     }
 
 
