@@ -27,6 +27,7 @@
 #include "control.h"
 #include "kinematics.h"
 #include "safety.h"
+#include "bras.h"
 
 #include "utils.h"
 #include "Debug.h"
