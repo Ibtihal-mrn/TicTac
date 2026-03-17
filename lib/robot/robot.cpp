@@ -2,18 +2,22 @@
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
-
-void robot_init() {
+void robot_init()
+{
   // Encoders
   encoders_init();
   // Ultrasonic init fait dans ultrasonic.cpp
-  
+
   emergencyButton_init();
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
-  if (!imu_init()) { Serial.println("MPU6050 FAIL.");
-  } else {
+  if (!imu_init())
+  {
+    Serial.println("MPU6050 FAIL.");
+  }
+  else
+  {
     delay(200);
     Serial.println("MPU6050 connected.");
     imu_calibrate(600, 2); // ~1.2s, robot immobile
@@ -21,10 +25,12 @@ void robot_init() {
   }
 }
 
-void robot_stop(){ 
-  motors.stopMotors(); 
+void robot_stop()
+{
+  motors.stopMotors();
 }
-void robot_test() {
+void robot_test()
+{
   motors.forward(150, 150);
   delay(2000);
   motors.stopMotors();
@@ -33,14 +39,14 @@ void robot_test() {
 }
 
 // AVANT et ARRIERE (+ , -)
-void driveDistancePID(float distance_mm, int speed) {
-  
+void driveDistancePID(float distance_mm, int speed)
+{
+
   // --- Determine direction ---
-    bool forwardMotion = (distance_mm >= 0);
-    long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
+  bool forwardMotion = (distance_mm >= 0);
+  long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
   unsigned long lp1 = 0;
   printMillis(DBG_MOTORS, "Target computed\n", millis(), lp1, 1000);
-
 
   // --- Encoder Read Start Values ---
   long startL, startR;
@@ -59,9 +65,14 @@ void driveDistancePID(float distance_mm, int speed) {
   const float dt = DT_MS / 1000.0f;
   unsigned long tPrev = micros();
 
-  while (true) {
+  while (true)
+  {
     unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
+    {
+      yield();
+      continue;
+    }
     tPrev += (unsigned long)DT_MS * 1000UL;
 
     // Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : "."); 
@@ -89,12 +100,14 @@ void driveDistancePID(float distance_mm, int speed) {
     // --- Read Current encoders Values ---
     long curL, curR;
     encoders_read(&curL, &curR);
+    if (DBG_ENCODER) printEncodersVal();
 
     // --- Compute distance traveled ---
     long distTicksL = labs(curL - startL);
     long distTicksR = labs(curR - startR);
     long avgDist = (distTicksL + distTicksR) / 2;
-    if (avgDist >= targetTicks) break; // Target Reached
+    if (avgDist >= targetTicks)
+      break; // Target Reached
 
     // --- Compute deltas for PID ---
     long dL, dR;
@@ -102,11 +115,15 @@ void driveDistancePID(float distance_mm, int speed) {
 
     // Heading error (cumulative) - erreur de cap cumulée (position)
     long headingErr = (curL - startL) - (curR - startR);
-    int pwmL=0, pwmR=0;
+    int pwmL = 0, pwmR = 0;
     control_driveStraight_PI(st, headingErr, dL, dR, speed, dt, pwmL, pwmR);
 
     // Automatically handle direction
-        if (!forwardMotion) { pwmL = -pwmL; pwmR = -pwmR; } //invers PWM pour marche arriere
+    if (!forwardMotion)
+    {
+      pwmL = -pwmL;
+      pwmR = -pwmR;
+    } // invers PWM pour marche arriere
 
     // Moteurs PWM vitesse
     motors.applyMotorOutputs(pwmL, pwmR);
@@ -120,20 +137,22 @@ void driveDistancePID(float distance_mm, int speed) {
             Lpwm = millis();
         }
   }
-  
+
   // Movement complete - stop motors
   motors.stopMotors();
-    debugPrintf(DBG_MOTORS, "Target distance reached\n");
+  debugPrintf(DBG_MOTORS, "Target distance reached\n");
 }
 
-void rotateAnglePID(float angle_deg, int speed) {
-  // Important : 
+void rotateAnglePID(float angle_deg, int speed)
+{
+  // Important :
   //    - this is a PD controller (no I-term), rate is dirctly used as D-term (gyro rate = damping).
 
   // ----- Setup Timing -----
-  const uint16_t DT_MS = 10;           // Loop runs every 10ms
-  const float dt = DT_MS / 1000.0f;   // dt = 0.01s
-  unsigned long tPrev = micros();    // Control freq = 100Hz
+  const uint16_t DT_MS = 10;      // Loop runs every 10ms
+  unsigned long tPrev = micros(); // Control freq = 100Hz
+  unsigned long startMs = millis();
+  const float targetDeg = angle_deg * ROTATE_TARGET_SCALE;
 
   // ----- Variables -------
   float angle = 0.0f;
@@ -141,22 +160,47 @@ void rotateAnglePID(float angle_deg, int speed) {
   unsigned long stableStart = 0;
 
   // ---- Parameters (à ajuster) ------
-  const float KP = 2.2f;
-  const float KD = 0.25f;
+  const float KP = ROTATE_KP;
+  const float KD = ROTATE_KD;
 
   const int PWM_MIN = 55;
   const int RAMP_STEP = 8;
+  const float BRAKE_START_DEG = 45.0f;
 
   const float ANGLE_TOL = 1.5f;
-  const float RATE_TOL  = 8.0f;
+  const float RATE_TOL = 8.0f;
   const uint16_t STABLE_MS = 120;
+  const uint32_t MAX_ROTATE_MS = (uint32_t)(2500.0f + 22.0f * fabs(targetDeg));
 
   // ----- Control Loop -----
-  while (true) {
+  while (true)
+  {
+
+    if (safety_update())
+    {
+      static unsigned long lp3 = 0;
+      motors.stopMotors();
+      if (DBG_MOTORS)
+        Serial.print("Safety triggered\n");
+      continue;
+    }
+
     // Fixed 100Hz timing -----
     unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL) {yield(); continue;}
-    tPrev += (unsigned long)DT_MS * 1000UL;
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
+    {
+      yield();
+      continue;
+    }
+    float dt = (float)(now - tPrev) / 1000000.0f;
+    tPrev = now;
+    dt = constrain(dt, 0.005f, 0.03f);
+
+    if (millis() - startMs >= MAX_ROTATE_MS)
+    {
+      debugPrintf(DBG_MOTORS, "rotateAnglePID timeout\n");
+      break;
+    }
 
     {
       RobotCommand peekCmd;
@@ -169,49 +213,70 @@ void rotateAnglePID(float angle_deg, int speed) {
       }
     }
     // Read Gyro -----
-    float rate = imu_readGyroZ_dps();   // deg/s
-    angle += rate * dt;                 // integrate
+    float rate = imu_readGyroZ_dps(); // deg/s
+    angle += rate * dt;               // integrate
 
-    if (DBG_MOTORS) { Serial.print("Angle: "); Serial.print(angle); Serial.print(" | Rate: "); Serial.println(rate); }
+    if (DBG_MOTORS)
+    {
+      Serial.print("Angle: ");
+      Serial.print(angle);
+      Serial.print(" | Rate: ");
+      Serial.println(rate);
+    }
 
     // Compute Error -----
-    float error = angle_deg - angle;
+    float error = targetDeg - angle;
 
     // Ramp PWM Limit -----
     if (pwmLimit < speed)
-        pwmLimit = min(pwmLimit + RAMP_STEP, speed);
+      pwmLimit = min(pwmLimit + RAMP_STEP, speed);
 
     // PD Control -----
     float control = KP * error - KD * rate;
 
+    // Freinage progressif en approche de la cible
+    int pwmCap = pwmLimit;
+    float absErr = fabs(error);
+    if (absErr < BRAKE_START_DEG)
+    {
+      float ratio = absErr / BRAKE_START_DEG; // 1 loin -> 0 proche cible
+      int brakeCap = PWM_MIN + (int)((speed - PWM_MIN) * ratio);
+      pwmCap = min(pwmCap, brakeCap);
+    }
+
     // Convert to PWM -----
     int pwm = (int)fabs(control);
-    pwm = constrain(pwm, 0, pwmLimit);
-    if (pwm > 0) pwm = max(pwm, PWM_MIN);
+    pwm = constrain(pwm, 0, pwmCap);
+    if (pwm > 0)
+      pwm = max(pwm, PWM_MIN);
 
     // ----- Apply Direction -----
     if (control > 0)
-        motors.applyMotorOutputs(-pwm, pwm);   // rotate right
+      motors.applyMotorOutputs(-pwm, pwm); // rotate right
     else
-        motors.applyMotorOutputs(pwm, -pwm);      // rotate left
+      motors.applyMotorOutputs(pwm, -pwm); // rotate left
 
     // ----- Debug -----
     if (DBG_MOTORS)
     {
-        Serial.print("Angle: "); Serial.print(angle);
-        Serial.print(" | Error: "); Serial.print(error);
-        Serial.print(" | Rate: "); Serial.print(rate);
-        Serial.print(" | PWM: "); Serial.println(pwm);
+      Serial.print("Angle: ");
+      Serial.print(angle);
+      Serial.print(" | Error: ");
+      Serial.print(error);
+      Serial.print(" | Rate: ");
+      Serial.print(rate);
+      Serial.print(" | PWM: ");
+      Serial.println(pwm);
     }
 
     // ----- Stop Condition -----
     if (fabs(error) < ANGLE_TOL && fabs(rate) < RATE_TOL)
     {
-        if (stableStart == 0)
-            stableStart = millis();
+      if (stableStart == 0)
+        stableStart = millis();
 
-        if (millis() - stableStart >= STABLE_MS)
-            break;
+      if (millis() - stableStart >= STABLE_MS)
+        break;
     }
     else
     {
@@ -371,8 +436,8 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
     } else {
       stableStart = 0;
     }
-
   }
+<<<<<<< HEAD
     motors.stopMotors();
 }
 
@@ -497,8 +562,14 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
   // Default (target reached when outside while loop).
   // motors.stopMotors();
+=======
+  // Movement complete - stop motors
+  motors.stopMotors();
+  debugPrintf(DBG_MOTORS, "Target Angle reached\n");
+>>>>>>> origin/esp32s3
 }
 
+// ----- LEGACY -----
 
 
 // ===========
@@ -510,6 +581,7 @@ void checkMatchTimer(Context& ctx) { ... }
 */
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+<<<<<<< HEAD
 const char* fsm_state_name(FsmState state) {
     switch (state) {
         case FsmState::INIT:              return "INIT";
@@ -760,12 +832,135 @@ switch (ctx.currentState) {
         }
     }
 }
+=======
+void hardware_init(Context &ctx)
+{
+  // To be called in setup() in main.cpp
 
+  // motors_init();
+  // encoders_init();
+  // ultrasonic_init(13, 10);  // trig, echo
+  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
+  // IMU
+  if (!imu_init())
+  {
+    Serial.println("MPU6050 FAIL.");
+  }
+  else
+  {
+    delay(200);
+    Serial.println("MPU6050 connected.");
+    imu_calibrate(600, 2); // ~1.2s, robot immobile
+    // Serial.println("IMU calibrated");
+  }
 
+  // Init Match Timer
+  ctx.matchActive = false;
+  ctx.matchDurationMs = MATCH_DURATION_MS;
+  ctx.matchStartMs = 0;
+  debugPrintf(DBG_FSM, "FSM -> INIT");
+  ctx.currentAction = Robot::INIT;
+}
 
+void startMatchTimer(Context &ctx)
+{
+  ctx.matchActive = true;
+  ctx.matchStartMs = millis();
+  ctx.stateStartMs = millis();
+  ctx.matchDurationMs = MATCH_DURATION_MS;
+}
+void checkMatchTimer(Context &ctx)
+{
+  if (ctx.matchActive && millis() - ctx.matchStartMs >= ctx.matchDurationMs)
+  {
+    ctx.matchActive = false;
+    debugPrintf(DBG_FSM, "Match timer elapsed -> TIMER_END");
+    ctx.currentAction = Robot::TIMER_END;
+  }
+}
 
+void robot_step(Context &ctx)
+{
 
+  // Periodic Checks
+  checkMatchTimer(ctx);
 
+  // BLE connect
 
+  // Main step.
+  switch (ctx.currentAction)
+  {
+  case Robot::INIT:
+    // robot_init();  CALLED IN SETUP()
+    // ctx.commandQueue.push({RobotCommandType::TUNE_PID, (float)TUNE_BOTH});
+    debugPrintf(DBG_FSM, "FSM -> IDLE");
+    ctx.currentAction = Robot::IDLE;
+    break;
 
+  case Robot::IDLE:
+    // ADD LaunchTrigger HERE
+
+    // start 100sec timer
+    startMatchTimer(ctx);
+
+    debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
+    ctx.currentAction = Robot::DISPATCH_CMD;
+    break;
+
+  case Robot::DISPATCH_CMD:
+    // parse command and set next action (e.g. EXEC_MOVE, EXEC_ROTATE, etc.)
+
+    // 1. Empty Queue
+    // if (ctx.commandQueue.empty()) { break; }
+
+    // 2. Get next command
+    // ctx.currentCommand = ctx.commandQueue.front();
+    // ctx.commandQueue.pop();
+
+    // 3. Dispatch to movement
+    // switch (ctx.currentCommand.type) {
+    //     case  RobotCommandType::MOVE_FORWARD_CM:
+    //         movement.startForward(ctx.currentCommand.value);
+    //         fsmChangeAction(ctx, FsmAction::EXEC_MOVE);
+    //         break;
+
+    //     case RobotCommandType::ROTATE_DEG:
+    //         movement.startRotate(ctx.currentCommand.value);
+    //         fsmChangeAction(ctx, FsmAction::EXEC_ROTATE);
+    //         break;
+>>>>>>> origin/esp32s3
+
+    //     case RobotCommandType::TUNE_PID:
+    //         fsmChangeAction(ctx, FsmAction::TUNE_PID);
+    //         break;
+
+    //     // case STEPPER_UP:
+
+    //     default: fsmChangeAction(ctx, FsmAction::DISPATCH_CMD); break;
+    // }
+    // break;
+    // }
+    break;
+
+  case Robot::EXEC_MOVE:
+
+    break;
+
+  case Robot::EXEC_ROTATE:
+    // robot_rotate(...);
+    break;
+
+  case Robot::TUNE_PID:
+    // adjust PID parameters
+    break;
+
+  case Robot::TIMER_END:
+    motors.stopMotors();
+    break;
+
+  case Robot::EMERGENCY_STOP:
+    motors.stopMotors();
+    break;
+  }
+}
