@@ -1,22 +1,30 @@
+// us.h
 #pragma once
 #include <Arduino.h>
 #include <Ultrasonic.h>
+#include "../../src/config_coprocessor.h"
+
+// Max number of sensors allowed
+#define MAX_SENSORS 12
+
 
 // ===== ZONES =====
-#define ZONE_FRONT  (1 << 0)
-#define ZONE_LEFT   (1 << 1)
-#define ZONE_RIGHT  (1 << 2)
-#define ZONE_BACK   (1 << 3)
+enum Zone {
+    ZONE_FRONT  = 1 << 0,
+    ZONE_LEFT   = 1 << 1,
+    ZONE_RIGHT  = 1 << 2,
+    ZONE_BACK   = 1 << 3
+};
 
 // ===== SENSOR STRUCT =====
 struct Sensor {
-    Ultrasonic us;
+    Ultrasonic *us;
     uint8_t zone;
     bool enabled;
     int16_t distance;
 };
 
-#define MAX_SENSORS 12
+
 
 static Sensor sensors[MAX_SENSORS];
 static uint8_t sensorCount = 0;
@@ -26,18 +34,15 @@ static uint8_t nextSensor = 0;
 static unsigned long lastRead = 0;
 
 static const uint16_t US_DELAY = 30;
-static const uint16_t THRESHOLD_CM = 15;
 
 // ===== ADD =====
 inline void us_add(uint8_t zone, int trig, int echo) {
     if (sensorCount >= MAX_SENSORS) return;
 
-    sensors[sensorCount] = {
-        Ultrasonic(trig, echo, 40000),
-        zone,
-        true,
-        -1
-    };
+    sensors[sensorCount].us = new Ultrasonic(trig, echo, US_TIMEOUT);
+    sensors[sensorCount].zone = zone;
+    sensors[sensorCount].enabled = true;
+    sensors[sensorCount].distance = -1;
 
     sensorCount++;
 }
@@ -63,12 +68,12 @@ inline uint8_t us_update() {
     uint8_t danger = 0;
 
     if (s.enabled) {
-        int d = (int)s.us.read(CM);
+        int d = (int)s.us->read(CM);
         if (d <= 0 || d > 400) d = -1;
 
         s.distance = d;
 
-        if (d > 0 && d < THRESHOLD_CM) {
+        if (d > 0 && d < US_OBSTACLE_THRESHOLD_CM) {
             danger |= s.zone;
         }
     }
@@ -78,3 +83,42 @@ inline uint8_t us_update() {
 
     return danger;
 }
+
+
+// ============= GETTERS =========
+// returns number of sensors added
+inline uint8_t us_count() {
+    return sensorCount;
+}
+
+// returns the zone of sensor i
+inline uint8_t us_getZone(uint8_t index) {
+    if (index >= sensorCount) return 0;
+    return sensors[index].zone;
+}
+
+// returns the distance (cm) of sensor i
+inline int16_t us_getDistance(uint8_t index) {
+    if (index >= sensorCount) return -1;
+    return sensors[index].distance;
+}
+
+// returns minimum distance of all sensors in a specific zone
+inline int16_t us_getDistanceForZone(uint8_t zone) {
+    int16_t minDist = 9999;
+    for (int i = 0; i < sensorCount; i++) {
+        if (sensors[i].zone & zone && sensors[i].distance > 0) {
+            if (sensors[i].distance < minDist) minDist = sensors[i].distance;
+        }
+    }
+    return (minDist == 9999) ? -1 : minDist;
+}
+
+
+
+
+
+
+
+
+//

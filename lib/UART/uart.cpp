@@ -1,10 +1,11 @@
+// uart.cpp
 #include "uart.h"
-#include "config_coprocessor.h"
+#include "../../src/config_coprocessor.h"
 
 static HardwareSerial* _serial = nullptr;
 
 static uint8_t buffer[sizeof(SensorPacket)];
-static uint8_t index = 0;
+static uint8_t rxIndex = 0;
 
 enum ParseState {
     WAIT_START,
@@ -15,6 +16,7 @@ static ParseState state = WAIT_START;
 
 // ================= INIT =================
 void uart_init(HardwareSerial& serial) {
+    _serial = &serial;
     serial.begin(UART_BAUD, SERIAL_8N1, UART_RX, UART_TX);
 }
 
@@ -40,15 +42,15 @@ bool readPacket(SensorPacket& out) {
 
             case WAIT_START:
                 if (b == PACKET_START) {
-                    index = 0;
+                    rxIndex = 0;
                     state = READ_DATA;
                 }
                 break;
 
             case READ_DATA:
-                buffer[index++] = b;
+                buffer[rxIndex++] = b;
 
-                if (index >= sizeof(SensorPacket)) {
+                if (rxIndex >= sizeof(SensorPacket)) {
                     memcpy(&out, buffer, sizeof(SensorPacket));
 
                     uint16_t chk = computeChecksum(

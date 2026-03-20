@@ -7,10 +7,11 @@
  */
 
 
-// ============= ESP32_S3 pinout ========
+// ================= ESP32_S3 pinout ====================
 // |  3V3                         | GND 
-// |  3V3                         | TX  
-// |  RST                         | RX 
+// |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
+// |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
+// --------------------------------------------------------
 // |  4  – Servo Right            | 1   -             
 // |  5  – Servo Left             | 2   -    
 // |  6  - SDA                    | 42  -
@@ -18,6 +19,7 @@
 // |  15 - Encoder                | 40  -   
 // |  16 - Encoder                | 39  - 
 // |  17 - Encoder                | 38  -
+// --------------------------------------------------------
 // |  18 - Encoder                | 37  - / (NO) PSRAM
 // |  8  - TeamSwitch             | 36  - / (NO) PSRAM        
 // |  3  - / (NO) STRAP           | 35  - / (NO) PSRAM
@@ -25,14 +27,15 @@
 // |  9  – Motor (ENA)            | 45  - / (NO) STRAP
 // |  10 – Motor (IN1)            | 48  - / (NO) 1.8V logic
 // |  11 – Motor (IN2)            | 47  - / (NO) 1.8V logic
+// --------------------------------------------------------
 // |  12 - Motor (IN3)            | 21  - 
 // |  13 - Motor (IN4)            | 20  - / (NO) USB+
 // |  14 - Motor (ENB)            | 19  - / (NO) USB+
 
 
 // ===== UART =====
-#define UART_TX 43   // choose valid pins
-#define UART_RX 44   // (RX not really needed here)
+// #define UART_TX 43  // 
+// #define UART_RX 44
 
 
 

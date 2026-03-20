@@ -5,8 +5,8 @@
 
 // ================= ESP32_S3 pinout ====================
 // |  3V3                         | GND 
-// |  3V3                         | TX  
-// |  RST                         | RX 
+// |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
+// |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
 // |  4  – US Front Trig  (1)     | 1   - US Back Trig  (4)
 // |  5  – US Front Trig  (1)     | 2   - US Back Trig  (4)
@@ -34,8 +34,12 @@
 #define STOP_PIN    12
 
 // ===== UART =====
-#define UART_TX 43
-#define UART_RX 44
+#define UART_RX 16
+#define UART_TX 17
+
+#define US_TIMEOUT 20000UL
+#define US_OBSTACLE_THRESHOLD_CM 15
+
 
 // ==================
 //       FRONT

@@ -3,15 +3,15 @@
 #include <Wire.h>
 
 // Hardware
-#include "robot.h"
-#include "bras.h"
-#include "Relais.h"
-#include "encoders.h"
+// #include "robot.h"
+// #include "bras.h"
+// #include "Relais.h"
+// #include "encoders.h"
 #include "us.h"         // ultrasonic
-#include "StartSwitch.h"
-#include "TeamSwitch.h"
-#include "safety.h"
-#include "motors.h"
+// #include "StartSwitch.h"
+// #include "TeamSwitch.h"
+// #include "safety.h"
+// #include "motors.h"
 #include "uart.h"
 
 // Config & Debug prints
@@ -70,8 +70,6 @@ void setup()
 
     Serial.println("Setup Done.");
 }
-
-// ================== PARSER ==================
 
 
 // ================== LOOP ==================

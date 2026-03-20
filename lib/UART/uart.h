@@ -4,6 +4,7 @@
 // ================== PROTOCOL ==================
 
 #define UART_BAUD 115200
+#define PACKET_START 0xAA
 
 #define CMD_GET_DATA      0x01
 #define CMD_ENABLE_ZONE   0x02
