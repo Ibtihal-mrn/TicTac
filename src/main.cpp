@@ -1,59 +1,44 @@
 #include <Arduino.h>
 #include <Wire.h>
-
 // Hardware
 #include "robot.h"
 #include "bras.h"
 #include "Relais.h"
-
-// Debug prints
 #include "encoders.h"
 #include "us.h"         // ultrasonic
+#include "StartSwitch.h"
+#include "TeamSwitch.h"
+#include "safety.h"          // ← Safety update
+#include "motors.h"          // ← Test moteurs
+
+// Config & Debug prints
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
-#include "StartSwitch.h"
-#include "TeamSwitch.h"
 
-#include "EmergencyButton.h" // ← Bouton urgence
-#include "safety.h"          // ← Safety update
-#include "motors.h"          // ← Test moteurs
+
+
 extern Motors motors;        // ← Import depuis robot.cpp
-
-// ------ helpers ------
-void imAlive()
-{
-  static unsigned long millis_print = 0;
-  if (millis() - millis_print >= 2000)
-  {
-    Serial.println("I'm alive");
-    millis_print = millis();
-  }
-}
-
 StartSwitch startSwitch(GPIO_NUM_8);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
+
 
 // ========= SETUP ===============
 // const int RELAY_PIN = 41;
 const bool RELAY_ACTIVE_LOW = true;
-
-
-
 bool lastSwitchState = HIGH;   // INPUT_PULLUP
 bool sequenceDone = false;     // Pour éviter répétition
 
 void setup()
 {
-  // Serial.begin(115200);
-  debugInit(115200, // does Serial.begin()
+  debugInit(115200,
             DBG_FSM 
-                // DBG_MOTORS |
-                // DBG_SENSORS |
-                // DEBUG_TEAM_SWITCH |
-                // DBG_SERVO |
-                // DBG_ENCODER |
-                // DBG_MAGNET
+            // DBG_MOTORS |
+            // DBG_SENSORS |
+            // DEBUG_TEAM_SWITCH |
+            // DBG_SERVO |
+            // DBG_ENCODER |
+            // DBG_MAGNET
             // DBG_COMMS |        // comment DBG_ to deactivate its related prints
             // DBG_ENCODER |
             // DBG_LAUNCH_TGR
@@ -73,7 +58,7 @@ void setup()
   // relais_on();
 
   // // I2C Init.
-  Wire.begin(6, 7); // SDA, SCL
+  Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
   Wire.setClock(100000);
   delay(200);
 

@@ -1,6 +1,15 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+void imAlive()
+{
+  static unsigned long millis_print = 0;
+  if (millis() - millis_print >= 2000)
+  {
+    Serial.println("I'm alive");
+    millis_print = millis();
+  }
+}
 
 void i2c_scanner() {
   Serial.println("I2C Scanner");

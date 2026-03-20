@@ -6,6 +6,38 @@
  * Tous les paramètres physiques et pins sont définis ici
  */
 
+
+// ============= ESP32_S3 pinout ========
+// |  3V3                         | GND 
+// |  3V3                         | TX  
+// |  RST                         | RX 
+// |  4  – Servo Right            | 1   -             
+// |  5  – Servo Left             | 2   -    
+// |  6  - SDA                    | 42  -
+// |  7  - SCL                    | 41  - 
+// |  15 - Encoder                | 40  -   
+// |  16 - Encoder                | 39  - 
+// |  17 - Encoder                | 38  -
+// |  18 - Encoder                | 37  - / (NO) PSRAM
+// |  8  - TeamSwitch             | 36  - / (NO) PSRAM        
+// |  3  - / (NO) STRAP           | 35  - / (NO) PSRAM
+// |  46 - / (NO) STRAP           | 0   - / (NO) BOOT
+// |  9  – Motor (ENA)            | 45  - / (NO) STRAP
+// |  10 – Motor (IN1)            | 48  - / (NO) 1.8V logic
+// |  11 – Motor (IN2)            | 47  - / (NO) 1.8V logic
+// |  12 - Motor (IN3)            | 21  - 
+// |  13 - Motor (IN4)            | 20  - / (NO) USB+
+// |  14 - Motor (ENB)            | 19  - / (NO) USB+
+
+
+// ===== UART =====
+#define UART_TX 43   // choose valid pins
+#define UART_RX 44   // (RX not really needed here)
+
+
+
+
+
 // ======= NEVER USE =========
 #define STRAP_0 0 // Strapping: boot mode. If pulled LOW at reset, enters download mode.
 #define STRAP_3 3 // Strapping: JTAG source. Must NOT float at boot. Many designs avoid it.
@@ -45,8 +77,14 @@
 //      - STRAP_3 : can be used as GPIO if not left floating at reset
 //      AVOID STRAP_45 (VDD_SPI) and STRAP_46 (boot mode/ROM print) : never pull HIGH at power-up, avoid strong pull-ups
 
-//
+// ==========================================
+//              PINOUT
+// ==========================================
 #define MATCH_DURATION_MS 50000
+
+#define SDA_PIN 6
+#define SCL_PIN 7
+// #define I2C_ADDR_SENSOR_HUB 0x12
 
 // ===================== IMU =====================
 // Mets -1.0f si le robot corrige dans le mauvais sens (rotation divergente)
