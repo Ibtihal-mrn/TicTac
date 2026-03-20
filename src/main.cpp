@@ -125,7 +125,9 @@ void loop()
     // delay(1000);  
 
     // driveDistancePID(900, 254);
-    driveDistancePID(900, 200);
+        rotateAnglePID(-180, 200);      // tourne à droite de 90°
+
+    // driveDistancePID(900, 200);
     // delay(200);
     // rotateAnglePID(90, 200);
     // delay(200);
@@ -171,7 +173,8 @@ void loop()
     // // driveDistancePID(500, 254);
     // // delay(1000);
     // // bras_retracter();
-    driveDistancePID(500, 200);   // avance
+    // driveDistancePID(500, 200);   // avance
+    rotateAnglePID(180, 200);      // tourne à droite de 90°
     delay(500);                    // arrêt
 
     relais_on();                   // active le relais
