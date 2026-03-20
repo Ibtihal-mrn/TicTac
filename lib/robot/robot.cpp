@@ -1,7 +1,7 @@
 #include "robot.h"
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
-
+// Variables globales pour le PID de déplacement et l'initiation
 void robot_init()
 {
   Serial.println("[robot_init] START");
@@ -820,19 +820,19 @@ switch (ctx.currentState) {
         }
 
         // ── EXEC_ROTATE_LEFT : tourner à gauche ─────────────────────────
-        case FsmState::EXEC_ROTATE_LEFT: {
+        case FsmState::EXEC_ROTATE_RIGHT: {
             float angle = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 90;
-            bleSerial.println("[FSM] EXEC_ROTATE_LEFT");
-            rotateAnglePID(-fabs(angle), 200);  // angle négatif = gauche
+            bleSerial.println("[FSM] EXEC_ROTATE_RIGHT");
+            rotateAnglePID(fabs(angle), 200);  // angle positif = droite
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
 
         // ── EXEC_ROTATE_RIGHT : tourner à droite ────────────────────────
-        case FsmState::EXEC_ROTATE_RIGHT: {
+        case FsmState::EXEC_ROTATE_LEFT: {
             float angle = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 90;
-            bleSerial.println("[FSM] EXEC_ROTATE_RIGHT");
-            rotateAnglePID(fabs(angle), 200);   // angle positif = droite
+            bleSerial.println("[FSM] EXEC_ROTATE_LEFT");
+            rotateAnglePID(-fabs(angle), 200);   // angle négatif = gauche
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
@@ -845,7 +845,6 @@ switch (ctx.currentState) {
             break;
         }
         
-
         // ── EXEC_MOVE_SERVO : déplacer le servo ─────────────────────────────
         case FsmState::EXEC_MOVE_SERVO: {
             float dist = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 200;

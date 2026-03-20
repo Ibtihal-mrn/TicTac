@@ -1,0 +1,134 @@
+"""
+cerebros/models.py — Structures de données du cerveau robot.
+
+Dataclasses légères utilisées par tous les modules.
+"""
+
+from __future__ import annotations
+
+import math
+import time
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Optional
+
+
+# ── Enums ─────────────────────────────────────────────────────────────────────
+
+class Team(Enum):
+    BLUE   = "blue"
+    YELLOW = "yellow"
+
+
+class ObjectType(Enum):
+    """Type d'objet détecté sur la table."""
+    GOAL        = auto()   # objectif à ramasser/atteindre
+    OBSTACLE    = auto()   # à éviter
+    CALIBRATION = auto()   # coin de table
+    ROBOT_ALLY  = auto()   # robot de notre équipe
+    ROBOT_ENEMY = auto()   # robot adverse
+    ROBOT_AVOID = auto()   # tag noir → à éviter
+    UNKNOWN     = auto()
+
+
+class RobotStatus(Enum):
+    IDLE       = auto()
+    MOVING     = auto()
+    TURNING    = auto()
+    DEPLOYING  = auto()
+    ERROR      = auto()
+    STOPPED    = auto()
+
+
+class ActionType(Enum):
+    """Commandes connues par le robot ESP32."""
+    FORWARD  = "FORWARD"
+    BACKWARD = "BACKWARD"
+    LEFT     = "LEFT"
+    RIGHT    = "RIGHT"
+    DEPLOY   = "DEPLOY"
+    RETRACT  = "RETRACT"
+    STOP     = "STOP"
+    STATUS   = "STATUS"
+    RESET    = "RESET"
+
+
+# ── Position ──────────────────────────────────────────────────────────────────
+
+@dataclass
+class Position:
+    """Position en mm sur la table (origine = coin haut-gauche)."""
+    x: float = 0.0
+    y: float = 0.0
+
+    def distance_to(self, other: Position) -> float:
+        return math.hypot(self.x - other.x, self.y - other.y)
+
+    def angle_to(self, other: Position) -> float:
+        """Angle en degrés de self vers other (0° = axe X+, sens trigo)."""
+        return math.degrees(math.atan2(other.y - self.y, other.x - self.x))
+
+    def __repr__(self) -> str:
+        return f"Pos({self.x:.0f}, {self.y:.0f})"
+
+
+# ── Objet détecté ────────────────────────────────────────────────────────────
+
+@dataclass
+class ObjectInfo:
+    """Un objet détecté par la vision."""
+    marker_id: int
+    label: str                       # ex: "BR1", "BLUE55", "AREA15"
+    obj_type: ObjectType
+    position: Position
+    last_seen: float = field(default_factory=time.time)
+    grid_x: int = 0
+    grid_y: int = 0
+
+    def __repr__(self) -> str:
+        return (f"Obj(id={self.marker_id}, label={self.label}, "
+                f"type={self.obj_type.name}, pos={self.position})")
+
+
+# ── Mission ───────────────────────────────────────────────────────────────────
+
+class MissionStatus(Enum):
+    PENDING    = auto()
+    ACTIVE     = auto()
+    COMPLETED  = auto()
+    FAILED     = auto()
+    SKIPPED    = auto()
+
+
+@dataclass
+class Mission:
+    """Une mission = un objectif à atteindre ou une action à réaliser."""
+    mission_id: int
+    target: ObjectInfo
+    priority: int = 0                # plus haut = plus prioritaire
+    status: MissionStatus = MissionStatus.PENDING
+    requires_deploy: bool = False    # doit-on déployer le bras ?
+    created_at: float = field(default_factory=time.time)
+    completed_at: Optional[float] = None
+
+    def __repr__(self) -> str:
+        return (f"Mission(#{self.mission_id}, target={self.target.label}, "
+                f"prio={self.priority}, status={self.status.name})")
+
+
+# ── Action ────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Action:
+    """Une commande atomique à envoyer au robot."""
+    action_type: ActionType
+    value: Optional[float] = None    # distance (mm) ou angle (degrés)
+
+    def to_command(self) -> str:
+        """Convertit en chaîne BLE (ex: 'FORWARD 200')."""
+        if self.value is not None:
+            return f"{self.action_type.value} {int(self.value)}"
+        return self.action_type.value
+
+    def __repr__(self) -> str:
+        return f"Action({self.to_command()})"
