@@ -38,9 +38,12 @@ static FsmContext fsmCtx;
 
 // ── Taille des stacks FreeRTOS ───────────────────────────────────────────────
 #define BLE_TASK_STACK  4096
-#define FSM_TASK_STACK  4096
+#define FSM_TASK_STACK  8192   // 4096 trop juste (snprintf, Wire, Servo, etc.)
 #define BLE_TASK_PRIO   1
 #define FSM_TASK_PRIO   2    // FSM légèrement plus prioritaire
+
+// Flag partagé : la tâche FSM le met à true à chaque step
+volatile bool fsmAlive = false;
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  TÂCHE BLE — Core 0
@@ -57,10 +60,12 @@ void bleTask(void* pvParameters) {
 
         // Heartbeat toutes les 5 secondes
         if (millis() - lastHeartbeat >= 5000) {
-            char hb[64];
-            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus",
-                     bleBridge.isConnected(), millis() / 1000);
+            char hb[96];
+            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus | FSM=%s",
+                     bleBridge.isConnected(), millis() / 1000,
+                     fsmAlive ? "OK" : "DEAD");
             bleSerial.println(hb);
+            fsmAlive = false;  // Reset — doit être remis à true par fsmTask
             lastHeartbeat = millis();
         }
 
@@ -82,6 +87,7 @@ void fsmTask(void* pvParameters) {
     for (;;) {
         // Un pas de la FSM
         fsm_step(fsmCtx);
+        fsmAlive = true;  // Heartbeat FSM
 
         // Petit yield pour ne pas affamer le watchdog
         // Note: fsm_step() contient déjà des vTaskDelay dans certains états
@@ -102,10 +108,10 @@ void setup() {
     // ── I2C Bus — DOIT être initialisé AVANT tout périphérique I2C ──────────
     //  Wire.begin(SDA, SCL) configure le bus I2C hardware de l'ESP32.
     //  Tous les périphériques I2C (IMU, IO Expander) partagent ce même bus.
-    Wire.begin(I2C_SDA, I2C_SCL);  // GPIO6 = SDA, GPIO7 = SCL
+    /*Wire.begin(I2C_SDA, I2C_SCL);  // GPIO6 = SDA, GPIO7 = SCL
     Wire.setClock(I2C_FREQ);       // 100 kHz (standard mode)
     Serial.println("[SETUP] I2C bus initialized (SDA=6, SCL=7, 100kHz)");
-
+*/
     // ── Créer les mutex FreeRTOS ─────────────────────────────────────────────
     //  Un mutex = un "verrou" : une seule tâche peut le prendre à la fois.
     //  i2cMutex : empêche 2 tâches d'accéder au bus I2C simultanément
@@ -125,14 +131,14 @@ void setup() {
     //    Registre 0x03 = Configuration Register du TCA9554
     //    Chaque bit = 1 pin :  1 = input,  0 = output
     //    0x0F = 0b00001111 → P0-P3 = input, P4-P7 = output
-    if (ioExpander.begin()) {
+    /*if (ioExpander.begin()) {
         ioExpander.queueWrite(0x03, IOEXP_PIN_CONFIG);  // Configurer direction des pins
         Serial.printf("[SETUP] IO Expander initialized (addr=0x%02X, config=0x%02X)\n",
                       IOEXP_I2C_ADDR, IOEXP_PIN_CONFIG);
     } else {
         Serial.println("[SETUP] ERROR: IO Expander queue creation failed!");
     }
-
+*/
     // ── Créer la tâche BLE sur Core 0 ───────────────────────────────────────
     xTaskCreatePinnedToCore(
         bleTask,           // Fonction de la tâche
@@ -165,7 +171,7 @@ void setup() {
     //    2. Toutes les 200ms, lit le registre 0x00 (état des pins)
     //    3. Met à jour ioExpanderData (teamSwitch, launchTrigger)
     //  Le paramètre &ioExpander est passé à taskEntry() qui appelle run().
-    xTaskCreatePinnedToCore(
+    /*xTaskCreatePinnedToCore(
         IOExpander::taskEntry,  // Point d'entrée statique (appelle run())
         "IOExp_Task",           // Nom pour le debug
         IOEXP_TASK_STACK,       // 2048 bytes de stack (suffisant)
@@ -178,6 +184,8 @@ void setup() {
 
     bleSerial.println("[SETUP] All tasks launched. System ready.");
     Serial.println("[SETUP] Setup complete — entering idle loop");
+}
+*/
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

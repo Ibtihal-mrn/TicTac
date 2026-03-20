@@ -4,25 +4,36 @@ Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
 void robot_init()
 {
+  Serial.println("[robot_init] START");
   // Encoders
   encoders_init();
+  Serial.println("[robot_init] Encoders OK");
   // Ultrasonic init fait dans ultrasonic.cpp
 
   emergencyButton_init();
+  Serial.println("[robot_init] EmergencyButton OK");
   // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
+
+  // Bras (servos)
+  bras_init();
+  Serial.println("[robot_init] Bras OK");
+
+  // Launch trigger (tirette)
+  pinMode(LAUNCH_TRIGGER_PIN, INPUT_PULLUP);
 
   // IMU
   if (!imu_init())
   {
-    Serial.println("MPU6050 FAIL.");
+    Serial.println("[robot_init] MPU6050 FAIL — skipping calibration.");
   }
   else
   {
     delay(200);
-    Serial.println("MPU6050 connected.");
+    Serial.println("[robot_init] MPU6050 connected.");
     imu_calibrate(600, 2); // ~1.2s, robot immobile
-    // Serial.println("IMU calibrated");
+    Serial.println("[robot_init] IMU calibrated.");
   }
+  Serial.println("[robot_init] DONE");
 }
 
 void robot_stop()
@@ -293,7 +304,7 @@ void rotateAnglePID(float angle_deg, int speed)
 
 
 // ----- LEGACY--------
-void robot_step() { // On va aussi plus l'utiliser normalement
+/*void robot_step() { // On va aussi plus l'utiliser normalement
   long left, right;
   encoders_read(&left, &right);
 
@@ -305,8 +316,9 @@ void robot_step() { // On va aussi plus l'utiliser normalement
 
   // motors_applySpeeds(speedL, speedR);
 }
+  */
 
-void robot_rotate(float angle_deg, int speed){
+/*void robot_rotate(float angle_deg, int speed){
   //   long targetTicks = ticks_for_rotation_deg(angle_deg);
 
   //   long startL, startR;
@@ -437,7 +449,6 @@ void robot_rotate_gyro(float target_deg, int pwmMax) {
       stableStart = 0;
     }
   }
-<<<<<<< HEAD
     motors.stopMotors();
 }
 
@@ -562,11 +573,6 @@ void robot_move_distance(float dist_mm, int pwmBaseTarget) {
 
   // Default (target reached when outside while loop).
   // motors.stopMotors();
-=======
-  // Movement complete - stop motors
-  motors.stopMotors();
-  debugPrintf(DBG_MOTORS, "Target Angle reached\n");
->>>>>>> origin/esp32s3
 }
 
 // ----- LEGACY -----
@@ -579,9 +585,14 @@ void hardware_init(Context& ctx) { ... }
 void startMatchTimer(Context& ctx) { ... }
 void checkMatchTimer(Context& ctx) { ... }
 */
+// ── Launch Trigger (tirette) ─────────────────────────────────────────────────
+static bool launchTrigger_isPulled() {
+    // INPUT_PULLUP: cord in = GND = LOW ; cord pulled = HIGH
+    return digitalRead(LAUNCH_TRIGGER_PIN) == HIGH;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-<<<<<<< HEAD
 const char* fsm_state_name(FsmState state) {
     switch (state) {
         case FsmState::INIT:              return "INIT";
@@ -626,28 +637,73 @@ void fsm_init(FsmContext& ctx, QueueHandle_t cmdQueue) {
 void fsm_step(FsmContext& ctx) {
 
     // ── Emergency button check (from ANY state) ────────────────────────────
-    if (ctx.currentState != FsmState::EMERGENCY_STOP && emergencyButton_isPressed()) {
-        motors.stopMotors();
-        fsm_change_state(ctx, FsmState::EMERGENCY_STOP);
-        return;
-    }
+    // FIXME: EBTN_PIN (8) == TEAM_SWITCH_PIN (8) — conflit GPIO !
+    //        Désactivé temporairement pour débloquer la FSM.
+    //        Réactiver une fois le pin corrigé dans config.h.
+    // if (ctx.currentState != FsmState::EMERGENCY_STOP && emergencyButton_isPressed()) {
+    //     motors.stopMotors();
+    //     fsm_change_state(ctx, FsmState::EMERGENCY_STOP);
+    //     return;
+    // }
 
 switch (ctx.currentState) {
 
-        // ── INIT : initialisation hardware (placeholder) ─────────────────
+        // ── INIT : initialisation hardware ─────────────────────────────
         case FsmState::INIT: {
             bleSerial.println("[FSM] INIT: Initializing robot systems...");
-            bleSerial.println("[FSM] INIT: Motors OK (simulated)");
-            bleSerial.println("[FSM] INIT: Sensors OK (simulated)");
+            robot_init();   // encoders, IMU, emergency button, bras, trigger
+            bleSerial.println("[FSM] INIT: Motors OK");
+            bleSerial.println("[FSM] INIT: Sensors OK");
             bleSerial.println("[FSM] INIT: Ready !");
             fsm_change_state(ctx, FsmState::IDLE);
             break;
         }
 
-        // ── IDLE : attente, on passe directement en DISPATCH ─────────────
+        // ── IDLE : attente du launch trigger (tirette) ───────────────────
+        //  Tant que la tirette n'est pas tirée, seuls PING/STATUS/RESET
+        //  sont acceptés. Les commandes de mouvement sont rejetées.
         case FsmState::IDLE: {
-            bleSerial.println("[FSM] IDLE: Entering command dispatch loop");
-            fsm_change_state(ctx, FsmState::DISPATCH_CMD);
+          fsm_change_state(ctx, FsmState::DISPATCH_CMD);
+            // Drain la queue — rejeter les commandes sauf PING/STATUS/RESET
+            /*RobotCommand cmd;
+            while (xQueueReceive(ctx.cmdQueue, &cmd, 0) == pdTRUE) {
+                switch (cmd.type) {
+                    case RobotCommandType::PING: {
+                        char pong[64];
+                        snprintf(pong, sizeof(pong), "[PONG] t=%lu ms (waiting trigger)", millis());
+                        bleSerial.println(pong);
+                        break;
+                    }
+                    case RobotCommandType::STATUS: {
+                        char st[128];
+                        snprintf(st, sizeof(st),
+                                 "[FSM] STATUS: IDLE (waiting trigger), uptime=%lus",
+                                 millis() / 1000);
+                        bleSerial.println(st);
+                        break;
+                    }
+                    case RobotCommandType::RESET:
+                        bleSerial.println("[FSM] RESET: Returning to INIT");
+                        fsm_change_state(ctx, FsmState::INIT);
+                        return;
+                    default:
+                        bleSerial.println("[FSM] IDLE: Command rejected — pull trigger first");
+                        break;
+                }
+            }*/
+
+            // Check launch trigger
+            //if (launchTrigger_isPulled()) {
+            //    bleSerial.println("[FSM] Launch trigger pulled! Entering command dispatch loop");
+            //    fsm_change_state(ctx, FsmState::DISPATCH_CMD);
+            /*} else {
+                // Log périodique pour indiquer qu'on attend
+                static unsigned long lastIdleLog = 0;
+                if (millis() - lastIdleLog >= 3000) {
+                    bleSerial.println("[FSM] IDLE: Waiting for launch trigger...");
+                    lastIdleLog = millis();
+                }
+            }*/
             break;
         }
 
@@ -783,6 +839,7 @@ switch (ctx.currentState) {
 
         // ── EXEC_STOP : arrêter les moteurs ─────────────────────────────
         case FsmState::EXEC_STOP: {
+            motors.stopMotors();
             bleSerial.println("[FSM] EXEC_STOP: Motors stopped");
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
@@ -811,156 +868,29 @@ switch (ctx.currentState) {
         case FsmState::EMERGENCY_STOP: {
             motors.stopMotors();
             bleSerial.println("[FSM] !!! EMERGENCY STOP !!!");
-            bleSerial.println("[FSM] All systems halted. Send RESET to recover.");
+            bleSerial.println("[FSM] All systems halted. Release button + send RESET to recover.");
 
-            // Boucle bloquante : on ne sort que sur RESET
+            // Boucle bloquante : on ne sort que sur RESET + bouton relâché
             while (true) {
                 motors.stopMotors();  // sécurité : moteurs coupés en permanence
                 RobotCommand cmd;
                 if (xQueueReceive(ctx.cmdQueue, &cmd, pdMS_TO_TICKS(200)) == pdTRUE) {
                     if (cmd.type == RobotCommandType::RESET) {
-                        bleSerial.println("[FSM] RESET received — exiting EMERGENCY STOP");
-                        fsm_change_state(ctx, FsmState::INIT);
-                        return;
+                        if (!emergencyButton_isPressed()) {
+                            bleSerial.println("[FSM] RESET received — exiting EMERGENCY STOP");
+                            fsm_change_state(ctx, FsmState::INIT);
+                            return;
+                        } else {
+                            bleSerial.println("[FSM] RESET ignored: release emergency button first!");
+                        }
+                    } else {
+                        // Toute autre commande est ignorée
+                        bleSerial.println("[FSM] Command ignored in EMERGENCY_STOP. Send RESET.");
                     }
-                    // Toute autre commande est ignorée
-                    bleSerial.println("[FSM] Command ignored in EMERGENCY_STOP. Send RESET.");
                 }
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
             break;
         }
     }
-}
-=======
-void hardware_init(Context &ctx)
-{
-  // To be called in setup() in main.cpp
-
-  // motors_init();
-  // encoders_init();
-  // ultrasonic_init(13, 10);  // trig, echo
-  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
-
-  // IMU
-  if (!imu_init())
-  {
-    Serial.println("MPU6050 FAIL.");
-  }
-  else
-  {
-    delay(200);
-    Serial.println("MPU6050 connected.");
-    imu_calibrate(600, 2); // ~1.2s, robot immobile
-    // Serial.println("IMU calibrated");
-  }
-
-  // Init Match Timer
-  ctx.matchActive = false;
-  ctx.matchDurationMs = MATCH_DURATION_MS;
-  ctx.matchStartMs = 0;
-  debugPrintf(DBG_FSM, "FSM -> INIT");
-  ctx.currentAction = Robot::INIT;
-}
-
-void startMatchTimer(Context &ctx)
-{
-  ctx.matchActive = true;
-  ctx.matchStartMs = millis();
-  ctx.stateStartMs = millis();
-  ctx.matchDurationMs = MATCH_DURATION_MS;
-}
-void checkMatchTimer(Context &ctx)
-{
-  if (ctx.matchActive && millis() - ctx.matchStartMs >= ctx.matchDurationMs)
-  {
-    ctx.matchActive = false;
-    debugPrintf(DBG_FSM, "Match timer elapsed -> TIMER_END");
-    ctx.currentAction = Robot::TIMER_END;
-  }
-}
-
-void robot_step(Context &ctx)
-{
-
-  // Periodic Checks
-  checkMatchTimer(ctx);
-
-  // BLE connect
-
-  // Main step.
-  switch (ctx.currentAction)
-  {
-  case Robot::INIT:
-    // robot_init();  CALLED IN SETUP()
-    // ctx.commandQueue.push({RobotCommandType::TUNE_PID, (float)TUNE_BOTH});
-    debugPrintf(DBG_FSM, "FSM -> IDLE");
-    ctx.currentAction = Robot::IDLE;
-    break;
-
-  case Robot::IDLE:
-    // ADD LaunchTrigger HERE
-
-    // start 100sec timer
-    startMatchTimer(ctx);
-
-    debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
-    ctx.currentAction = Robot::DISPATCH_CMD;
-    break;
-
-  case Robot::DISPATCH_CMD:
-    // parse command and set next action (e.g. EXEC_MOVE, EXEC_ROTATE, etc.)
-
-    // 1. Empty Queue
-    // if (ctx.commandQueue.empty()) { break; }
-
-    // 2. Get next command
-    // ctx.currentCommand = ctx.commandQueue.front();
-    // ctx.commandQueue.pop();
-
-    // 3. Dispatch to movement
-    // switch (ctx.currentCommand.type) {
-    //     case  RobotCommandType::MOVE_FORWARD_CM:
-    //         movement.startForward(ctx.currentCommand.value);
-    //         fsmChangeAction(ctx, FsmAction::EXEC_MOVE);
-    //         break;
-
-    //     case RobotCommandType::ROTATE_DEG:
-    //         movement.startRotate(ctx.currentCommand.value);
-    //         fsmChangeAction(ctx, FsmAction::EXEC_ROTATE);
-    //         break;
->>>>>>> origin/esp32s3
-
-    //     case RobotCommandType::TUNE_PID:
-    //         fsmChangeAction(ctx, FsmAction::TUNE_PID);
-    //         break;
-
-    //     // case STEPPER_UP:
-
-    //     default: fsmChangeAction(ctx, FsmAction::DISPATCH_CMD); break;
-    // }
-    // break;
-    // }
-    break;
-
-  case Robot::EXEC_MOVE:
-
-    break;
-
-  case Robot::EXEC_ROTATE:
-    // robot_rotate(...);
-    break;
-
-  case Robot::TUNE_PID:
-    // adjust PID parameters
-    break;
-
-  case Robot::TIMER_END:
-    motors.stopMotors();
-    break;
-
-  case Robot::EMERGENCY_STOP:
-    motors.stopMotors();
-    break;
-  }
 }

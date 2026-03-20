@@ -17,21 +17,21 @@
 #define DBG_MAGNET        (1<<9)
 #define DEBUG_TEAM_SWITCH (1<<10)
 // Global debug mask (0 = none). You can set this at runtime.
-extern uint8_t debugMask;
+extern uint16_t debugMask;
 
 // Initialize Serial and debug mask
-inline void debugInit(uint32_t baud, uint8_t mask=0) {
+inline void debugInit(uint32_t baud, uint16_t mask=0) {
   Serial.begin(baud);
   debugMask = mask;
 }
 
 // Set mask at runtime
-inline void debugSetMask(uint8_t mask) { debugMask = mask; }
-inline void debugEnable(uint8_t bits) { debugMask |= bits; }
-inline void debugDisable(uint8_t bits) { debugMask &= ~bits; }
+inline void debugSetMask(uint16_t mask) { debugMask = mask; }
+inline void debugEnable(uint16_t bits) { debugMask |= bits; }
+inline void debugDisable(uint16_t bits) { debugMask &= ~bits; }
 
 // Minimum safe formatted print for AVR
-inline void debugPrintf(uint8_t feature, const char *fmt, ...) {
+inline void debugPrintf(uint16_t feature, const char *fmt, ...) {
   if (!(debugMask & feature)) return;
   char buf[128];
   va_list args;
