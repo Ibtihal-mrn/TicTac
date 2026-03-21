@@ -12,23 +12,21 @@
 // #include "TeamSwitch.h"
 // #include "safety.h"
 // #include "motors.h"
-#include "uart.h"
+// #include "uart.h"
 
 // Config & Debug prints
 #include "utils.h"
 #include "Debug.h"
-#include "config.h"
+#include "configTest.h"    //TODO: change back to config.h
 
 
 // ------------
 // extern Motors motors;
 
-#define STOP_PIN 4
 
-SensorPacket latestPacket;
 
-HardwareSerial& link = Serial1;
 
+// Hardware Interrupt (Ultrasonic sensors Hub)
 volatile bool emergencyStop = false;
 void IRAM_ATTR stopISR() { emergencyStop = true; }
 
@@ -56,12 +54,12 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, RISING);
 
     // UART comms
-    uart_init(link);
-    link.write(CMD_DISABLE_ZONE);
-    link.write(0xFF);           // disable all
-    delay(10);
-    link.write(CMD_ENABLE_ZONE);
-    link.write(ZONE_FRONT);     // enable only front
+    // uart_init(link);
+    // link.write(CMD_DISABLE_ZONE);
+    // link.write(0xFF);           // disable all
+    // delay(10);
+    // link.write(CMD_ENABLE_ZONE);
+    // link.write(ZONE_FRONT);     // enable only front
 
 
     // Utils.h
@@ -79,25 +77,11 @@ void loop() {
     if (emergencyStop){ 
         Serial.print("EMERGENCY STOP TRIGGERED.");
         // stop motors
-        link.write(CMD_GET_DATA);
+
         emergencyStop = false; //reset
     }
 
-    // Read UART response
-    if (readPacket(latestPacket)) {
-        // DEBUG
-        Serial.print("Front: "); Serial.print(latestPacket.front_mm);
-        Serial.print(" | Left: "); Serial.print(latestPacket.left_mm);
-        Serial.print(" | Right: "); Serial.print(latestPacket.right_mm);
-        Serial.print(" | Back: "); Serial.println(latestPacket.back_mm);
-    }
-
-    // Static polling (optionnal)
-    static unsigned long lastPoll = 0;
-    if (millis() - lastPoll > 1000) {
-        link.write(CMD_GET_DATA);
-        lastPoll = millis();
-    }
+    
 
 }
 

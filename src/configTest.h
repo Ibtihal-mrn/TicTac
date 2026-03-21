@@ -1,0 +1,112 @@
+#pragma once
+/**
+ * CONFIG.H
+ *
+ * Configuration centrale pour le système de mouvement du robot
+ * Tous les paramètres physiques et pins sont définis ici
+ */
+
+
+// ================= ESP32_S3 pinout ====================
+// |  3V3                         | GND 
+// |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
+// |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
+// --------------------------------------------------------
+// |  4  – Servo Right            | 1   -             
+// |  5  – Servo Left             | 2   -    
+// |  6  - SDA                    | 42  -
+// |  7  - SCL                    | 41  - 
+// |  15 - Encoder                | 40  -   
+// |  16 - Encoder                | 39  - 
+// |  17 - Encoder                | 38  -
+// --------------------------------------------------------
+// |  18 - Encoder                | 37  - / (NO) PSRAM
+// |  8  - TeamSwitch             | 36  - / (NO) PSRAM        
+// |  3  - / (NO) STRAP           | 35  - / (NO) PSRAM
+// |  46 - / (NO) STRAP           | 0   - / (NO) BOOT
+// |  9  – Motor (ENA)            | 45  - / (NO) STRAP
+// |  10 – Motor (IN1)            | 48  - / (NO) 1.8V logic
+// |  11 – Motor (IN2)            | 47  - / (NO) 1.8V logic
+// --------------------------------------------------------
+// |  12 - Motor (IN3)            | 21  - 
+// |  13 - Motor (IN4)            | 20  - / (NO) USB+
+// |  14 - Motor (ENB)            | 19  - / (NO) USB+
+
+// ---> STOP_PIN
+
+
+// ======= NEVER USE =========
+#define STRAP_0 0 // Strapping: boot mode. If pulled LOW at reset, enters download mode.
+#define STRAP_3 3 // Strapping: JTAG source. Must NOT float at boot. Many designs avoid it.
+#define USB_DM 19 // USB D-
+#define USB_DP 20 // USB D+
+
+#define PSRAM_IO35 35 // reserved for Octal SPI PSRAM
+#define PSRAM_IO36 36
+#define PSRAM_IO37 37
+
+#define STRAP_45 45 // Strapping: VDD_SPI voltage. NEVER pull HIGH at power-up.
+#define STRAP_46 46 // Strapping: boot mode/ROM print. Avoid strong pull-ups.
+#define IO47_1V8 47
+#define IO48_1V8 48
+#define PSRAM_UART_TX 49  // UART reserved for PSRAM
+#define PSRAM_UART_RX 50  // NOT viable for standard UART communication 
+
+
+
+// ========= Constants ===========
+#define MATCH_DURATION_MS 50000
+
+
+
+// ======================= PINOUT =======================
+// -----I2C -----
+#define SDA_PIN 6
+#define SCL_PIN 7
+// #define I2C_ADDR_SENSOR_HUB 0x12
+
+// ----- US sensors ------
+#define STOP_PIN 2
+
+// ==================== STEPPER ============================
+#define SERVO_RIGHT 4 // need PMW pin
+#define SERVO_LEFT 5
+
+// ===================== IMU =====================
+#define IMU_GYRO_Z_SIGN 1.0f // Mets -1.0f si le robot corrige dans le mauvais sens (rotation divergente)
+
+// ===================== ROTATION =====================
+// Calibration angulaire : si 90° demandé donne 82° mesuré, mets 90/82 = 1.10f
+#define ROTATE_TARGET_SCALE 1.13f
+#define ROTATE_KP 2.2f
+#define ROTATE_KD 0.25f
+
+// =================== ACTUATORS PINS ======================
+#define LAUNCH_TRIGGER_PIN 1 // TODO: not used here, impl in main.cpp startSwitch !
+#define TEAM_SWITCH_PIN 8
+// #define EBTN_PIN 48     //TODO: remove ?
+
+// ===================== MOTORS ============================
+// Power pins : out1, out2, out3, out4 (respectivement M1+, M1-, M2+, M2- sur le driver)
+#define ENA 14 // ordre pins : enA, 1, 2, 3, 4, enB
+#define IN1 13
+#define IN2 12 // LEFT MOTOR : IN1, IN2, ENA (marron, gris, bleu)
+#define IN3 11
+#define IN4 10
+#define ENB 9 // RIGHT MOTOR : IN3, IN4, ENB (rouge, jaune, purple)
+
+// ==================== ENCODERS ===========================
+#define ENC_L_A 15 // Pinout : Red (M+), Black (M-), Encoder_A = Yellow, Encoder_B = White, Blue (3.3VCC), Green (GND)
+#define ENC_L_B 16
+#define ENC_R_A 17 // Motor 2
+#define ENC_R_B 18
+// PETIT PAMI
+// #define ENCODER_PIN_LEFT 34
+// #define ENCODER_PIN_RIGHT 35
+// ========= Electro Aimant ==========
+#define RELAY_PIN 38
+#define SWITCH_PIN 48
+
+
+
+

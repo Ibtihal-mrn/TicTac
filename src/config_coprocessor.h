@@ -1,8 +1,7 @@
+// config_coprocessor.h
 #pragma once
 
-// CONFIG for CoProcessor
-
-
+// CONFIG for CoProcessor Sensor hub
 
 // ================= ESP32_S3 pinout ====================
 // |  3V3                         | GND 
@@ -42,6 +41,8 @@
 
 #define US_TIMEOUT 20000UL
 #define US_OBSTACLE_THRESHOLD_CM 15
+#define US_OBSTACLE_CLEAR_CM 18       // to prevent bouncing, implement hysteresis
+#define STOP_HOLD_MS    100   // small debounce
 
 
 // ==================

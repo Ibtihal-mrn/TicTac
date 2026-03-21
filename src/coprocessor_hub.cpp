@@ -31,7 +31,12 @@
 
 // ===== STATE =====
 static uint8_t enabled_zones = 0xFF; // all enabled
-uint8_t dangerFlags = 0;
+
+
+// debug prints for Hysterisis debounce resilience
+static bool stopState = false;
+static unsigned long lastStopChange = 0;
+static bool lastStopState = false; // only for debug prints
 
 
 // ====== Handle Commands =====
@@ -59,6 +64,34 @@ void handleCommand() {
     
 }
 
+void debugSensors(bool stopState) {
+    static unsigned long lastPrint = 0;
+
+    if (millis() - lastPrint < 200) return; // 5 Hz
+    lastPrint = millis();
+
+    for (int i = 0; i < us_count(); i++) {
+        Serial.print("S"); Serial.print(i);
+        // Serial.print(" Z:"); Serial.print(us_getZone(i));
+        Serial.print(" D:"); Serial.print(us_getDistance(i));
+        Serial.print(" | ");
+    }
+    Serial.print("STOP:");
+    Serial.print(stopState ? "1" : "0");
+    Serial.println("");
+}
+
+void debugStopPinState(bool currentState){
+    // ONLY toggle the lastStopState to print when stopPin is on or off
+    if (currentState != lastStopState) {
+        lastStopState = currentState;
+
+        Serial.print("STOP → ");
+        Serial.println(currentState ? "TRIGGERED" : "CLEARED");
+    }
+}
+
+
 // ================== SETUP ==================
 void setup() {
     Serial.begin(115200); // debug
@@ -66,7 +99,7 @@ void setup() {
     Serial.println("Hub starting...");
 
     // I2C
-    Wire.begin(I2C_ADDR_SENSOR_HUB, SDA_PIN_HUB, SDA_PIN_HUB);
+    Wire.begin(I2C_ADDR_SENSOR_HUB, SDA_PIN_HUB, SCL_PIN_HUB);
     Wire.onReceive(onReceive);
     Wire.onRequest(onRequest);
 
@@ -87,35 +120,54 @@ void setup() {
 
 // ================== LOOP ==================
 void loop() {
-    // imAlive();
-
-    // if (true) return;
-
-    // 1. ALWAYS update sensors (real-time)
-    uint8_t d = us_update();
-
-    #if DEBUG
-        debugSensors(); // print sensor data (selected only)
-    #endif
-
-    // 2. accumulate danger
-    dangerFlags |= d;
-
-    // 3. STOP pin
-    digitalWrite(STOP_PIN, dangerFlags != 0);
-
-    // 4. UPDATE PACKET
-    packet.danger_flags = dangerFlags;
-    packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
-    packet.left_mm  = us_getDistanceForZone(ZONE_LEFT);
-    packet.right_mm = us_getDistanceForZone(ZONE_RIGHT);
-    packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
+    // imAlive(); // 
+    
+    // Update each sensor
+    for (int i = 0; i < us_count(); i++) {
+        bool stopState = updateSensorAndStop(i);    // Update sensor with hysteresis
+        digitalWrite(STOP_PIN, stopState);          // update STOP pin accordingly
+        if (DEBUG) debugStopPinState(stopState);               // print if stop pin has been toggled
+    }
+    if (DEBUG) debugSensors(stopState); // optionally print all sensor distances
 
 
-    // 5. Handle UART commands (non-blocking)
-    handleCommand();
 
-    // 6. reset flags each cycle
-    dangerFlags = 0;
+    
+    // #if DEBUG
+    //     debugStopPinState(stopState); 
+    //     debugSensors(stopState); // print sensor data (selected only)
+    // #endif
+    
+    if (true) return;
+
+
+
+
+
+    // // 1. ALWAYS update sensors (real-time)
+    // uint8_t d = us_update();
+
+    // // 2. compute stop state
+    // bool stopState = hysterisisStopState();
+
+    // // 3. Apply STOP
+    // digitalWrite(STOP_PIN, stopState);
+
+    // // 4. Debug prints
+    // #if DEBUG
+    //     debugStopPinState(stopState); 
+    //     debugSensors(stopState); // print sensor data (selected only)
+    // #endif
+
+    // // 5. UPDATE PACKET
+    // packet.danger_flags = stopState ? ZONE_FRONT : 0;
+    // packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
+    // packet.left_mm  = us_getDistanceForZone(ZONE_LEFT);
+    // packet.right_mm = us_getDistanceForZone(ZONE_RIGHT);
+    // packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
+
+
+    // // 5. Handle I2C commands (non-blocking)
+    // handleCommand();
 }
 
