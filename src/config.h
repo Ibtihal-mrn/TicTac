@@ -12,10 +12,10 @@
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
 // |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
-// |  4  – Servo Right            | 1   -             
-// |  5  – Servo Left             | 2   -    
-// |  6  - SDA                    | 42  -
-// |  7  - SCL                    | 41  - 
+// |  4  – STOP pin               | 1   -             
+// |  5  – SDA                    | 2   -    
+// |  6  - SCL                    | 42  -
+// |  7  -                        | 41  - 
 // |  15 - Encoder                | 40  -   
 // |  16 - Encoder                | 39  - 
 // |  17 - Encoder                | 38  -
@@ -85,9 +85,11 @@
 // ==========================================
 #define MATCH_DURATION_MS 50000
 
-#define SDA_PIN 6
-#define SCL_PIN 7
-// #define I2C_ADDR_SENSOR_HUB 0x12
+
+// --- I2C ----
+#define STOP_PIN    4
+#define SDA_PIN     5
+#define SCL_PIN     6
 
 // ===================== IMU =====================
 // Mets -1.0f si le robot corrige dans le mauvais sens (rotation divergente)

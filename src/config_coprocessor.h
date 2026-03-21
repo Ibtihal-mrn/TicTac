@@ -40,14 +40,12 @@
 
 
 
-// Special Pins
-#define STOP_PIN_HUB    12
 
-// ===== UART =====
-// #define UART_RX 16
-// #define UART_TX 17
-#define SDA_PIN_HUB 13
-#define SCL_PIN_HUB 14
+
+// I2C
+#define STOP_PIN_HUB    4
+#define SDA_PIN_HUB     5
+#define SCL_PIN_HUB     6
 
 #define US_TIMEOUT 20000UL
 uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
@@ -58,12 +56,14 @@ uint8_t US_OBSTACLE_CLEAR_CM = 13;     // to prevent bouncing, implement hystere
 // ==================
 //       FRONT
 // ==================
-#define US_F1_TRIG 4     // Left
-#define US_F1_ECHO 5
-#define US_F2_TRIG 6     // Middle
-#define US_F2_ECHO 7
-#define US_F3_TRIG 15    // Rigth
-#define US_F3_ECHO 16
+#define US_F1_TRIG 13     // Left
+#define US_F1_ECHO 14
+
+#define US_F2_TRIG 7     // Middle
+#define US_F2_ECHO 15
+
+#define US_F3_TRIG 16    // Rigth
+#define US_F3_ECHO 17
 
 
 // ==================

@@ -29,7 +29,7 @@
 // |  11 – Motor (IN2)            | 47  - / (NO) 1.8V logic
 // --------------------------------------------------------
 // |  12 - Motor (IN3)            | 21  - 
-// |  13 - Motor (IN4)            | 20  - / (NO) USB+
+// |  13 - Motor (IN4)            | 20  - / (NO) UsSB+
 // |  14 - Motor (ENB)            | 19  - / (NO) USB+
 
 // ---> STOP_PIN
@@ -60,13 +60,13 @@
 
 
 // ======================= PINOUT =======================
-// -----I2C -----
-#define SDA_PIN 6
-#define SCL_PIN 7
-// #define I2C_ADDR_SENSOR_HUB 0x12
+// --- I2C ----
+#define STOP_PIN    4
+#define SDA_PIN     5
+#define SCL_PIN     6
 
 // ----- US sensors ------
-#define STOP_PIN 2
+// #define STOP_PIN 2
 
 // ==================== STEPPER ============================
 #define SERVO_RIGHT 4 // need PMW pin

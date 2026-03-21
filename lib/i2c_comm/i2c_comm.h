@@ -9,7 +9,7 @@
 //      sensor_hub   : SDA - 13, SCL - 14 
 
 
-#define HUB_ADDR 0x10
+#define HUB_ADDR 0x08
 
 #define CMD_GET_DATA                  0x01
 #define CMD_ENABLE_ZONE               0x02
