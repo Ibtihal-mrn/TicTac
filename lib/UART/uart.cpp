@@ -2,6 +2,11 @@
 #include "uart.h"
 #include "../../src/config_coprocessor.h"
 
+
+#define UART_RX 49
+#define UART_TX 50   //! NOTE : these RX/TX are reserved for PSRAM only, to use UART either use USB_pins (19&20) or define any other pin pair you want 
+
+
 static HardwareSerial* _serial = nullptr;
 
 static uint8_t buffer[sizeof(SensorPacket)];

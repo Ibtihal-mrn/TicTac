@@ -3,6 +3,7 @@
 // CONFIG for CoProcessor
 
 
+
 // ================= ESP32_S3 pinout ====================
 // |  3V3                         | GND 
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
@@ -25,17 +26,19 @@
 // |  11 - US Back Trig   (9)     | 47  - / (NO) 1.8V logic
 // ----------------------------------------------------------
 // |  12 - STOP_PIN               | 21  - US Back Echo  (9) 
-// |  13 - SDA                    | 20  - / (NO) USB+
-// |  14 - SCL                    | 19  - / (NO) USB+
-
-
+// |  13 - RX                     | 20  - / (NO) USB+
+// |  14 - TX                     | 19  - / (NO) USB+
+// ~ around 23 free pins for general use
+// 10 US sensors (20pins) + UART and stop pin
 
 // Special Pins
 #define STOP_PIN    12
 
 // ===== UART =====
-#define UART_RX 16
-#define UART_TX 17
+// #define UART_RX 16
+// #define UART_TX 17
+#define SDA_PIN_HUB 13
+#define SCL_PIN_HUB 14
 
 #define US_TIMEOUT 20000UL
 #define US_OBSTACLE_THRESHOLD_CM 15

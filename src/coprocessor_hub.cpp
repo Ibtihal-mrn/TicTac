@@ -1,12 +1,22 @@
 // coprocessor_hub.cpp
 #include <Arduino.h>
-#include "uart.h"
+
+// Hardware
 #include "us.h"
+// #include "uart.h"   
+#include "i2c_comm.h"
+
+
+// Config & Debug prints
+#include "utils.h"
+#include "Debug.h"
+// #include "config.h"
 #include "config_coprocessor.h"
 
 
-#define DEBUG 1
 
+// Debug prints Toggle
+#define DEBUG 1
 #if DEBUG
     #define DBG_PRINT(x)  Serial.print(x)
     #define DBG_PRINTLN(x) Serial.println(x)
@@ -16,8 +26,7 @@
 #endif
 
 
-SensorPacket packet;
-HardwareSerial& uart = Serial1;  // Use Serial1 for communication
+// SensorPacket packet; // defined in i2c_comm.h
 
 
 // ===== STATE =====
@@ -27,83 +36,66 @@ uint8_t dangerFlags = 0;
 
 // ====== Handle Commands =====
 void handleCommand() {
-    if (!uart.available()) return;
-    
-    uint8_t cmd = uart.read();
+    if (newCommand) {
+        newCommand = false;
 
-    switch (cmd) {
-        case CMD_GET_DATA:
-            sendPacket(packet);
-            DBG_PRINTLN("CMD_GET_DATA -> packet sent");
-            break;
+        switch (lastCmd) {
 
-        case CMD_ENABLE_ZONE:
-            if (uart.available()) {
-                uint8_t mask = uart.read();
-                enabled_zones |= mask;          // ADD zones
+            case CMD_ENABLE_ZONE:
+                enabled_zones |= lastParam;
                 us_setZones(enabled_zones);
-                // DBG_PRINT("Enabled zones mask: "); DBG_PRINTLN(enabled_zones, BIN);
-            }
-            break;
+                break;
 
-        case CMD_DISABLE_ZONE:
-            if (uart.available()) {
-                uint8_t mask = uart.read();
-                enabled_zones &= ~mask;         // REMOVE zones
+            case CMD_DISABLE_ZONE:
+                enabled_zones &= ~lastParam;
                 us_setZones(enabled_zones);
-                // DBG_PRINT("Disabled zones mask: "); DBG_PRINTLN(enabled_zones, BIN);
-            }
-            break;
+                break;
+
+            case CMD_GET_DATA:
+                // nothing to do, handled in onRequest()
+                break;
+        }
     }
     
 }
-
-void imAlive()
-{
-    static unsigned long millis_print = 0;
-    if (millis() - millis_print >= 2000)
-    {
-        Serial.println("I'm alive");
-        millis_print = millis();
-    }
-}
-
 
 // ================== SETUP ==================
 void setup() {
-    Serial.begin(UART_BAUD); // debug
+    Serial.begin(115200); // debug
     while(!Serial) delay(10); // wait for USB enumeration
-    Serial.println("Setup starting...");
+    Serial.println("Hub starting...");
+
+    // I2C
+    Wire.begin(I2C_ADDR_SENSOR_HUB, SDA_PIN_HUB, SDA_PIN_HUB);
+    Wire.onReceive(onReceive);
+    Wire.onRequest(onRequest);
+
 
     pinMode(STOP_PIN, OUTPUT); // emergency stop pin (defined in config_coprocessor.h)
 
     // Add here all the Ultrasonic sensors
-    // us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
+    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
 
-    // us_setZones(enabled_zones); // apply initial config
+    us_setZones(enabled_zones); // apply initial config
 
-    uart_init(uart);         // uart comms
+    // uart_init(uart);         // uart comms
 
-    Serial.print("Setup done.");
+    Serial.println("Setup done.");
 }
 
 // ================== LOOP ==================
 void loop() {
-
-    imAlive();
+    // imAlive();
 
     // if (true) return;
+
     // 1. ALWAYS update sensors (real-time)
     uint8_t d = us_update();
 
     #if DEBUG
-        for (int i = 0; i < us_count(); i++) {
-            DBG_PRINTLN(String("Sensor ") + i +
-                        " zone " + us_getZone(i) +
-                        " distance " + us_getDistance(i) + " cm");
-        }
+        debugSensors(); // print sensor data (selected only)
     #endif
 
     // 2. accumulate danger

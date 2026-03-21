@@ -85,6 +85,7 @@ inline uint8_t us_update() {
 }
 
 
+
 // ============= GETTERS =========
 // returns number of sensors added
 inline uint8_t us_count() {
@@ -116,6 +117,23 @@ inline int16_t us_getDistanceForZone(uint8_t zone) {
 
 
 
+
+
+// ==== PRINTS =======
+void debugSensors() {
+    static unsigned long lastPrint = 0;
+
+    if (millis() - lastPrint < 200) return; // 5 Hz
+    lastPrint = millis();
+
+    for (int i = 0; i < us_count(); i++) {
+        Serial.print("S"); Serial.print(i);
+        // Serial.print(" Z:"); Serial.print(us_getZone(i));
+        Serial.print(" D:"); Serial.print(us_getDistance(i));
+        Serial.print(" | ");
+    }
+    Serial.println("");
+}
 
 
 
