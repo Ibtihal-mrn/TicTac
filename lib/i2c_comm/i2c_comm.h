@@ -12,8 +12,7 @@
 #define HUB_ADDR 0x08
 
 #define CMD_GET_DATA                  0x01
-#define CMD_ENABLE_ZONE               0x02
-#define CMD_DISABLE_ZONE              0x03
+#define CMD_SET_ZONES                  0x02
 #define CMD_ENABLE_SENSOR             0x04
 #define CMD_DISABLE_SENSOR            0x05
 #define CMD_SET_OBSTACLE_THRESHOLD    0x06
@@ -23,6 +22,7 @@
 #define CMD_GET_CONFIG                0x10
 
 static volatile uint8_t pingResponse = 0XAA;
+
 
 
 // ================== STRUCT ==================
@@ -103,27 +103,50 @@ void disableSensor(uint8_t id) {
     Wire.endTransmission();
 }
 
-void enableZone(uint8_t zoneMask) {
+bool setZones(uint8_t mask) {
     Wire.beginTransmission(HUB_ADDR);
-    Wire.write(CMD_ENABLE_ZONE);
-    Wire.write(zoneMask);
-    Wire.endTransmission();
+    Wire.write(CMD_SET_ZONES);
+    Wire.write(mask);
+    uint8_t err = Wire.endTransmission();
+
+    if (err != 0) {
+        Serial.print("I2C error (setThresholds): ");
+        Serial.println(err);
+        return false;
+    }
+    return true;
 }
 
-void setThresholds(uint8_t obst, uint8_t clear) {
+
+
+
+bool setThresholds(uint8_t obst_thr, uint8_t clear_thr) {
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_SET_OBSTACLE_THRESHOLD);
-    Wire.write(obst);
+    Wire.write(obst_thr);
     Wire.write(CMD_SET_CLEAR_THRESHOLD);
-    Wire.write(clear);
-    Wire.endTransmission();
+    Wire.write(clear_thr);
+    uint8_t err = Wire.endTransmission();
+
+    if (err != 0) {
+        Serial.print("I2C error (setThresholds): ");
+        Serial.println(err);
+        return false;
+    }
+    return true;
 }
 
 SensorPacket getData() {
     SensorPacket p;
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_GET_DATA);
-    Wire.endTransmission();
+    uint8_t err = Wire.endTransmission();
+
+    if (err != 0) {
+        Serial.print("I2C error (getData): ");
+        Serial.println(err);
+        return;
+    }
 
     Wire.requestFrom(HUB_ADDR, sizeof(SensorPacket));
     Wire.readBytes((uint8_t*)&p, sizeof(SensorPacket));
@@ -133,7 +156,7 @@ SensorPacket getData() {
 // =============== INTI US ================
 void initUSConfig(){
     // Enable zones
-    enableZone(ZONE_FRONT);
+    setZones(ZONE_FRONT);
 
     // enable sensors
     enableSensor(0);

@@ -1,47 +1,58 @@
+// main.cpp
 #include <Arduino.h>
 #include <Wire.h>
+
 // Hardware
 #include "robot.h"
 #include "bras.h"
 #include "Relais.h"
 #include "encoders.h"
-#include "us.h"         // ultrasonic
 #include "StartSwitch.h"
 #include "TeamSwitch.h"
-#include "safety.h"          // ← Safety update
-#include "motors.h"          // ← Test moteurs
+#include "motors.h"
+
+// Hub sensors Coprocessor
+#include "i2c_comm.h"
+#include "us.h"
 
 // Config & Debug prints
 #include "utils.h"
 #include "Debug.h"
 #include "config.h"
+#include "globals.h"
 
-
-
-extern Motors motors;        // ← Import depuis robot.cpp
+// External Objects
 StartSwitch startSwitch(GPIO_NUM_8);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
+// Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
+void IRAM_ATTR stopISR() { emergencyStop = true; }
 
-// ========= SETUP ===============
+
+// TODO: remove/obfuscate this :
 // const int RELAY_PIN = 41;
 const bool RELAY_ACTIVE_LOW = true;
 bool lastSwitchState = HIGH;   // INPUT_PULLUP
 bool sequenceDone = false;     // Pour éviter répétition
 
+
+
+// ================== SETUP ==================
 void setup()
 {
   debugInit(115200,
-            DBG_FSM 
+            DBG_FSM |
+            DBG_I2C_HUB
             // DBG_MOTORS |
             // DBG_SENSORS |
             // DEBUG_TEAM_SWITCH |
             // DBG_SERVO |
             // DBG_ENCODER |
             // DBG_MAGNET
-            // DBG_COMMS |        // comment DBG_ to deactivate its related prints
+            // DBG_COMMS |  
             // DBG_ENCODER |
-            // DBG_LAUNCH_TGR
+            // DBG_LAUNCH_TGR       
+            // comment to deactivate its related prints
   );
 
   // pinMode(SWITCH_PIN, INPUT_PULLUP);
@@ -49,7 +60,7 @@ void setup()
   // relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
 
   // Init electro-aimant
-  const bool RELAY_ACTIVE_LOW = true;
+  const bool RELAY_ACTIVE_LOW = true;  
   bool lastSwitchState = HIGH;   // INPUT_PULLUP
   bool sequenceDone = false;     // Pour éviter répétition
   pinMode(SWITCH_PIN, INPUT_PULLUP);
@@ -57,14 +68,19 @@ void setup()
   relais_init(RELAY_PIN, RELAY_ACTIVE_LOW);
   // relais_on();
 
-  // // I2C Init.
-  Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
-  Wire.setClock(100000);
+  // I2C Setup.
+  Wire.begin(SDA_PIN, SCL_PIN, 100000);
+  initUSConfig();
   delay(200);
 
   // Utils.h
-  printEsp32Info();
+  // printEsp32Info();
   // i2c_scanner();
+
+  // ======== HARDWARE INIT ==========
+
+  pinMode(STOP_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, RISING);
 
   // Init Hardware et Robot
   ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
@@ -86,12 +102,12 @@ void loop()
 {
 
   static bool runSequence = true;  
-  ultrasonic_update();
 
 
   if (!runSequence) {
     return; 
   }
+
 
   if (teamSwitch.readTeam() == TeamSwitchTeam::A)
   {

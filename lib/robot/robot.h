@@ -30,22 +30,19 @@ struct Context {
 
 
 
+// New
+void driveDistancePID(float distance_mm, int speed);
+void rotateAnglePID(float angle_deg, int speed);
 
 
 
-
-// ------------------- Robot API -------------------------------------
+// ------------------- LEGACY -------------------------------------
 void robot_init();
 
 void robot_move_distance(float dist_mm, int speed);
 void robot_rotate(float angle_deg, int speed);
-void robot_stop();
 void robot_rotate_gyro(float target_deg, int pwmMax);
 
 void robot_step();
 
 
-// New
-void robot_test();
-void driveDistancePID(float distance_mm, int speed);
-void rotateAnglePID(float angle_deg, int speed);

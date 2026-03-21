@@ -89,13 +89,6 @@ void setup()
 // ================== LOOP ==================
 void loop() {
 
-    // uint8_t res = pingHub();
-    // Serial.print("PING response: 0x");
-    // Serial.println(res, HEX);
-
-    // delay(500);
-    // if(true) return;
-
     // 1. Handle Emergency
     if (emergencyStop){ 
         Serial.print("EMERGENCY STOP TRIGGERED.");

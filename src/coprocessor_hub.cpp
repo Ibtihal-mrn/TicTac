@@ -47,20 +47,17 @@ void handleCommand() {
     DBG_PRINTLN(lastParam);
 
     switch(lastCmd) {
-        case CMD_ENABLE_ZONE:
-            activeZones |= lastParam;
+        case CMD_SET_ZONES:
+            activeZones = lastParam;
             us_setZones(activeZones);
             Serial.print("Enabled zones: 0x"); DBG_PRINTLN(activeZones);
             break;
-        case CMD_DISABLE_ZONE:
-            activeZones &= ~lastParam;
-            us_setZones(activeZones);
-            Serial.print("Disabled zones, new mask: 0x"); DBG_PRINTLN(activeZones);
-            break;
+
         case CMD_SET_OBSTACLE_THRESHOLD:
             US_OBSTACLE_THRESHOLD_CM = lastParam;
             Serial.print("Obstacle threshold set to: "); DBG_PRINTLN(US_OBSTACLE_THRESHOLD_CM);
             break;
+
         case CMD_SET_CLEAR_THRESHOLD:
             US_OBSTACLE_CLEAR_CM = lastParam;
             Serial.print("Clear threshold set to: "); DBG_PRINTLN(US_OBSTACLE_CLEAR_CM);
@@ -68,12 +65,13 @@ void handleCommand() {
 
         case CMD_PING:
             DBG_PRINTLN("PING received.");
-
             break;
+
         case CMD_RESET:
             for (int i = 0; i < us_count(); i++) sensors[i].obstacle = false;
             Serial.println("All sensors reset.");
             break;
+
         default:
             Serial.println("Unknown command!");
             break;
@@ -181,7 +179,7 @@ void loop() {
     }
 
     // 2. Apply STOP
-    digitalWrite(STOP_PIN_HUB, stopState); 
+    digitalWrite(STOP_PIN_HUB, stopState); // TODO : apply millis() ?
 
     // 3. UPDATE PACKET
     updatePacket(stopState);

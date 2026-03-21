@@ -5,26 +5,29 @@
 #include "motors.h"
 #include "encoders.h"
 #include "us.h"
-#include "EmergencyButton.h"
 #include "imu.h"
 
 #include "control.h"
 #include "kinematics.h"
-#include "safety.h"
 
+//
 #include "utils.h"
 #include "Debug.h"
 
-Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
+// I2C sensors
+#include "i2c_comm.h"
 
+
+
+
+
+
+
+// TODO: Replace by hardware_init()
 void robot_init()
 {
   // Encoders
   encoders_init();
-  // Ultrasonic init fait dans ultrasonic.cpp
-
-  emergencyButton_init();
-  // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
   // IMU
   if (!imu_init())
@@ -40,23 +43,27 @@ void robot_init()
   }
 }
 
-void robot_stop()
-{
-  motors.stopMotors();
-}
-void robot_test()
-{
-  motors.forward(150, 150);
-  delay(2000);
-  motors.stopMotors();
 
-  // while(true);
+
+
+
+// ======= PID MOVEMENT =========
+
+void driveFroward(float mm, int speed){
+  setZones(ZONE_FRONT);
+  driveDistancePID(mm, speed);
 }
+
+void driveBackward(float mm, int speed){
+  setZones(ZONE_BACK);
+  driveDistancePID(mm, speed);
+}
+
+
 
 // AVANT et ARRIERE (+ , -)
 void driveDistancePID(float distance_mm, int speed)
 {
-
   // --- Determine direction ---
   bool forwardMotion = (distance_mm >= 0);
   long targetTicks = ticks_for_distance_mm(fabs(distance_mm)); // Compute Tick Target
@@ -83,25 +90,21 @@ void driveDistancePID(float distance_mm, int speed)
   while (true)
   {
     unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
-    {
-      yield();
-      continue;
-    }
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL){ yield(); continue; }
     tPrev += (unsigned long)DT_MS * 1000UL;
 
-    // Serial.print("Safety check: "); Serial.println(safety_update() ? "STOP" : ".");
-    // printUltrasonicVal();
-
-
-    // STOP MOTOR CONDITIONS
-    if (safety_update())
+    // ========== STOP MOTOR CONDITIONS ============
+    if (emergencyStop)
     {
-      static unsigned long lp3 = 0;
       motors.stopMotors();
-      if (DBG_MOTORS)
-        // 
-        // printUltrasonicVal();
+      while (emergencyStop) { yield(); }
+
+      // Reset PID values after interruption
+      control_reset(st);
+
+      // Reset timing
+      tPrev = micros();
+
       continue;
     }
 
@@ -136,14 +139,15 @@ void driveDistancePID(float distance_mm, int speed)
     // Moteurs PWM vitesse
     motors.applyMotorOutputs(pwmL, pwmR);
 
-    // Debug print every 1s
-    static unsigned long Lpwm = 0;
-    if (DBG_MOTORS && millis() - Lpwm >= 1000)
-    {
-      Serial.print("PWM L: "); Serial.print(pwmL);
-      Serial.print(" | PWM R: "); Serial.println(pwmR);
-      Lpwm = millis();
-    }
+    // ----- Debug -----
+    #if DBG_MOTORS
+      static unsigned long Lpwm = 0;
+      if (millis() - Lpwm >= 1000){
+        Serial.print("PWM L: "); Serial.print(pwmL);
+        Serial.print(" | PWM R: "); Serial.println(pwmR);
+        Lpwm = millis();
+      }
+    #endif
   }
 
   // Movement complete - stop motors
@@ -183,23 +187,27 @@ void rotateAnglePID(float angle_deg, int speed)
   // ----- Control Loop -----
   while (true)
   {
-
-    if (safety_update())
-    {
-      static unsigned long lp3 = 0;
-      motors.stopMotors();
-      if (DBG_MOTORS)
-        Serial.print("Safety triggered\n");
-      continue;
-    }
-
     // Fixed 100Hz timing -----
     unsigned long now = micros();
-    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL)
+    if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL){ yield(); continue; }
+    tPrev += (unsigned long)DT_MS * 1000UL;
+
+    // ========== STOP MOTOR CONDITIONS ============
+    if (emergencyStop)
     {
-      yield();
+      motors.stopMotors();
+      while (emergencyStop) { yield(); }
+
+      // Reset PID values after interruption
+      // control_reset(st);
+
+      // Reset timing
+      tPrev = micros();
+
       continue;
     }
+
+
     float dt = (float)(now - tPrev) / 1000000.0f;
     tPrev = now;
     dt = constrain(dt, 0.005f, 0.03f);
@@ -213,14 +221,6 @@ void rotateAnglePID(float angle_deg, int speed)
     // Read Gyro -----
     float rate = imu_readGyroZ_dps(); // deg/s
     angle += rate * dt;               // integrate
-
-    if (DBG_MOTORS)
-    {
-      Serial.print("Angle: ");
-      Serial.print(angle);
-      Serial.print(" | Rate: ");
-      Serial.println(rate);
-    }
 
     // Compute Error -----
     float error = targetDeg - angle;
@@ -255,17 +255,20 @@ void rotateAnglePID(float angle_deg, int speed)
       motors.applyMotorOutputs(pwm, -pwm); // rotate left
 
     // ----- Debug -----
-    if (DBG_MOTORS)
-    {
-      Serial.print("Angle: ");
-      Serial.print(angle);
-      Serial.print(" | Error: ");
-      Serial.print(error);
-      Serial.print(" | Rate: ");
-      Serial.print(rate);
-      Serial.print(" | PWM: ");
-      Serial.println(pwm);
-    }
+    #if DBG_MOTORS
+      static unsigned long Lpwm = 0;
+      if (millis() - Lpwm >= 1000){
+        Serial.print("Angle: ");
+        Serial.print(angle);
+        Serial.print(" | Error: ");
+        Serial.print(error);
+        Serial.print(" | Rate: ");
+        Serial.print(rate);
+        Serial.print(" | PWM: ");
+        Serial.println(pwm);
+        Lpwm = millis();
+      }
+    #endif
 
     // ----- Stop Condition -----
     if (fabs(error) < ANGLE_TOL && fabs(rate) < RATE_TOL)
@@ -286,7 +289,7 @@ void rotateAnglePID(float angle_deg, int speed)
   debugPrintf(DBG_MOTORS, "Target Angle reached\n");
 }
 
-// ----- LEGACY -----
+
 
 
 // ===========
