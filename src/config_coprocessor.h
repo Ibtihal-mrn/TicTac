@@ -48,8 +48,8 @@
 #define SCL_PIN_HUB     6
 
 #define US_TIMEOUT 20000UL
-uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
-uint8_t US_OBSTACLE_CLEAR_CM = 13;     // to prevent bouncing, implement hysteresis
+extern uint8_t US_OBSTACLE_THRESHOLD_CM;
+extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hysteresis
 #define STOP_HOLD_MS    100   // small debounce
 
 

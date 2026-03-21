@@ -2,8 +2,7 @@
 #include <Arduino.h>
 
 // Hardware
-#include "us.h"
-// #include "uart.h"   
+#include "us.h" 
 #include "i2c_comm.h"
 
 
@@ -29,6 +28,8 @@
 // ===== STATE =====
 static uint8_t enabled_zones = 0xFF; // all enabled
 
+uint8_t US_OBSTACLE_THRESHOLD_CM = 20;
+uint8_t US_OBSTACLE_CLEAR_CM     = 22;  // initial values
 
 // debug prints for Hysterisis debounce resilience
 static bool stopState = false;
@@ -113,6 +114,8 @@ void updatePacket(bool stopState){
     packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
 
     packet.danger_flags = stopState ? 1 : 0;
+
+    if (true)return;
 
     #if DEBUG
         static unsigned long Lpt = 0;

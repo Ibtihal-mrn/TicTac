@@ -22,10 +22,12 @@
 #include "globals.h"
 
 // External Objects
+extern Motors motors;
 StartSwitch startSwitch(GPIO_NUM_8);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
+volatile bool emergencyStop = false;  //extern in globals.h
 void IRAM_ATTR stopISR() { emergencyStop = true; }
 
 

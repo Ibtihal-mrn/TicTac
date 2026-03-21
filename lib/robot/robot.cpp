@@ -20,7 +20,7 @@
 
 
 
-
+Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 
 
 // TODO: Replace by hardware_init()
@@ -97,6 +97,8 @@ void driveDistancePID(float distance_mm, int speed)
     if (emergencyStop)
     {
       motors.stopMotors();
+      unsigned long lp6 = 0;
+      printMillis(DBG_MOTORS, "Emergency Button !\n", millis(), lp6, 1000);
       while (emergencyStop) { yield(); }
 
       // Reset PID values after interruption
@@ -196,6 +198,8 @@ void rotateAnglePID(float angle_deg, int speed)
     if (emergencyStop)
     {
       motors.stopMotors();
+      unsigned long lp6 = 0;
+      printMillis(DBG_MOTORS, "Emergency Button !\n", millis(), lp6, 1000);
       while (emergencyStop) { yield(); }
 
       // Reset PID values after interruption
