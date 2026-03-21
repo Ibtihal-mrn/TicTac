@@ -10,7 +10,7 @@
 // Config & Debug prints
 #include "utils.h"
 #include "Debug.h"
-// #include "config.h"
+// #include "config.h"  // do not add
 #include "config_coprocessor.h"
 
 
@@ -26,9 +26,6 @@
 #endif
 
 
-// SensorPacket packet; // defined in i2c_comm.h
-
-
 // ===== STATE =====
 static uint8_t enabled_zones = 0xFF; // all enabled
 
@@ -41,27 +38,41 @@ static bool lastStopState = false; // only for debug prints
 
 // ====== Handle Commands =====
 void handleCommand() {
-    if (newCommand) {
-        newCommand = false;
+    if (!newCommand) return;
+    newCommand = false;
 
-        switch (lastCmd) {
+    Serial.print("Received command 0x");
+    DBG_PRINT(lastCmd);
+    DBG_PRINT(" with param 0x");
+    DBG_PRINTLN(lastParam);
 
-            case CMD_ENABLE_ZONE:
-                enabled_zones |= lastParam;
-                us_setZones(enabled_zones);
-                break;
-
-            case CMD_DISABLE_ZONE:
-                enabled_zones &= ~lastParam;
-                us_setZones(enabled_zones);
-                break;
-
-            case CMD_GET_DATA:
-                // nothing to do, handled in onRequest()
-                break;
-        }
+    switch(lastCmd) {
+        case CMD_ENABLE_ZONE:
+            activeZones |= lastParam;
+            us_setZones(activeZones);
+            Serial.print("Enabled zones: 0x"); DBG_PRINTLN(activeZones);
+            break;
+        case CMD_DISABLE_ZONE:
+            activeZones &= ~lastParam;
+            us_setZones(activeZones);
+            Serial.print("Disabled zones, new mask: 0x"); DBG_PRINTLN(activeZones);
+            break;
+        case CMD_SET_OBSTACLE_THRESHOLD:
+            US_OBSTACLE_THRESHOLD_CM = lastParam;
+            Serial.print("Obstacle threshold set to: "); DBG_PRINTLN(US_OBSTACLE_THRESHOLD_CM);
+            break;
+        case CMD_SET_CLEAR_THRESHOLD:
+            US_OBSTACLE_CLEAR_CM = lastParam;
+            Serial.print("Clear threshold set to: "); DBG_PRINTLN(US_OBSTACLE_CLEAR_CM);
+            break;
+        case CMD_RESET:
+            for (int i = 0; i < us_count(); i++) sensors[i].obstacle = false;
+            Serial.println("All sensors reset.");
+            break;
+        default:
+            Serial.println("Unknown command!");
+            break;
     }
-    
 }
 
 void debugSensors(bool stopState) {
@@ -92,19 +103,52 @@ void debugStopPinState(bool currentState){
 }
 
 
-// ================== SETUP ==================
+void updatePacket(bool stopState){
+    packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
+    packet.left_mm  = us_getDistanceForZone(ZONE_LEFT);
+    packet.right_mm = us_getDistanceForZone(ZONE_RIGHT);
+    packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
+
+    packet.danger_flags = stopState ? 1 : 0;
+
+    #if DEBUG
+        static unsigned long Lpt = 0;
+        if (millis() - Lpt >= 1000)
+        {
+            Serial.print("PACKET → F:");
+            Serial.print(packet.front_mm);
+            Serial.print(" L:");
+            Serial.print(packet.left_mm);
+            Serial.print(" R:");
+            Serial.print(packet.right_mm);
+            Serial.print(" B:");
+            Serial.print(packet.back_mm);
+            Serial.print(" D:");
+            Serial.print(packet.danger_flags);
+            Serial.print("Packet size: ");
+            Serial.println(sizeof(SensorPacket));
+            Lpt = millis();
+        }
+    #endif
+}
+
+
+// ================== 
+//      SETUP 
+// ==================
 void setup() {
     Serial.begin(115200); // debug
     while(!Serial) delay(10); // wait for USB enumeration
+    delay(500);
     Serial.println("Hub starting...");
 
     // I2C
-    Wire.begin(I2C_ADDR_SENSOR_HUB, SDA_PIN_HUB, SCL_PIN_HUB);
-    Wire.onReceive(onReceive);
-    Wire.onRequest(onRequest);
+    Wire.begin(SDA_PIN_HUB, SCL_PIN_HUB, HUB_ADDR);
+    Wire.onReceive(onReceive);  // master writes commands
+    Wire.onRequest(onRequest);  // master read
 
-
-    pinMode(STOP_PIN, OUTPUT); // emergency stop pin (defined in config_coprocessor.h)
+    // Emergency pin setup
+    pinMode(STOP_PIN_HUB, OUTPUT); // emergency stop pin (defined in config_coprocessor.h)
 
     // Add here all the Ultrasonic sensors
     us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
@@ -113,61 +157,41 @@ void setup() {
 
     us_setZones(enabled_zones); // apply initial config
 
-    // uart_init(uart);         // uart comms
-
     Serial.println("Setup done.");
 }
 
-// ================== LOOP ==================
+// ================== 
+//      LOOP 
+// ==================
 void loop() {
-    // imAlive(); // 
+    // // imAlive(); if (true) return;
+
+    bool stopState = false;
     
-    // Update each sensor
+    // 1. Update each sensor
     for (int i = 0; i < us_count(); i++) {
-        bool stopState = updateSensorAndStop(i);    // Update sensor with hysteresis
-        digitalWrite(STOP_PIN, stopState);          // update STOP pin accordingly
-        if (DEBUG) debugStopPinState(stopState);               // print if stop pin has been toggled
+        updateSensorAndStop(i);    // Update sensor with hysteresis
+        if (sensors[i].obstacle) stopState = true;
     }
-    if (DEBUG) debugSensors(stopState); // optionally print all sensor distances
+
+    // 2. Apply STOP
+    digitalWrite(STOP_PIN_HUB, stopState); 
+
+    // 3. UPDATE PACKET
+    updatePacket(stopState);
+
+    // 4. Debug
+    #if DEBUG
+        debugSensors(stopState); // optionally print all sensor distances
+        debugStopPinState(stopState);               // print if stop pin has been toggled
+    #endif
 
 
-
+    // 5. I2C commands
+    handleCommand();
     
-    // #if DEBUG
-    //     debugStopPinState(stopState); 
-    //     debugSensors(stopState); // print sensor data (selected only)
-    // #endif
     
-    if (true) return;
+    delay(10);
 
-
-
-
-
-    // // 1. ALWAYS update sensors (real-time)
-    // uint8_t d = us_update();
-
-    // // 2. compute stop state
-    // bool stopState = hysterisisStopState();
-
-    // // 3. Apply STOP
-    // digitalWrite(STOP_PIN, stopState);
-
-    // // 4. Debug prints
-    // #if DEBUG
-    //     debugStopPinState(stopState); 
-    //     debugSensors(stopState); // print sensor data (selected only)
-    // #endif
-
-    // // 5. UPDATE PACKET
-    // packet.danger_flags = stopState ? ZONE_FRONT : 0;
-    // packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
-    // packet.left_mm  = us_getDistanceForZone(ZONE_LEFT);
-    // packet.right_mm = us_getDistanceForZone(ZONE_RIGHT);
-    // packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
-
-
-    // // 5. Handle I2C commands (non-blocking)
-    // handleCommand();
 }
 

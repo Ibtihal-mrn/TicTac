@@ -30,8 +30,18 @@
 // ~ around 23 free pins for general use
 // 10 US sensors (20pins) + UART and stop pin
 
+// RUN CMD
+// robot_master :
+//          >> pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
+// Sensor_hub : 
+//          >> pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM0
+
+
+
 // Special Pins
-#define STOP_PIN    12
+#define STOP_PIN_HUB    12
 
 // ===== UART =====
 // #define UART_RX 16
@@ -40,8 +50,8 @@
 #define SCL_PIN_HUB 14
 
 #define US_TIMEOUT 20000UL
-#define US_OBSTACLE_THRESHOLD_CM 15
-#define US_OBSTACLE_CLEAR_CM 18       // to prevent bouncing, implement hysteresis
+uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
+uint8_t US_OBSTACLE_CLEAR_CM = 13;     // to prevent bouncing, implement hysteresis
 #define STOP_HOLD_MS    100   // small debounce
 
 

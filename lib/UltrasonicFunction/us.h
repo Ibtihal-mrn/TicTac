@@ -22,8 +22,8 @@ struct Sensor {
     uint8_t zone;
     bool enabled;
     bool obstacle=false;
-    int16_t distance;
-    int16_t lastDistance = -1; //Hysteresis
+    int16_t distance=-2;
+    int16_t lastDistance = -2; //Hysteresis
     unsigned long lastChange=0;
 };
 
@@ -90,13 +90,17 @@ inline int16_t us_getDistanceForZone(uint8_t zone) {
 
 // ===== UPDATE =====
 bool updateSensorAndStop(int i) {
-    int d = us_getDistance(i);  // current reading
-    if (d <= 0 || d > 400) d = -1;
-
     unsigned long now = millis();
     Sensor &s = sensors[i];
 
-    // Hysteresis + debounce
+    if (!s.enabled) return false;
+
+    // 1. Read ultrasonic distance
+    int d = s.us->read(CM);  // current reading
+    if (d <= 0 || d > 400) d = -1;
+    s.distance = d;
+
+    // 2. Hysteresis + debounce
     if (!s.obstacle && d > 0 && d < US_OBSTACLE_THRESHOLD_CM) {
         if (now - s.lastChange > STOP_HOLD_MS) {
             s.obstacle = true;
@@ -111,55 +115,11 @@ bool updateSensorAndStop(int i) {
 
     s.lastDistance = d;
 
-    // Immediately compute STOP: OR of this sensor
-    bool stop = false;
-    if (sensors[i].obstacle) stop=true;
-
-    return stop; // for debug / packet
+    // digitalWrite(STOP_PIN, stop); // update STOP pin in loop()
+    return s.obstacle; // for debug / packet
 }
 
 
 
 
-
-
-inline uint8_t us_update() {
-    unsigned long now = millis();
-    if (now - lastRead < US_DELAY) return 0;
-
-    if (sensorCount == 0) return 0;
-
-    Sensor &s = sensors[nextSensor];
-
-    uint8_t danger = 0;
-
-    if (s.enabled) {
-        int d = (int)s.us->read(CM);
-        if (d <= 0 || d > 400) d = -1;
-
-        s.distance = d;
-
-        if (d > 0 && d < US_OBSTACLE_THRESHOLD_CM) {
-            danger |= s.zone;
-        }
-    }
-
-    nextSensor = (nextSensor + 1) % sensorCount;
-    lastRead = now;
-
-    return danger;
-}
-
-
-
-
-
-
-
-// ==== PRINTS =======
-
-
-
-
-
-//
+// ---- end ----

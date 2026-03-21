@@ -7,12 +7,16 @@
 // #include "bras.h"
 // #include "Relais.h"
 // #include "encoders.h"
-#include "us.h"         // ultrasonic
+         // ultrasonic
 // #include "StartSwitch.h"
 // #include "TeamSwitch.h"
 // #include "safety.h"
 // #include "motors.h"
 // #include "uart.h"
+
+// Hub sensors Coprocessor
+#include "i2c_comm.h"
+#include "us.h"               //only to extract shared commands (ZONE..)
 
 // Config & Debug prints
 #include "utils.h"
@@ -23,6 +27,15 @@
 // ------------
 // extern Motors motors;
 
+// Debug prints Toggle
+#define DEBUG 1
+#if DEBUG
+    #define DBG_PRINT(x)  Serial.print(x)
+    #define DBG_PRINTLN(x) Serial.println(x)
+#else
+    #define DBG_PRINT(x)
+    #define DBG_PRINTLN(x)
+#endif
 
 
 
@@ -36,7 +49,8 @@ void IRAM_ATTR stopISR() { emergencyStop = true; }
 void setup()
 {
     debugInit(115200,
-                DBG_FSM 
+                DBG_FSM |
+                DBG_I2C_HUB 
                 // DBG_MOTORS |
                 // DBG_SENSORS |
                 // DEBUG_TEAM_SWITCH |
@@ -53,13 +67,10 @@ void setup()
     pinMode(STOP_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, RISING);
 
-    // UART comms
-    // uart_init(link);
-    // link.write(CMD_DISABLE_ZONE);
-    // link.write(0xFF);           // disable all
-    // delay(10);
-    // link.write(CMD_ENABLE_ZONE);
-    // link.write(ZONE_FRONT);     // enable only front
+    // I2C Setup
+    Wire.begin(SDA_PIN, SCL_PIN);
+    initUSConfig();
+    // 
 
 
     // Utils.h
@@ -81,7 +92,17 @@ void loop() {
         emergencyStop = false; //reset
     }
 
-    
 
+    SensorPacket p = getData();
+    #if DBG_I2C_HUB
+        Serial.print(F("Danger flags: ")); Serial.println(p.danger_flags);
+        Serial.print(F("Front: ")); Serial.print(p.front_mm);
+        Serial.print(F(" mm, Left: ")); Serial.print(p.left_mm);
+        Serial.print(F(" mm, Right: ")); Serial.print(p.right_mm);
+        Serial.print(F(" mm, Back: ")); Serial.print(p.back_mm);
+        Serial.print("Packet size: "); Serial.println(sizeof(SensorPacket));
+    #endif
+
+    delay(500);
 }
 

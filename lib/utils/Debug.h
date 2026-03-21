@@ -15,6 +15,7 @@
 #define DBG_SERVO         (1<<8)
 #define DBG_MAGNET        (1<<9)
 #define DEBUG_TEAM_SWITCH (1<<10)
+#define DBG_I2C_HUB       (1<<11)
 // Global debug mask (0 = none). You can set this at runtime.
 extern uint8_t debugMask;
 
@@ -32,7 +33,7 @@ inline void debugDisable(uint8_t bits) { debugMask &= ~bits; }
 // Minimum safe formatted print for AVR
 inline void debugPrintf(uint8_t feature, const char *fmt, ...) {
   if (!(debugMask & feature)) return;
-  char buf[48]; // keep small — UNO RAM is tight
+  char buf[48];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
