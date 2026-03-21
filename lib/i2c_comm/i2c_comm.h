@@ -4,6 +4,9 @@
 #include <Wire.h>
 #include "us.h"
 
+// Note :
+//      robot_master : SDA - 6 , SCL - 7 
+//      sensor_hub   : SDA - 13, SCL - 14 
 
 
 #define HUB_ADDR 0x10
@@ -19,7 +22,7 @@
 #define CMD_RESET                     0x09
 #define CMD_GET_CONFIG                0x10
 
-
+static volatile uint8_t pingResponse = 0XAA;
 
 
 // ================== STRUCT ==================
@@ -62,13 +65,30 @@ static void onReceive(int len) {
 
 // ===== SEND DATA TO MASTER =====
 static void onRequest() {
-    Wire.write((uint8_t*)&packet, sizeof(packet));
+    if (lastCmd == CMD_PING) {
+        Wire.write(pingResponse);  // 1 byte response
+    } else {
+        SensorPacket copy = packet;
+        Wire.write((uint8_t*)&copy, sizeof(copy));
+    }
 }
 
 
 
 
 // ====== MASTER =========
+uint8_t pingHub() {
+    Wire.beginTransmission(HUB_ADDR);
+    Wire.write(CMD_PING);
+    Wire.endTransmission();
+
+    Wire.requestFrom(HUB_ADDR, 1);
+
+    if (Wire.available()) { return Wire.read(); }
+
+    return 0xFF; // error
+}
+
 void enableSensor(uint8_t id) {
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_ENABLE_SENSOR);
@@ -110,7 +130,7 @@ SensorPacket getData() {
     return p;
 }
 
-// INTI US
+// =============== INTI US ================
 void initUSConfig(){
     // Enable zones
     enableZone(ZONE_FRONT);
