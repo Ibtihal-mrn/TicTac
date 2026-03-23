@@ -12,7 +12,7 @@ def validate_aruco(corner: np.ndarray, gray: np.ndarray) -> bool:
     """Valide un candidat ArUco pour eliminer les faux positifs grossiers."""
     pts = corner[0].astype(int)
     area = cv2.contourArea(pts)
-    if area < 200 or area > 80000:
+    if area < 100 or area > 80000:
         return False
 
     x, y, w, h = cv2.boundingRect(pts)
@@ -36,7 +36,7 @@ def validate_aruco(corner: np.ndarray, gray: np.ndarray) -> bool:
         return False
 
     # Une variance trop faible indique souvent un faux marqueur uniforme.
-    return float(np.std(pixels)) >= 35.0
+    return float(np.std(pixels)) >= 20.0
 
 
 def detect_all(
@@ -54,7 +54,7 @@ def detect_all(
         ),
         interpolation=cv2.INTER_AREA,
     )
-    small = cv2.GaussianBlur(small, (5, 5), 0)
+    small = cv2.GaussianBlur(small, (3, 3), 0)
     enhanced_small = clahe.apply(small)
 
     aruco_corners: list[np.ndarray] = []

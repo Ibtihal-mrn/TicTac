@@ -150,7 +150,7 @@ def main() -> None:
 
         frame_count += 1
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        if cv2.waitKey(50) & 0xFF == ord("q"):
             break  # Quitter avec 'q'.
 
     # shut down proprement les ressources.
