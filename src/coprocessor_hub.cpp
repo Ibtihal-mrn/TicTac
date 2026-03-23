@@ -28,13 +28,15 @@
 // ===== STATE =====
 static uint8_t enabled_zones = 0xFF; // all enabled
 
-uint8_t US_OBSTACLE_THRESHOLD_CM = 20;
-uint8_t US_OBSTACLE_CLEAR_CM     = 22;  // initial values
+uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
+uint8_t US_OBSTACLE_CLEAR_CM     = 14;  // initial values
 
 // debug prints for Hysterisis debounce resilience
 static bool stopState = false;
 static unsigned long lastStopChange = 0;
 static bool lastStopState = false; // only for debug prints
+
+
 
 
 // ====== Handle Commands =====
@@ -138,6 +140,38 @@ void updatePacket(bool stopState){
     #endif
 }
 
+bool debounceStopPin(bool rawStop){
+    static bool stableStop = false;
+    static bool lastRaw = false;
+    static bool lastStable = false;
+    static unsigned long lastChange = 0;
+
+    const uint16_t STOP_DEBOUNCE_MS = 100;
+
+    // Detect raw change → start timer
+    if (rawStop != lastRaw) {
+        lastChange = millis();
+        lastRaw = rawStop;
+    }
+
+    // Apply if stable long enough
+    if ((millis() - lastChange) > STOP_DEBOUNCE_MS) {
+        stableStop = rawStop;
+    }
+
+    // EDGE DETECTION
+    if (stableStop != lastStable) {
+        digitalWrite(STOP_PIN_HUB, stableStop);
+
+        if (DEBUG) {
+            Serial.println(stableStop ? "STOP → TRIGGERED" : "STOP → CLEARED");
+        }
+
+        lastStable = stableStop;  // update AFTER printing
+    }
+
+    return stableStop;
+}
 
 // ================== 
 //      SETUP 
@@ -170,10 +204,7 @@ void loop() {
     // //  if (true) return;
 
     // imAlive();
-
-
-
-    bool stopState = false;
+    bool stopState = false; // tracks the current stop pin state
     
     // 1. Update each sensor
     for (int i = 0; i < us_count(); i++) {
@@ -182,10 +213,10 @@ void loop() {
     }
 
     // 2. Apply STOP
-    digitalWrite(STOP_PIN_HUB, stopState); // TODO : apply millis() ?
+    bool stableStop = debounceStopPin(stopState);
 
     // 3. UPDATE PACKET
-    updatePacket(stopState);
+    updatePacket(stableStop);
 
     // 4. Debug
     #if DEBUG

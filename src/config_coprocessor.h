@@ -32,11 +32,11 @@
 
 // RUN CMD
 // robot_master :
-//          >> pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
-//          >> pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
+//          >> pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
 // Sensor_hub : 
-//          >> pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
-//          >> pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM0
+//          >> pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
 
 
 
@@ -50,11 +50,11 @@
 #define US_TIMEOUT 20000UL
 extern uint8_t US_OBSTACLE_THRESHOLD_CM;
 extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hysteresis
-#define STOP_HOLD_MS    100   // small debounce
+#define STOP_HOLD_MS    150   // small debounce
 
 
 // ==================
-//       FRONT
+//       FRONTs
 // ==================
 #define US_F1_TRIG 13     // Left
 #define US_F1_ECHO 14

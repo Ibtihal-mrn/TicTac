@@ -5,7 +5,7 @@
 #include "../../src/config_coprocessor.h"
 
 // ====== CONFIG =======
-#define MAX_SENSORS 12
+#define MAX_SENSORS 10
 #define US_DELAY = 30
 
 // ===== ZONES =====
