@@ -48,10 +48,13 @@ def main() -> None:
         print(f"[ERREUR] {exc}")
         return
 
-    # ── Cerveau robot (cerebros) ──────────────────────────────────
-    def log_ble_command(cmd: str) -> None:
-        """Log les commandes BLE dans le terminal au lieu de les envoyer."""
-        print(f"[BLE CMD] >>> {cmd}")
+    # ── Connexion BLE vers le robot ─────────────────────────
+    from cerebros.ble_sender import BLEBridge
+    ble = BLEBridge(target_name="Eurobot")
+    try:
+        ble.connect()
+    except Exception as e:
+        print(f"[WARN] BLE non connecté: {e} — commandes loggées uniquement")
 
     brain = Brain(
         team=Team.BLUE,
@@ -59,7 +62,7 @@ def main() -> None:
         initial_pos=Position(150, 1000),
         initial_heading=0.0,
     )
-    brain.set_send_function(log_ble_command)
+    brain.set_send_function(ble.send)
 
     create_windows()  # Ouverture des fenetres camera / aerienne.
 
@@ -151,6 +154,7 @@ def main() -> None:
             break  # Quitter avec 'q'.
 
     # shut down proprement les ressources.
+    ble.disconnect()
     sender.disconnect()
     cap.release()
     cv2.destroyAllWindows()

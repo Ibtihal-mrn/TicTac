@@ -1,0 +1,119 @@
+"""
+cerebros/ble_sender.py — Bridge BLE via bleak (Nordic UART Service).
+
+Fournit une fonction synchrone send() utilisable comme callback par l'Executor,
+avec une boucle async bleak en arriere-plan (meme approche que ui.py).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import threading
+from typing import Optional
+
+from bleak import BleakClient, BleakScanner
+
+# Nordic UART Service UUIDs (identiques a ui.py)
+NUS_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # PC -> ESP32
+NUS_TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # ESP32 -> PC
+
+TARGET_NAME = "Eurobot"
+
+
+class BLEBridge:
+    """Connexion BLE vers un ESP32 — thread-safe, sync send()."""
+
+    def __init__(self, target_name: str = TARGET_NAME):
+        self._target_name = target_name
+        self._client: Optional[BleakClient] = None
+        self._rx_char = None
+        self._connected = False
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def _schedule(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    # -- Connexion -----------------------------------------------------
+
+    def connect(self) -> bool:
+        """Scan + connect (bloquant depuis le thread appelant)."""
+        future = self._schedule(self._async_connect())
+        return future.result(timeout=20.0)
+
+    async def _async_connect(self) -> bool:
+        print(f"[BLEBridge] Scanning for '{self._target_name}'...")
+        devices = await BleakScanner.discover(timeout=5.0)
+        candidates = [d for d in devices
+                      if d.name and self._target_name in d.name]
+
+        if not candidates:
+            print("[BLEBridge] Device not found.")
+            return False
+
+        device = candidates[0]
+        print(f"[BLEBridge] Found {device.name} [{device.address}]")
+
+        self._client = BleakClient(device.address,
+                                   disconnected_callback=self._on_disconnect)
+        await self._client.connect(timeout=15.0)
+
+        for svc in self._client.services:
+            for c in svc.characteristics:
+                if c.uuid == NUS_TX_UUID:
+                    await self._client.start_notify(c, self._on_notify)
+                if c.uuid == NUS_RX_UUID:
+                    self._rx_char = c
+
+        self._connected = True
+        print(f"[BLEBridge] Connected to {device.name}")
+        return True
+
+    def _on_disconnect(self, _client):
+        self._connected = False
+        self._rx_char = None
+        print("[BLEBridge] Disconnected.")
+
+    def _on_notify(self, _sender, data: bytearray):
+        text = data.decode("utf-8", errors="replace").strip()
+        if text:
+            print(f"[BLE <-] {text}")
+
+    # -- Envoi (sync, utilisable comme callback Executor) --------------
+
+    def send(self, cmd: str) -> None:
+        """Envoie une commande BLE (appel synchrone, thread-safe)."""
+        print(f"[BLE ->] {cmd}")
+        if not self._connected or not self._rx_char:
+            print("[BLEBridge] Not connected — command not sent.")
+            return
+        future = self._schedule(self._async_write(cmd))
+        try:
+            future.result(timeout=2.0)
+        except Exception as e:
+            print(f"[BLEBridge] Send error: {e}")
+
+    async def _async_write(self, cmd: str):
+        if self._client and self._client.is_connected and self._rx_char:
+            await self._client.write_gatt_char(
+                self._rx_char, (cmd + "\n").encode("utf-8"), response=False)
+
+    # -- Deconnexion ---------------------------------------------------
+
+    def disconnect(self) -> None:
+        if self._connected and self._client:
+            future = self._schedule(self._client.disconnect())
+            try:
+                future.result(timeout=5.0)
+            except Exception:
+                pass
+        self._loop.call_soon_threadsafe(self._loop.stop)
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
