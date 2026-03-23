@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import numpy as np
 
 from marker_detection import config
@@ -41,6 +42,50 @@ def separate_markers(
             obj_aruco.append((marker_id, corner))
 
     return corners_by_id, obj_aruco
+
+
+def get_marker_heading(
+    marker_id: int,
+    obj_aruco: list[tuple[int, np.ndarray]],
+    h_img_to_grid: np.ndarray | None,
+) -> float | None:
+    """Calcule le heading (en degres) d'un marqueur a partir de ses corners ArUco.
+
+    OpenCV retourne les 4 coins dans l'ordre :
+        corner[0] = top-left, corner[1] = top-right,
+        corner[2] = bottom-right, corner[3] = bottom-left.
+
+    On projette les corners dans l'espace grille, puis on calcule l'angle
+    du vecteur (coin0 -> coin1), ce qui donne l'orientation du bord
+    superieur du tag.
+
+    Returns:
+        Angle en degres (0 = droite, sens trigo), ou None si non trouve.
+    """
+    if h_img_to_grid is None:
+        return None
+
+    for mid, corner in obj_aruco:
+        if mid != marker_id:
+            continue
+
+        pts = corner[0]  # shape (4, 2) — les 4 coins en pixels image
+
+        # Projeter corner 0 et corner 1 dans l'espace grille
+        c0 = to_cell(pts[0][0], pts[0][1], h_img_to_grid)
+        c1 = to_cell(pts[1][0], pts[1][1], h_img_to_grid)
+
+        if c0 is None or c1 is None:
+            return None
+
+        # Vecteur du bord superieur du tag dans l'espace grille
+        dx = c1[0] - c0[0]
+        dy = c1[1] - c0[1]
+
+        heading_deg = math.degrees(math.atan2(dy, dx))
+        return heading_deg
+
+    return None
 
 
 def _build_detected_list(

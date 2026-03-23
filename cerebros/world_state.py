@@ -23,6 +23,10 @@ def _classify_marker(marker_id: int, team: Team) -> ObjectType:
     if marker_id in config.CORNER_IDS:
         return ObjectType.CALIBRATION
 
+    # Notre robot (A41)
+    if marker_id == config.OUR_ROBOT_ID:
+        return ObjectType.ROBOT_ALLY
+
     # Robots bleus
     if marker_id in config.BLUE_ROBOT_IDS:
         if team == Team.BLUE:
@@ -35,16 +39,14 @@ def _classify_marker(marker_id: int, team: Team) -> ObjectType:
             return ObjectType.ROBOT_ALLY
         return ObjectType.ROBOT_ENEMY
 
-    # Objets de notre équipe → GOAL
-    if team == Team.BLUE and marker_id in config.BLUE_OBJECT_IDS:
+    # Objets bleus et jaunes → GOAL (à prendre)
+    if marker_id in config.BLUE_OBJECT_IDS:
         return ObjectType.GOAL
-    if team == Team.YELLOW and marker_id in config.YELLOW_OBJECT_IDS:
+    if marker_id in config.YELLOW_OBJECT_IDS:
         return ObjectType.GOAL
 
-    # Objets adverses → OBSTACLE (tag noir = à éviter)
-    if team == Team.BLUE and marker_id in config.YELLOW_OBJECT_IDS:
-        return ObjectType.ROBOT_AVOID
-    if team == Team.YELLOW and marker_id in config.BLUE_OBJECT_IDS:
+    # Objets noirs → à éviter
+    if marker_id in config.BLACK_OBJECT_IDS:
         return ObjectType.ROBOT_AVOID
 
     # Zones/Areas → OBSTACLE par défaut (configurable)
@@ -58,14 +60,18 @@ def _label_from_id(marker_id: int) -> str:
     """Génère un label lisible depuis un marker ID (compatible markers.py)."""
     if marker_id in config.CORNER_IDS:
         return f"TABLE{marker_id}"
+    if marker_id == config.OUR_ROBOT_ID:
+        return "BR1"
     if 1 <= marker_id <= 5:
         return f"BR{marker_id}"
     if 6 <= marker_id <= 10:
         return f"YR{marker_id - 5}"
-    if 51 <= marker_id <= 70:
+    if marker_id in config.BLUE_OBJECT_IDS:
         return f"BLUE{marker_id}"
-    if 71 <= marker_id <= 90:
+    if marker_id in config.YELLOW_OBJECT_IDS:
         return f"YELLOW{marker_id}"
+    if marker_id in config.BLACK_OBJECT_IDS:
+        return f"BLACK{marker_id}"
     if 11 <= marker_id <= 50:
         return f"AREA{marker_id}"
     return f"ARUCO{marker_id}"

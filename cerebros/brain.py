@@ -81,13 +81,21 @@ class Brain:
 
     # ── Entrée vision ─────────────────────────────────────────────────
 
-    def feed_vision(self, detections: List[Tuple[str, int, int]]) -> None:
+    def feed_vision(self, detections: List[Tuple[str, int, int]],
+                     robot_heading: float | None = None) -> None:
         """Reçoit les détections de la caméra.
 
         Args:
             detections: liste de (label, grid_x, grid_y)
+            robot_heading: heading du robot en degrés (depuis ArUco corners)
         """
         self.world.update_from_vision(detections)
+
+        # Mettre à jour le heading du robot si la vision le fournit
+        if robot_heading is not None and self.robot is not None:
+            self.robot.heading_deg = robot_heading
+            if config.DEBUG:
+                print(f"[Brain] Heading vision: {robot_heading:.1f}°")
 
         # Vérifier si le monde a changé significativement → replanifier
         if self._current_mission and not self.executor.is_busy:

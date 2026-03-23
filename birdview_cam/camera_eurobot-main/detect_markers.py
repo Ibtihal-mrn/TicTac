@@ -26,7 +26,14 @@ from marker_detection.visualization import (
     draw_table_outline,
 )
 from marker_detection.esp32_sender import ESP32Sender
-from marker_detection.markers import send_detected_objects
+from marker_detection.markers import send_detected_objects, _build_detected_list, get_marker_heading
+
+import sys, os
+# Ajouter le dossier racine TicTac au path pour importer cerebros
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from cerebros.brain import Brain
+from cerebros.models import Position, Team
+from cerebros import config as cerebros_config
 
 
 def main() -> None:
@@ -40,6 +47,19 @@ def main() -> None:
     except RuntimeError as exc:
         print(f"[ERREUR] {exc}")
         return
+
+    # ── Cerveau robot (cerebros) ──────────────────────────────────
+    def log_ble_command(cmd: str) -> None:
+        """Log les commandes BLE dans le terminal au lieu de les envoyer."""
+        print(f"[BLE CMD] >>> {cmd}")
+
+    brain = Brain(
+        team=Team.BLUE,
+        robot_id="BR1",
+        initial_pos=Position(150, 1000),
+        initial_heading=0.0,
+    )
+    brain.set_send_function(log_ble_command)
 
     create_windows()  # Ouverture des fenetres camera / aerienne.
 
@@ -105,6 +125,18 @@ def main() -> None:
             # print_detected_objects(corners_by_id, obj_aruco, h_img_to_grid)
             send_detected_objects(corners_by_id,
                                   obj_aruco, h_img_to_grid, sender)
+
+            # ── Cerebros : nourrir le cerveau avec les detections ─────
+            detections = _build_detected_list(
+                corners_by_id, obj_aruco, h_img_to_grid)
+
+            # Calculer le heading du robot depuis les corners ArUco
+            robot_heading = get_marker_heading(
+                cerebros_config.OUR_ROBOT_ID, obj_aruco, h_img_to_grid)
+
+            if detections:
+                brain.feed_vision(detections, robot_heading=robot_heading)
+                brain.tick()
 
         draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
 

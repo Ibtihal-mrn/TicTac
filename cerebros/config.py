@@ -24,18 +24,24 @@ CELL_H_MM = TABLE_H_MM / GRID_ROWS   # 100 mm
 #   6‑10  → robots jaunes (YR1‑YR5)
 #   11‑50 → zones/objets sur la table  (sauf 20‑23)
 #   20‑23 → coins de table (calibration)
-#   51‑70 → objets bleus (BLUE*)
-#   71‑90 → objets jaunes (YELLOW*)
+# Tags :
+#   36 → Bleu (A36) — objectif à prendre
+#   47 → Jaune (A47) — objectif à prendre
+#   51 → Noir (A51) — à éviter
+#   41 → Notre robot (A41)
 CORNER_IDS = {20, 21, 22, 23}
+
+OUR_ROBOT_ID = 41                        # Tag du robot A41
 
 BLUE_ROBOT_IDS  = set(range(1, 6))     # 1‑5
 YELLOW_ROBOT_IDS = set(range(6, 11))   # 6‑10
 
-BLUE_OBJECT_IDS   = set(range(51, 71))   # 51‑70
-YELLOW_OBJECT_IDS = set(range(71, 91))   # 71‑90
+BLUE_OBJECT_IDS   = {36}                 # Bleu A36
+YELLOW_OBJECT_IDS = {47}                 # Jaune A47
+BLACK_OBJECT_IDS  = {51}                 # Noir A51 (à éviter)
 
-# IDs 11‑50 (hors coins) sont des zones/obstacles/goals
-AREA_IDS = set(range(11, 51)) - CORNER_IDS
+# IDs 11‑50 (hors coins, robot et objectifs) sont des zones/obstacles
+AREA_IDS = set(range(11, 51)) - CORNER_IDS - {OUR_ROBOT_ID} - BLUE_OBJECT_IDS - YELLOW_OBJECT_IDS - BLACK_OBJECT_IDS
 
 # ── Équipe ───────────────────────────────────────────────────────────────────
 TEAM_BLUE   = "blue"
