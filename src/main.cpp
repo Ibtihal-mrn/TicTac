@@ -72,7 +72,7 @@ void setup()
 
   // I2C Setup.
   Wire.begin(SDA_PIN, SCL_PIN, 100000);
-  initUSConfig();
+  // initUSConfig();    //TODO:
   delay(200);
 
   // Utils.h
