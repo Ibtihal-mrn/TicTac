@@ -25,8 +25,9 @@
 // |  11 - US Back Trig   (9)     | 47  - / (NO) 1.8V logic
 // ----------------------------------------------------------
 // |  12 - STOP_PIN               | 21  - US Back Echo  (9) 
-// |  13 - RX                     | 20  - / (NO) USB+
-// |  14 - TX                     | 19  - / (NO) USB+
+// |  13 - SCL                    | 20  - / (NO) USB+
+// |  14 - SDA                     | 19  - / (NO) USB+
+
 // ~ around 23 free pins for general use
 // 10 US sensors (20pins) + UART and stop pin
 

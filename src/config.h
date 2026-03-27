@@ -60,8 +60,8 @@
 
 // ==================== I2C ====================
 #define STOP_PIN    4
-#define SDA_PIN     5
-#define SCL_PIN     6
+#define SDA_PIN     5      // WhiteTrig  (4)
+#define SCL_PIN     6     // Yellow
 
 
 // =================== ACTUATORS PINS ====================
