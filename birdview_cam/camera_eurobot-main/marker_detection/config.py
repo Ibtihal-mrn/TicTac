@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-FRAME_W = 1280
-FRAME_H = 720
-CAMERA_INDEX = 1
+FRAME_W = 3840
+FRAME_H = 2160
+CAMERA_INDEX = 0
 CAMERA_FPS = 10
 
 WINDOW_CAMERA = "Camera"
