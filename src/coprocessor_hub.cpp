@@ -1,0 +1,235 @@
+// coprocessor_hub.cpp
+#include <Arduino.h>
+
+// Hardware
+#include "us.h" 
+#include "i2c_comm.h"
+
+
+// Config & Debug prints
+#include "utils.h"
+#include "Debug.h"
+// #include "config.h"  // do not add
+#include "config_coprocessor.h"
+
+
+
+// Debug prints Toggle
+#define DEBUG 1
+#if DEBUG
+    #define DBG_PRINT(x)  Serial.print(x)
+    #define DBG_PRINTLN(x) Serial.println(x)
+#else
+    #define DBG_PRINT(x)
+    #define DBG_PRINTLN(x)
+#endif
+
+
+// ===== STATE =====
+static uint8_t enabled_zones = 0xFF; // all enabled
+
+uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
+uint8_t US_OBSTACLE_CLEAR_CM     = 14;  // initial values
+
+// debug prints for Hysterisis debounce resilience
+static bool stopState = false;
+static unsigned long lastStopChange = 0;
+static bool lastStopState = false; // only for debug prints
+
+
+
+
+// ====== Handle Commands =====
+void handleCommand() {
+    if (!newCommand) return;
+    newCommand = false;
+
+    Serial.print("Received command 0x");
+    DBG_PRINT(lastCmd);
+    DBG_PRINT(" with param 0x");
+    DBG_PRINTLN(lastParam);
+
+    switch(lastCmd) {
+        case CMD_SET_ZONES:
+            activeZones = lastParam;
+            us_setZones(activeZones);
+            Serial.print("Enabled zones: 0x"); DBG_PRINTLN(activeZones);
+            break;
+
+        case CMD_SET_OBSTACLE_THRESHOLD:
+            US_OBSTACLE_THRESHOLD_CM = lastParam;
+            Serial.print("Obstacle threshold set to: "); DBG_PRINTLN(US_OBSTACLE_THRESHOLD_CM);
+            break;
+
+        case CMD_SET_CLEAR_THRESHOLD:
+            US_OBSTACLE_CLEAR_CM = lastParam;
+            Serial.print("Clear threshold set to: "); DBG_PRINTLN(US_OBSTACLE_CLEAR_CM);
+            break;
+
+        case CMD_PING:
+            DBG_PRINTLN("PING received.");
+            break;
+
+        case CMD_RESET:
+            for (int i = 0; i < us_count(); i++) sensors[i].obstacle = false;
+            Serial.println("All sensors reset.");
+            break;
+
+        default:
+            Serial.println("Unknown command!");
+            break;
+    }
+}
+
+void debugSensors(bool stopState) {
+    static unsigned long lastPrint = 0;
+
+    if (millis() - lastPrint < 200) return; // 5 Hz
+    lastPrint = millis();
+
+    for (int i = 0; i < us_count(); i++) {
+        Serial.print("S"); Serial.print(i);
+        // Serial.print(" Z:"); Serial.print(us_getZone(i));
+        Serial.print(" D:"); Serial.print(us_getDistance(i));
+        Serial.print(" | ");
+    }
+    Serial.print("STOP:");
+    Serial.print(stopState ? "1" : "0");
+    Serial.println("");
+}
+
+void debugStopPinState(bool currentState){
+    // ONLY toggle the lastStopState to print when stopPin is on or off
+    if (currentState != lastStopState) {
+        lastStopState = currentState;
+
+        Serial.print("STOP → ");
+        Serial.println(currentState ? "TRIGGERED" : "CLEARED");
+    }
+}
+
+
+void updatePacket(bool stopState){
+    packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
+    packet.left_mm  = us_getDistanceForZone(ZONE_LEFT);
+    packet.right_mm = us_getDistanceForZone(ZONE_RIGHT);
+    packet.back_mm  = us_getDistanceForZone(ZONE_BACK);
+
+    packet.danger_flags = stopState ? 1 : 0;
+
+    if (true)return;
+
+    #if DEBUG
+        static unsigned long Lpt = 0;
+        if (millis() - Lpt >= 1000)
+        {
+            Serial.print("PACKET → F:");
+            Serial.print(packet.front_mm);
+            Serial.print(" L:");
+            Serial.print(packet.left_mm);
+            Serial.print(" R:");
+            Serial.print(packet.right_mm);
+            Serial.print(" B:");
+            Serial.print(packet.back_mm);
+            Serial.print(" D:");
+            Serial.print(packet.danger_flags);
+            Serial.print("Packet size: ");
+            Serial.println(sizeof(SensorPacket));
+            Lpt = millis();
+        }
+    #endif
+}
+
+bool debounceStopPin(bool rawStop){
+    static bool stableStop = false;
+    static bool lastRaw = false;
+    static bool lastStable = false;
+    static unsigned long lastChange = 0;
+
+    const uint16_t STOP_DEBOUNCE_MS = 100;
+
+    // Detect raw change → start timer
+    if (rawStop != lastRaw) {
+        lastChange = millis();
+        lastRaw = rawStop;
+    }
+
+    // Apply if stable long enough
+    if ((millis() - lastChange) > STOP_DEBOUNCE_MS) {
+        stableStop = rawStop;
+    }
+
+    // EDGE DETECTION
+    if (stableStop != lastStable) {
+        digitalWrite(STOP_PIN_HUB, stableStop);
+
+        if (DEBUG) {
+            Serial.println(stableStop ? "STOP → TRIGGERED" : "STOP → CLEARED");
+        }
+
+        lastStable = stableStop;  // update AFTER printing
+    }
+
+    return stableStop;
+}
+
+// ================== 
+//      SETUP 
+// ==================
+void setup() {
+    Serial.begin(115200); // debug
+
+    // I2C
+    Wire.begin(HUB_ADDR, SDA_PIN_HUB, SCL_PIN_HUB, 100000);
+    Wire.onReceive(onReceive);  // master writes commands
+    Wire.onRequest(onRequest);  // master read
+
+    // Emergency pin setup
+    pinMode(STOP_PIN_HUB, OUTPUT); // emergency stop pin (defined in config_coprocessor.h)
+
+    // Add here all the Ultrasonic sensors
+    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
+    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+
+    us_setZones(enabled_zones); // apply initial config
+
+    Serial.println("Setup done.");
+}
+
+// ================== 
+//      LOOP 
+// ==================
+void loop() {
+    // //  if (true) return;
+
+    // imAlive();
+    bool stopState = false; // tracks the current stop pin state
+    
+    // 1. Update each sensor
+    for (int i = 0; i < us_count(); i++) {
+        updateSensorAndStop(i);    // Update sensor with hysteresis
+        if (sensors[i].obstacle) stopState = true;
+    }
+
+    // 2. Apply STOP
+    bool stableStop = debounceStopPin(stopState);
+
+    // 3. UPDATE PACKET
+    updatePacket(stableStop);
+
+    // 4. Debug
+    #if DEBUG
+        debugSensors(stopState); // optionally print all sensor distances
+        debugStopPinState(stopState);               // print if stop pin has been toggled
+    #endif
+
+
+    // 5. I2C commands
+    handleCommand();
+    
+    
+    delay(10);
+
+}
+

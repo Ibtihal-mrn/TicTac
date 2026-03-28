@@ -1,72 +1,101 @@
+// us.cpp
 #include "us.h"
-#include <Ultrasonic.h>
-#include "../../src/config.h"
-#include "../utils/Debug.h"
 
-// ...existing code...
+// =========== STATE ============
+Sensor sensors[MAX_SENSORS];
+uint8_t sensorCount = 0;
+uint8_t nextSensor = 0;
+uint8_t activeZones = 0xFF;
 
-Ultrasonic us1(US_TRIG_PIN,  US_ECHO_PIN,  US_TIMEOUT);
-Ultrasonic us2(US2_TRIG_PIN, US2_ECHO_PIN, US_TIMEOUT);
-Ultrasonic us3(US3_TRIG_PIN, US3_ECHO_PIN, US_TIMEOUT);
+static unsigned long lastRead = 0;
 
-int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM;
 
-static int16_t dUS1 = -1, dUS2 = -1, dUS3 = -1;
-static uint8_t nextSensor = 0;
-static unsigned long lastReadMs = 0;
-static const uint16_t US_INTER_SENSOR_MS = 30; // anti-crosstalk sans delay bloquant
+// ============= API =============
+// Add sensor
+void us_add(uint8_t zone, int trig, int echo) {
+    if (sensorCount >= MAX_SENSORS) return;
 
-static int16_t readOne(Ultrasonic& us) {
-  int d = (int)us.read(CM);
-  if (d <= 0 || d > 400) return -1;
-  return (int16_t)d;
+    sensors[sensorCount].us = new Ultrasonic(trig, echo, US_TIMEOUT);
+    sensors[sensorCount].zone = zone;
+    sensors[sensorCount].enabled = true;
+    sensors[sensorCount].distance = -1;
+
+    sensorCount++;
 }
 
-static int16_t minValid(int16_t a, int16_t b) {
-  if (a < 0) return b;
-  if (b < 0) return a;
-  return (a < b) ? a : b;
+// Enable/disable measurements in a zone
+void us_setZones(uint8_t mask) {
+    activeZones = mask;
+
+    for (int i = 0; i < sensorCount; i++) {
+        sensors[i].enabled = (mask & sensors[i].zone);
+    }
 }
 
-static int16_t minValid3(int16_t a, int16_t b, int16_t c) {
-  return minValid(minValid(a, b), c);
+
+// ============= GETTERS =========
+uint8_t us_count() {
+    // returns number of sensors added
+    return sensorCount;
+}
+uint8_t us_getZone(uint8_t index) {
+    // returns the zone of sensor i
+    if (index >= sensorCount) return 0;
+    return sensors[index].zone;
+}
+int16_t us_getDistance(uint8_t index) {
+    // returns the distance (cm) of sensor i
+    if (index >= sensorCount) return -1;
+    return sensors[index].distance;
+}
+int16_t us_getDistanceForZone(uint8_t zone) {
+    // returns minimum distance of all sensors in a specific zone
+    int16_t minDist = 9999;
+    for (int i = 0; i < sensorCount; i++) {
+        if (sensors[i].zone & zone && sensors[i].distance > 0) {
+            if (sensors[i].distance < minDist) minDist = sensors[i].distance;
+        }
+    }
+    return (minDist == 9999) ? -1 : minDist;
 }
 
-void ultrasonic_update() {
-  const unsigned long now = millis();
-  if (now - lastReadMs < US_INTER_SENSOR_MS) return;
 
-  switch (nextSensor) {
-    case 0: dUS1 = readOne(us1); break;
-    case 1: dUS2 = readOne(us2); break;
-    case 2: dUS3 = readOne(us3); break;
-  }
+// ===== UPDATE =====
+bool updateSensorAndStop(int i) {
+    unsigned long now = millis();
+    Sensor &s = sensors[i];
 
-  nextSensor = (nextSensor + 1) % 3;
-  lastReadMs = now;
+    if (!s.enabled) return false;
+
+    // 1. Read ultrasonic distance
+    int d = s.us->read(CM);  // current reading
+    if (d <= 0 || d > 400) d = -1;
+    s.distance = d;
+
+    // 2. Hysteresis + debounce
+    if (!s.obstacle && d > 0 && d < US_OBSTACLE_THRESHOLD_CM) {
+        if (now - s.lastChange > STOP_HOLD_MS) {
+            s.obstacle = true;
+            s.lastChange = now;
+        }
+    } else if (s.obstacle && (d < 0 || d > US_OBSTACLE_CLEAR_CM)) {
+        if (now - s.lastChange > STOP_HOLD_MS) {
+            s.obstacle = false;
+            s.lastChange = now;
+        }
+    }
+
+    s.lastDistance = d;
+
+    // digitalWrite(STOP_PIN, stop); // update STOP pin in loop()
+    return s.obstacle; // for debug / packet
 }
 
-bool ultrasonic_isObstacle() {
-  ultrasonic_update(); // maintient les mesures fraîches
-  int16_t dmin = minValid3(dUS1, dUS2, dUS3);
-  return (dmin > 0 && dmin <= obstcle_threshold_cm);
-}
 
-int16_t ultrasonic_read() {
-  ultrasonic_update();
-  return minValid3(dUS1, dUS2, dUS3);
-}
 
-void printUltrasonicVal() {
-  static unsigned long lastPrint = 0;
-  ultrasonic_update();
 
-  if (millis() - lastPrint < 300) return;
-  lastPrint = millis();
 
-  int16_t dmin = minValid3(dUS1, dUS2, dUS3);
-  Serial.print("US1: "); Serial.print(dUS1);
-  Serial.print(" | US2: "); Serial.print(dUS2);
-  Serial.print(" | US3: "); Serial.print(dUS3);
-  Serial.print(" | MIN: "); Serial.println(dmin);
-}
+
+
+
+// ---end

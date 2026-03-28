@@ -197,6 +197,23 @@ void loop() {
 }
 
 
+// ---------- Setup ----------
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(ENB, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  encoders_init();
+
+  // Stop motors initially
+  stopMotors();
+}
 
 
 

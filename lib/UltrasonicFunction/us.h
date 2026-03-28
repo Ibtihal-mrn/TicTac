@@ -1,13 +1,49 @@
-#ifndef ULTRASONIC_FUNCTION_US_H
-#define ULTRASONIC_FUNCTION_US_H
-
+// us.h
+#pragma once
 #include <Arduino.h>
+#include <Ultrasonic.h>
+#include "../../src/config_coprocessor.h"
 
-void ultrasonic_update();      // nouveau: à appeler souvent (loop)
+// ====== CONFIG =======
+#define MAX_SENSORS 10
+#define US_DELAY = 30
 
-bool ultrasonic_isObstacle();
-int16_t ultrasonic_read();     // min des 3 capteurs avant
+// ===== ZONES =====
+enum Zone {
+    ZONE_FRONT  = 1 << 0,
+    ZONE_LEFT   = 1 << 1,
+    ZONE_RIGHT  = 1 << 2,
+    ZONE_BACK   = 1 << 3
+};
 
-void printUltrasonicVal();
+// ===== SENSOR STRUCT =====
+struct Sensor {
+    Ultrasonic *us;
+    uint8_t zone;
+    bool enabled;
+    bool obstacle=false;
+    int16_t distance=-2;
+    int16_t lastDistance = -2; //Hysteresis
+    unsigned long lastChange=0;
+};
 
-#endif
+// ======== EXTERN VARS ======
+extern Sensor sensors[MAX_SENSORS];
+extern uint8_t sensorCount;
+extern uint8_t activeZones;
+
+
+// ========= API =========
+void us_add(uint8_t zone, int trig, int echo);
+void us_setZones(uint8_t mask);
+
+uint8_t us_count();
+uint8_t us_getZone(uint8_t index);
+int16_t us_getDistance(uint8_t index);
+int16_t us_getDistanceForZone(uint8_t zone);
+
+bool updateSensorAndStop(int i);
+
+
+
+// ---- end ----

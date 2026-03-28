@@ -16,6 +16,7 @@
 #define DBG_SERVO         (1<<8)
 #define DBG_MAGNET        (1<<9)
 #define DEBUG_TEAM_SWITCH (1<<10)
+#define DBG_I2C_HUB       (1<<11)
 // Global debug mask (0 = none). You can set this at runtime.
 extern uint16_t debugMask;
 
