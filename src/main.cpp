@@ -28,6 +28,8 @@ SemaphoreHandle_t i2cMutex        = nullptr;  // Mutex pour protéger le bus I2C
 SemaphoreHandle_t ioExpanderMutex = nullptr;  // Mutex pour protéger ioExpanderData
 IOExpanderData    ioExpanderData  = {{}, false};  // Données IO Expander (pin[8] + ready)
 
+volatile bool emergencyStop = false;  // Flag d'arrêt d'urgence (utilisé par robot.cpp)
+
 // ── Instance IO Expander ─────────────────────────────────────────────────
 //  On crée l'objet avec l'adresse I2C définie dans config.h.
 //  L'objet est global pour être accessible si besoin (ex: queueWrite depuis la FSM).
@@ -195,26 +197,3 @@ void loop() {
     // Arduino loop() tourne aussi sur Core 1, on la laisse idle
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
-
-
-// ---------- Setup ----------
-void setup() {
-  Serial.begin(115200);
-
-  pinMode(ENA, OUTPUT);
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-
-  pinMode(ENB, OUTPUT);
-  pinMode(IN3, OUTPUT);
-  pinMode(IN4, OUTPUT);
-
-  encoders_init();
-
-  // Stop motors initially
-  stopMotors();
-}
-
-
-
-

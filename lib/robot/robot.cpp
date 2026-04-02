@@ -3,8 +3,8 @@
 // I2C sensors
 #include "i2c_comm.h"
 
-
-
+// Forward declarations
+void driveDistancePID(float distance_mm, int speed);
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 // Variables globales pour le PID de déplacement et l'initiation

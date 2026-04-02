@@ -62,6 +62,13 @@
 #define STOP_PIN    4
 #define SDA_PIN     5
 #define SCL_PIN     6
+#define I2C_FREQ    100000
+
+// ==================== IO Expander ====================
+#define IOEXP_I2C_ADDR    0x20
+#define IOEXP_PIN_CONFIG  0x0F   // P0-P3 input, P4-P7 output
+#define IOEXP_TASK_STACK  2048
+#define IOEXP_TASK_PRIO   1
 
 
 // =================== ACTUATORS PINS ====================
@@ -104,3 +111,9 @@
 #define ROTATE_TARGET_SCALE 1.13f
 #define ROTATE_KP 2.2f
 #define ROTATE_KD 0.25f
+
+// ==================== Ultrasonic (single sensor, main robot) ====================
+#define US_MAIN_TIMEOUT 20000UL
+#define US_TRIG_PIN 1  // US Left :  2, 42, 41, 40, 39, 38
+#define US_ECHO_PIN 2
+#define US_MAIN_OBSTACLE_THRESHOLD_CM 30

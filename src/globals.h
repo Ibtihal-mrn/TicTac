@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-<<<<<<< HEAD
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -24,9 +23,4 @@ struct IOExpanderData {
 extern SemaphoreHandle_t ioExpanderMutex;  // protège ioExpanderData
 extern IOExpanderData    ioExpanderData;   // données lues par la tâche IOExp
 
-
-=======
-
-
 extern volatile bool emergencyStop;
->>>>>>> esp32s3

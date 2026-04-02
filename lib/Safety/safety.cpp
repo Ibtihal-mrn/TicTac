@@ -1,11 +1,7 @@
 #include "safety.h"
-#include "config.h"
 #include "../../src/config.h"
-#include "../UltrasonicFunction/us.h"
-// #include "ultrasonic.h"
-// #include <Ultrasonic.h>
+#include "ultrasonic_function.h"
 #include "EmergencyButton.h"
-// #include ""
 static unsigned long us_millis = 0;
 static int us_read_delay_ms = 500; // délai entre lectures du sonar (throttling)
 // static unsigned long us_millis = 0;
