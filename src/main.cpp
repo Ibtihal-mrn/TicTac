@@ -109,11 +109,10 @@ void setup() {
 
     // ── I2C Bus — DOIT être initialisé AVANT tout périphérique I2C ──────────
     //  Wire.begin(SDA, SCL) configure le bus I2C hardware de l'ESP32.
-    //  Tous les périphériques I2C (IMU, IO Expander) partagent ce même bus.
-    /*Wire.begin(I2C_SDA, I2C_SCL);  // GPIO6 = SDA, GPIO7 = SCL
+    //  Tous les périphériques I2C (IMU, IO Expander, Sensor Hub) partagent ce même bus.
+    Wire.begin(SDA_PIN, SCL_PIN);
     Wire.setClock(I2C_FREQ);       // 100 kHz (standard mode)
-    Serial.println("[SETUP] I2C bus initialized (SDA=6, SCL=7, 100kHz)");
-*/
+    Serial.println("[SETUP] I2C bus initialized");
     // ── Créer les mutex FreeRTOS ─────────────────────────────────────────────
     //  Un mutex = un "verrou" : une seule tâche peut le prendre à la fois.
     //  i2cMutex : empêche 2 tâches d'accéder au bus I2C simultanément

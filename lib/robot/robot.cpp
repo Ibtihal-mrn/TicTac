@@ -105,14 +105,15 @@ void driveDistancePID(float distance_mm, int speed)
       }
     }
 
-//-------------ULTRASONS--------------------------
-    // STOP MOTOR CONDITIONS (ultrason désactivé pour le moment pour éviter un bug)
-    // if (safety_update()) {
-    //   static unsigned long lp3 = 0; 
-    //   motors.stopMotors();
-    //   if (DBG_MOTORS) Serial.print("Safety triggered\n");
-    //   continue;
-    // }
+//-------------ULTRASONS (via I2C coprocesseur)--------------------------
+    if (safety_update()) {
+      motors.stopMotors();
+      bleSerial.println("[DRIVE] Safety triggered — waiting...");
+      while (safety_update()) { vTaskDelay(pdMS_TO_TICKS(50)); }
+      bleSerial.println("[DRIVE] Safety cleared — resuming");
+      tPrev = micros();
+      continue;
+    }
 
     // --- Read Current encoders Values ---
     long curL, curR;
