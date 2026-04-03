@@ -97,16 +97,33 @@ void driveDistancePID(float distance_mm, int speed)
     if (emergencyStop)
     {
       motors.stopMotors();
+
+      // Debug Prints
       unsigned long lp6 = 0;
       printMillis(DBG_MOTORS, "Emergency Button !\n", millis(), lp6, 1000);
-      while (emergencyStop) { yield(); }
+      #if DBG_MOTORS
+        static unsigned long LastPrint = 0;
+        if (millis() - LastPrint >= 1000){
+          SensorPacket p = getData();
+          Serial.print(F("Danger flags: ")); Serial.println(p.danger_flags);
+          Serial.print(F("Front: ")); Serial.print(p.front_mm);
+          Serial.print(F(" mm, Left: ")); Serial.print(p.left_mm);
+          Serial.print(F(" mm, Right: ")); Serial.print(p.right_mm);
+          Serial.print(F(" mm, Back: ")); Serial.print(p.back_mm);
+          LastPrint = millis();
+        }
+      #endif
+
+      // Yield
+      while (digitalRead(STOP_PIN) == HIGH) { yield(); }
+
+      // Obstacle Cleared
+      emergencyStop = false;
 
       // Reset PID values after interruption
       control_reset(st);
-
-      // Reset timing
-      tPrev = micros();
-
+      tPrev = micros(); // Reset timing
+      
       continue;
     }
 

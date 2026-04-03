@@ -38,7 +38,7 @@
 //          >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
 //          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
 //      ACM1
-//          >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
 //          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
 //      ACM2
 //          >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
@@ -67,7 +67,8 @@
 #define US_TIMEOUT 20000UL
 extern uint8_t US_OBSTACLE_THRESHOLD_CM;
 extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hysteresis
-#define STOP_HOLD_MS    150   // small debounce
+#define STOP_HOLD_MS        150   // sensor-level debounce
+#define STOP_CLEAR_HOLD_MS  2000  // hub-level stop release hold
 
 
 // ==================

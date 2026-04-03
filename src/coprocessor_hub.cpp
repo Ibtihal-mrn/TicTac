@@ -143,36 +143,37 @@ void updatePacket(bool stopState){
 }
 
 bool debounceStopPin(bool rawStop){
-    static bool stableStop = false;
-    static bool lastRaw = false;
-    static bool lastStable = false;
-    static unsigned long lastChange = 0;
+    /* Debounce STOP pin :
+        a.ka : based on all US detections, how fast can i write the STOP_PIN ?
+        - STOP immediately
+        - only CLEAR after 2000ms of no obstacle.
+    */ 
+    static bool stopLatched = false;
+    static unsigned long clearSince = 0;
+    static bool lastPrintedState = false;
 
-    const uint16_t STOP_DEBOUNCE_MS = 100;
-
-    // Detect raw change → start timer
-    if (rawStop != lastRaw) {
-        lastChange = millis();
-        lastRaw = rawStop;
-    }
-
-    // Apply if stable long enough
-    if ((millis() - lastChange) > STOP_DEBOUNCE_MS) {
-        stableStop = rawStop;
-    }
-
-    // EDGE DETECTION
-    if (stableStop != lastStable) {
-        digitalWrite(STOP_PIN_HUB, stableStop);
-
-        if (DEBUG) {
-            Serial.println(stableStop ? "STOP → TRIGGERED" : "STOP → CLEARED");
+    if (rawStop) {
+        stopLatched = true;
+        clearSince = 0;
+    } else if (stopLatched) {
+        if (clearSince == 0) {
+            clearSince = millis();
         }
 
-        lastStable = stableStop;  // update AFTER printing
+        if (millis() - clearSince >= STOP_CLEAR_HOLD_MS) {
+            stopLatched = false;
+            clearSince = 0;
+        }
     }
 
-    return stableStop;
+    digitalWrite(STOP_PIN_HUB, stopLatched);
+
+    if (stopLatched != lastPrintedState) {
+        if (DEBUG) Serial.println(stopLatched ? "STOP → TRIGGERED" : "STOP → CLEARED");
+        lastPrintedState = stopLatched;
+    }
+
+    return stopLatched;
 }
 
 // ================== 

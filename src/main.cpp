@@ -26,9 +26,9 @@ extern Motors motors;
 StartSwitch startSwitch(GPIO_NUM_8);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
-// Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
+// OBSTACLE : Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
 volatile bool emergencyStop = false;  //extern in globals.h
-void IRAM_ATTR stopISR() { emergencyStop = true; }
+void IRAM_ATTR stopISR() { emergencyStop = digitalRead(STOP_PIN); }
 
 
 // TODO: remove/obfuscate this :
@@ -72,17 +72,18 @@ void setup()
 
   // I2C Setup.
   Wire.begin(SDA_PIN, SCL_PIN, 100000);
-  // initUSConfig();    //TODO:
+  // initUSConfig();    //TODO: change init config of hub
   delay(200);
+  
 
   // Utils.h
+  i2c_scanner();
   // printEsp32Info();
-  // i2c_scanner();
+
 
   // ======== HARDWARE INIT ==========
-
-  pinMode(STOP_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, RISING);
+  pinMode(STOP_PIN, INPUT); //
+  attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, CHANGE);
 
   // Init Hardware et Robot
   ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
@@ -93,11 +94,12 @@ void setup()
   Serial.println("Setup Done.");
 
   // startSwitch.begin();
-  teamSwitch.begin();
+  // teamSwitch.begin();
 
-  Serial.println("Waiting for start switch...");
+  // Serial.println("Waiting for start switch...");
   // startSwitch.waitForStart();
   Serial.println("Starting sequence..."); 
+  Serial.println("Setup Done."); 
 }
 
 void loop()
@@ -106,9 +108,13 @@ void loop()
   static bool runSequence = true;  
 
 
-  if (!runSequence) {
-    return; 
-  }
+  if (!runSequence) return;
+
+
+  driveDistancePID(1000, 200);
+
+
+  return;
 
 
   if (teamSwitch.readTeam() == TeamSwitchTeam::A)

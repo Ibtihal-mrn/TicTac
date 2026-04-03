@@ -67,7 +67,7 @@
 // =================== ACTUATORS PINS ====================
 #define LAUNCH_TRIGGER_PIN 1     // TODO: not used here, impl in main.cpp startSwitch !
 #define TEAM_SWITCH_PIN    8
-#define EBTN_PIN           48    //TODO: remove // changed to Hardware Switch
+// #define EBTN_PIN           48    //TODO: remove, changed to Hardware Switch
 
 
 // ==================== STEPPER ====================
