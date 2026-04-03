@@ -8,23 +8,23 @@
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
 // |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
-// |  4  – US Front Trig  (1)     | 1   - US Back Trig  (4)
-// |  5  – US Front Trig  (1)     | 2   - US Back Trig  (4)
-// |  6  - US Front Echo  (1)     | 42  - US Back Echo  (4)
-// |  7  - US Front Trig  (2)     | 41  - US Back Trig  (5)
-// |  15 - US Front Echo  (2)     | 40  - US Back Echo  (5)
-// |  16 - US Front Trig  (3)     | 39  - US Back Trig  (6)
-// |  17 - US Front Echo  (3)     | 38  - US Back Echo  (6)
+// |  4  – US Front Trig  (1)     | 1   - US Back Trig  (7)
+// |  5  – US Front Echo  (1)     | 2   - US Back Trig  (7)
+// |  6  - US Front Echo  (2)     | 42  - US Back Echo  (8)
+// |  7  - US Front Trig  (2)     | 41  - US Back Trig  (8)
+// |  15 - US Front Echo  (3)     | 40  - US Back Echo  (9)
+// |  16 - US Front Trig  (3)     | 39  - US Back Trig  (9)
+// |  17 - US Front Echo  (4)     | 38  - US Back Trig  (10)
 // --------------------------------------------------------
-// |  18 - US Left Trig   (7)     | 37  - / (NO) PSRAM
-// |  8  - US Left Echo   (7)     | 36  - / (NO) PSRAM        
+// |  18 - US Left Trig   (4)     | 37  - / (NO) PSRAM
+// |  8  - US Left Echo   (5)     | 36  - / (NO) PSRAM        
 // |  3  - / (NO) STRAP           | 35  - / (NO) PSRAM
 // |  46 - / (NO) STRAP           | 0   - / (NO) BOOT
-// |  9  - US Left Trig   (8)     | 45  - / (NO) STRAP
-// |  10 - US Left Echo   (8)     | 48  - / (NO) 1.8V logic
-// |  11 - US Back Trig   (9)     | 47  - / (NO) 1.8V logic
+// |  9  - US Left Trig   (5)     | 45  - / (NO) STRAP
+// |  10 - US Left Echo   (6)     | 48  - / (NO) 1.8V logic
+// |  11 - US Back Trig   (6)     | 47  - / (NO) 1.8V logic
 // ----------------------------------------------------------
-// |  12 - STOP_PIN               | 21  - US Back Echo  (9) 
+// |  12 - STOP_PIN               | 21  - US Back Echo  (10) 
 // |  13 - SCL                    | 20  - / (NO) USB+
 // |  14 - SDA                     | 19  - / (NO) USB+
 
@@ -32,21 +32,37 @@
 // 10 US sensors (20pins) + UART and stop pin
 
 // RUN CMD
+//
 // robot_master :
-//          >> pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
-//          >> pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
+//      ACM0
+//          >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
+//      ACM1
+//          >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
+//      ACM2
+//          >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM2
+//
 // Sensor_hub : 
-//          >> pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
-//          >> pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
-
+//      ACM0
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM0
+//      ACM1
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
+//      ACM2
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM2
 
 
 
 
 // I2C
-#define STOP_PIN_HUB    4
-#define SDA_PIN_HUB     5
-#define SCL_PIN_HUB     6
+#define STOP_PIN_HUB    12
+#define SCL_PIN_HUB     13
+#define SDA_PIN_HUB     14
+
 
 #define US_TIMEOUT 20000UL
 extern uint8_t US_OBSTACLE_THRESHOLD_CM;
@@ -57,15 +73,14 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 // ==================
 //       FRONTs
 // ==================
-#define US_F1_TRIG 13     // Left
-#define US_F1_ECHO 14
+#define US_F1_TRIG 38     // Left
+#define US_F1_ECHO 21
 
-#define US_F2_TRIG 7     // Middle
-#define US_F2_ECHO 15
+#define US_F2_TRIG      // Middle
+#define US_F2_ECHO 
 
-#define US_F3_TRIG 16    // Rigth
-#define US_F3_ECHO 17
-
+#define US_F3_TRIG     // Rigth
+#define US_F3_ECHO 
 
 // ==================
 //       LEFT

@@ -28,8 +28,8 @@
 // ===== STATE =====
 static uint8_t enabled_zones = 0xFF; // all enabled
 
-uint8_t US_OBSTACLE_THRESHOLD_CM = 10;
-uint8_t US_OBSTACLE_CLEAR_CM     = 14;  // initial values
+uint8_t US_OBSTACLE_THRESHOLD_CM = 17;
+uint8_t US_OBSTACLE_CLEAR_CM     = 20;  // initial values
 
 // debug prints for Hysterisis debounce resilience
 static bool stopState = false;
@@ -98,6 +98,8 @@ void debugSensors(bool stopState) {
     Serial.println("");
 }
 
+
+//TODO: remove this duplicate fn
 void debugStopPinState(bool currentState){
     // ONLY toggle the lastStopState to print when stopPin is on or off
     if (currentState != lastStopState) {
@@ -189,8 +191,8 @@ void setup() {
 
     // Add here all the Ultrasonic sensors
     us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
 
     us_setZones(enabled_zones); // apply initial config
 
@@ -221,7 +223,7 @@ void loop() {
     // 4. Debug
     #if DEBUG
         debugSensors(stopState); // optionally print all sensor distances
-        debugStopPinState(stopState);               // print if stop pin has been toggled
+        // debugStopPinState(stopState);               // print if stop pin has been toggled
     #endif
 
 
