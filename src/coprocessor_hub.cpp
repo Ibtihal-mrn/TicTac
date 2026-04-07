@@ -192,8 +192,8 @@ void setup() {
 
     // Add here all the Ultrasonic sensors
     us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
 
     us_setZones(enabled_zones); // apply initial config
 

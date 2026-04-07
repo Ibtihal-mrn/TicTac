@@ -57,6 +57,8 @@
 
 
 
+//! TEST : | US1 (8, 9) | US2 (1, 2) | US3 (4, 5) | 
+
 
 // I2C
 #define STOP_PIN_HUB    12
@@ -68,20 +70,20 @@
 extern uint8_t US_OBSTACLE_THRESHOLD_CM;
 extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hysteresis
 #define STOP_HOLD_MS        150   // sensor-level debounce
-#define STOP_CLEAR_HOLD_MS  2000  // hub-level stop release hold
+#define STOP_CLEAR_HOLD_MS  800  // hub-level stop release hold
 
 
 // ==================
-//       FRONTs
+//       FRONT
 // ==================
-#define US_F1_TRIG 38     // Left
-#define US_F1_ECHO 21
+#define US_F1_TRIG 8     // Left
+#define US_F1_ECHO 9
 
-#define US_F2_TRIG      // Middle
-#define US_F2_ECHO 
+#define US_F2_TRIG  1    // Middle
+#define US_F2_ECHO  2
 
-#define US_F3_TRIG     // Rigth
-#define US_F3_ECHO 
+#define US_F3_TRIG  4    // Rigth
+#define US_F3_ECHO  5
 
 // ==================
 //       LEFT
