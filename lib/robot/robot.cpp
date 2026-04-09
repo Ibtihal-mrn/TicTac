@@ -17,10 +17,73 @@
 // I2C sensors
 #include "i2c_comm.h"
 
-
+#include "pid.h"
 
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
+static PIDController motion(motors);
+
+
+void driveForward(float mm, int speed) {
+    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
+    motion.startLinear(mm, speed);
+}
+
+void driveBackward(float mm, int speed) {
+    setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
+    motion.startLinear(-mm, speed);
+}
+
+void rotate(float angle, int speed) {
+    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
+    motion.startRotate(angle, speed);
+}
+
+
+
+void robot_step(Context &ctx)
+{
+    if (emergencyStop) {
+        motion.abort();
+        ctx.currentAction = Robot::EMERGENCY_STOP;
+    }
+
+    switch (ctx.currentAction)
+    {
+        case Robot::EXEC_MOVE  :
+        case Robot::EXEC_ROTATE:
+            if (motion.update()) {
+                ctx.currentAction = Robot::IDLE;
+            }
+            break;
+
+        case Robot::EMERGENCY_STOP:
+            motion.abort();
+            if (digitalRead(STOP_PIN) == LOW) {
+                emergencyStop = false;
+                ctx.currentAction = Robot::IDLE;
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+
+
+
+
+
+
+
+// ====================================
+// ====================================
+// ====================================
+// ====================================
+
+
+
 
 
 // TODO: Replace by hardware_init()
@@ -48,22 +111,22 @@ void robot_init()
 
 
 // ======= PID MOVEMENT =========
-void driveForward(float mm, int speed){
-  setZones(ZONE_FRONT);
-  driveDistancePID(mm, speed);
-}
+// void driveForward(float mm, int speed){
+//   setZones(ZONE_FRONT);
+//   driveDistancePID(mm, speed);
+// }
 
-void driveBackward(float mm, int speed){
-  setZones(ZONE_BACK);
-  driveDistancePID(-mm, speed);
-}
+// void driveBackward(float mm, int speed){
+//   setZones(ZONE_BACK);
+//   driveDistancePID(-mm, speed);
+// }
 
-void rotate(float angle, int speed){
-  // if (angle > 0) setZones(ZONE_RIGHT);
-  // else setZones(ZONE_LEFT);
-  setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
-  rotateAnglePID(angle, speed);
-}
+// void rotate(float angle, int speed){
+//   // if (angle > 0) setZones(ZONE_RIGHT);
+//   // else setZones(ZONE_LEFT);
+//   setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
+//   rotateAnglePID(angle, speed);
+// }
 
 // FREINAGE
 void brakeForwardMotion(int initialSpeed)
@@ -482,3 +545,5 @@ void robot_step(Context &ctx)
     break;
   }
 }
+
+

@@ -7,7 +7,7 @@
 #define DBG_FSM           (1<<0)
 #define DBG_TASKMANAGER   (1<<1)
 #define DBG_MOTORS        (1<<2)
-#define DBG_SENSORS       (1<<3)
+#define DBG_PID           (1<<3)
 #define DBG_COMMS         (1<<4)
 #define DBG_ENCODER       (1<<5)
 #define DBG_LAUNCH_TGR    (1<<6)
@@ -16,6 +16,7 @@
 #define DBG_MAGNET        (1<<9)
 #define DEBUG_TEAM_SWITCH (1<<10)
 #define DBG_I2C_HUB       (1<<11)
+// #define           (1<<12)
 // Global debug mask (0 = none). You can set this at runtime.
 extern uint8_t debugMask;
 

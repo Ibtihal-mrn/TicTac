@@ -5,16 +5,15 @@
 
 
 // int Kp = 1;
-int leftMotorBias = 0;
-int rightMotorBias = 0;  // TODO should be imported from motors.h
+int leftMotorBias = 0;    // (optionnal) hardcoded motor bias
+int rightMotorBias = 0;
 
-
-// --------- TUNING (démarre avec ça) ----------
-static const int PWM_MAX = 255;
+// --------- Tuning Constants ---------
 static const int PWM_MIN = 40;      // PWM mini qui fait bouger 
+static const int PWM_MAX = 255;
 static const int RAMP_STEP = 6;     // PWM par cycle (si dt=10ms => ~300 PWM/s)
 
-static const float K_HEADING = 0.03;  // gain cap (ticks -> "ticks/s" de correction)
+static const float HEADING_KP = 0.03;  // gain cap (ticks -> "ticks/s" de correction)
 
 static const float KP_VEL_L = 0.25;
 static const float KI_VEL_L = 1.20;
@@ -22,11 +21,11 @@ static const float KI_VEL_L = 1.20;
 static const float KP_VEL_R = 0.25;
 static const float KI_VEL_R = 1.20;
 
-static const float I_CLAMP = 300.0;
+static const float I_CLAMP = 300.0;    // integral limit (anti-windup)
 
 // La droite est ~0.15% plus "rapide" en ticks -> on la réduit un peu
-static const float VEL_TRIM_L = 1.0000f;
-static const float VEL_TRIM_R = 0.9985f;  // = 1 / 1.0015 environ
+static const float VEL_SCALE_L = 1.0000f;
+static const float VEL_SCALE_R = 0.9985f;  // = 1 / 1.0015 environ
 
 
 // facteur grossier pour convertir PWM -> vitesse cible (ticks/s)
@@ -62,7 +61,7 @@ void control_driveStraight_PI(
   float vR = dR / dt;
 
   // ---- boucle CAP : correction basée sur erreur cumulée ----
-  float headingCorr = K_HEADING * (float)headingErrTicks;  // en "ticks/s"
+  float headingCorr = HEADING_KP * (float)headingErrTicks;  // en "ticks/s"
 
   // ---- vitesse cible base ----
   float vBase = st.pwmBase * PWM_TO_TICKS_PER_SEC;
@@ -70,8 +69,8 @@ void control_driveStraight_PI(
   float vL_ref = vBase - headingCorr;
   float vR_ref = vBase + headingCorr;
 
-  vL_ref *= VEL_TRIM_L;
-  vR_ref *= VEL_TRIM_R;
+  vL_ref *= VEL_SCALE_L;
+  vR_ref *= VEL_SCALE_R;
 
   // ---- PI vitesse gauche ----
   float eL = vL_ref - vL;

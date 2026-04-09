@@ -2,6 +2,7 @@
 #include <Arduino.h>
 
 enum class Team { TEAM_YELLOW = 0, TEAM_BLUE = 1 };
+
 enum class Robot {
 	INIT,
 	IDLE,
@@ -14,6 +15,17 @@ enum class Robot {
 	EMERGENCY_STOP,
 };
 
+static const char* const stateList[] = { // for debug prints ..
+    "INIT",
+    "IDLE",
+    "DISPATCH_CMD",
+    "EXEC_MOVE",
+    "EXEC_ROTATE",
+    "TASK",
+    "TUNE_PID",
+    "TIMER_END",
+    "EMERGENCY_STOP"
+};
 struct Context {
     Team currentTeam;
 	Robot currentAction;
@@ -29,26 +41,14 @@ struct Context {
 
 
 
+// Fsm
+void robot_init();
+void hardware_init(Context &ctx);
+void robot_step(Context &ctx);
 
-// New
-void driveDistancePID(float distance_mm, int speed);
-void rotateAnglePID(float angle_deg, int speed);
+
 
 // Avec US
 void driveForward(float mm, int speed);
 void driveBackward(float mm, int speed);
 void rotate(float angle, int speed);
-
-// Freinage
-void brakeForwardMotion(int initialSpeed);
-
-// ------------------- LEGACY -------------------------------------
-void robot_init();
-
-void robot_move_distance(float dist_mm, int speed);
-void robot_rotate(float angle_deg, int speed);
-void robot_rotate_gyro(float target_deg, int pwmMax);
-
-void robot_step();
-
-void newPIDTestForward(float mm, int speed);
