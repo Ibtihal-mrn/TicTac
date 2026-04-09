@@ -52,8 +52,8 @@ private:
 
     static constexpr int PWM_MIN = 40;
     static constexpr int PWM_MAX = 255;
-    static constexpr float DONE_DISTANCE_MM = 2.0f;
-    static constexpr float DONE_ANGLE_DEG = 2.0f;
+    static constexpr float DONE_DISTANCE_MM = 10.0f;    // linear precision
+    static constexpr float DONE_ANGLE_DEG = 5.0f;       // angle  precision
     static constexpr float DONE_RATE_DPS = 8.0f;
     static constexpr float INTEGRAL_CLAMP = 300.0f;
     static constexpr unsigned long STABLE_MS = 120;
