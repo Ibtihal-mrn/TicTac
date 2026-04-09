@@ -1,5 +1,6 @@
 #include "encoders.h"
 #include "BLEBridge.h"
+#include "Debug.h"
 
 volatile long ticksL = 0;
 volatile long ticksR = 0;
@@ -51,7 +52,7 @@ void encoders_computeDelta(long left, long right, long *dL, long *dR) {
 // ------ Debug ------
 void printEncodersVal() {
   static unsigned long millis_print = 0;
-  if(millis() - millis_print >= 2000) { 
+  if(millis() - millis_print >= 1000) { 
     long left, right;
     encoders_read(&left, &right);
     bleSerial.print("Encoders: L=");

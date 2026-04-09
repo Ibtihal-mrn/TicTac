@@ -42,3 +42,12 @@ Todo :
 - freeRtos
 - Commands Queue
 
+
+
+
+## TODO:
+
+- US Health Routine.
+- add freinage to stop.
+
+

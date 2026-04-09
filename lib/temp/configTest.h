@@ -8,19 +8,22 @@
 
 
 
+// ========= Constants ===========
+#define MATCH_DURATION_MS 50000
+
 
 // ================= ESP32_S3 pinout ====================
 // |  3V3                         | GND 
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
 // |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
-// |  4  – STOP pin               | 1   - Servo Left            
-// |  5  – SDA                    | 2   - Servo Right
+// |  4  – STOP_PIN               | 1   -             
+// |  5  – SDA                    | 2   -    
 // |  6  - SCL                    | 42  -
-// |  7  -                        | 41  - RelaySwitch
-// |  15 - Encoder                | 40  - Relay
-// |  16 - Encoder                | 39  - Team Switch
-// |  17 - Encoder                | 38  - Start Switch
+// |  7  -                        | 41  - 
+// |  15 - Encoder                | 40  -   
+// |  16 - Encoder                | 39  - 
+// |  17 - Encoder                | 38  -
 // --------------------------------------------------------
 // |  18 - Encoder                | 37  - / (NO) PSRAM
 // |  8  - TeamSwitch             | 36  - / (NO) PSRAM        
@@ -31,7 +34,7 @@
 // |  11 – Motor (IN2)            | 47  - / (NO) 1.8V logic
 // --------------------------------------------------------
 // |  12 - Motor (IN3)            | 21  - 
-// |  13 - Motor (IN4)            | 20  - / (NO) USB+
+// |  13 - Motor (IN4)            | 20  - / (NO) UsSB+
 // |  14 - Motor (ENB)            | 19  - / (NO) USB+
 
 // ======= NEVER USE =========
@@ -52,30 +55,26 @@
 #define PSRAM_UART_RX 50  // NOT viable for standard UART communication 
 
 
-// ==========================================
-//              PINOUT
-// ==========================================
-
-#define MATCH_DURATION_MS 50000
-
-// ==================== I2C ====================
+// =======================
+//          PINOUT
+// =======================
+// --- I2C ----
 #define STOP_PIN    4
-#define SDA_PIN     5      // WhiteTrig  (4)
-#define SCL_PIN     6     // Yellow
+#define SDA_PIN     5
+#define SCL_PIN     6
+
+// ------- ACTUATORS PINS -------
+#define LAUNCH_TRIGGER_PIN 1 // TODO: not used here, impl in main.cpp startSwitch !
+#define TEAM_SWITCH_PIN 8
+// #define EBTN_PIN 48     //TODO: remove ?
 
 
-// =================== ACTUATORS PINS ====================
-#define LAUNCH_TRIGGER_PIN 38     // TODO: not used here, impl in main.cpp startSwitch !
-#define TEAM_SWITCH_PIN    39
-// #define EBTN_PIN           48    //TODO: remove, changed to Hardware Switch
+// ------- STEPPER -------
+#define SERVO_RIGHT 42 // need PMW pin
+#define SERVO_LEFT  41
 
-
-// ==================== STEPPER ====================
-#define SERVO_LEFT  1 // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
-#define SERVO_RIGHT 2
-
-
-// ==================== MOTORS ====================
+// ------- MOTORS -------
+/* Power pins : out1, out2, out3, out4 (respectivement M1+, M1-, M2+, M2- sur le driver)*/
 #define ENA 14 // ordre pins : enA, 1, 2, 3, 4, enB
 #define IN1 13
 #define IN2 12 // LEFT MOTOR : IN1, IN2, ENA (marron, gris, bleu)
@@ -83,25 +82,24 @@
 #define IN4 10
 #define ENB 9 // RIGHT MOTOR : IN3, IN4, ENB (rouge, jaune, purple)
 
-// Power pins : out1, out2, out3, out4 (respectivement M1+, M1-, M2+, M2- sur le driver)
-
-// ==================== ENCODERS ====================
-#define ENC_R_A 15 // Pinout : Red (M+), Black (M-), Encoder_A = Yellow, Encoder_B = White, Blue (3.3VCC), Green (GND)
-#define ENC_R_B 16
-
-#define ENC_L_A 17 // Motor 2
-#define ENC_L_B 18
+// ------- ENCODERS -------
+#define ENC_L_A 15 // Pinout : Red (M+), Black (M-), Encoder_A = Yellow, Encoder_B = White, Blue (3.3VCC), Green (GND)
+#define ENC_L_B 16
+#define ENC_R_A 17 // Motor 2
+#define ENC_R_B 18
 
 
-
-// ==================== Electro Aimant ====================
-#define RELAY_PIN 40
-#define SWITCH_PIN 41
+// ------- Electro Aimant -------
+#define RELAY_PIN  38
+#define SWITCH_PIN 48
 
 
 
-// ==================== ROTATION ====================
+// ===================== IMU =====================
+// #define IMU_GYRO_Z_SIGN 1.0f // Mets -1.0f si le robot corrige dans le mauvais sens (rotation divergente)
+
+// ===================== ROTATION =====================
 // Calibration angulaire : si 90° demandé donne 82° mesuré, mets 90/82 = 1.10f
-#define ROTATE_TARGET_SCALE 1.13f
-#define ROTATE_KP 2.2f
-#define ROTATE_KD 0.25f
+// #define ROTATE_TARGET_SCALE 1.13f
+// #define ROTATE_KP 2.2f
+// #define ROTATE_KD 0.25f

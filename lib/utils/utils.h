@@ -1,6 +1,6 @@
 
 
-
+void imAlive();
 
 void i2c_scanner();
 
