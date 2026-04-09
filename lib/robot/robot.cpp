@@ -8,7 +8,7 @@
 #include "imu.h"
 
 #include "control.h"
-#include "kinematics.h"
+// #include "kinematics.h"
 
 //
 #include "utils.h"

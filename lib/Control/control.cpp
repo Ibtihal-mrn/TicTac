@@ -1,26 +1,12 @@
 #include "control.h"
-#include "../motors/motors.h"   // pour baseSpeed, Kp, trimL, trimR
-
-int Kp = 1;
-int trimL = 0;
-int trimR = 0;  // TODO should be imported from motors.h
+// #include "../motors/motors.h"   // pour baseSpeed, Kp, trimL, trimR
 
 
-void control_computeSpeeds(long dL, long dR, int &speedL, int &speedR) {
-  // erreur basée sur la vitesse, PAS la position totale
-  long error = dL - dR;
 
-  
-  int correction = error * Kp;
 
-  // limite la correction pour éviter les crashs
-  correction = constrain(correction, -60, 60);
-
-  // speedL = constrain(baseSpeed - correction + trimL, 0, 255);
-  // speedR = constrain(baseSpeed + correction + trimR, 0, 255);
-  speedL = 0;
-  speedR = 0;
-}
+// int Kp = 1;
+int leftMotorBias = 0;
+int rightMotorBias = 0;  // TODO should be imported from motors.h
 
 
 // --------- TUNING (démarre avec ça) ----------
@@ -100,8 +86,8 @@ void control_driveStraight_PI(
   float uR = KP_VEL_R * eR + KI_VEL_R * st.iR;
 
   // ---- PWM final : base + PI + trim ----
-  pwmL = (int)(st.pwmBase + uL + trimL);
-  pwmR = (int)(st.pwmBase + uR + trimR);
+  pwmL = (int)(st.pwmBase + uL + leftMotorBias);
+  pwmR = (int)(st.pwmBase + uR + rightMotorBias);
 
   pwmL = constrain(pwmL, 0, PWM_MAX);
   pwmR = constrain(pwmR, 0, PWM_MAX);

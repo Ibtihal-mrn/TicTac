@@ -105,3 +105,13 @@
 #define ROTATE_TARGET_SCALE 1.13f
 #define ROTATE_KP 2.2f
 #define ROTATE_KD 0.25f
+
+
+// =================== WHEELS =======================
+#define WHEELDIAMM    60.62f     // rayon 3cm -> diamètre 6cm = 60mm
+#define TRACKWIDTHMM  213.0f   // entraxe 21.3cm = 213mm
+#define TICKSPERREV   2292      // 1 tour de roue = 2292 ticks (mesuré)
+
+
+
+
