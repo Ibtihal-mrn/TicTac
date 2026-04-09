@@ -8,6 +8,7 @@
  * Communication inter-cœurs :
  *   cmdQueue (FreeRTOS queue) : commandes BLE → FSM
  *   logQueue (dans BLEBridge) : logs FSM → BLE notify → PC
+ * 
  */
 
 #include <Arduino.h>
