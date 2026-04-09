@@ -45,7 +45,7 @@ static const float VEL_TRIM_R = 0.9985f;  // = 1 / 1.0015 environ
 
 // facteur grossier pour convertir PWM -> vitesse cible (ticks/s)
 // tu pourras le recalibrer ensuite
-static const float PWM_TO_TICKS_PER_SEC = 8.0;
+static const float PWM_TO_TICKS_PER_SEC = 20.0;
 
 // --------------------------------------------
 

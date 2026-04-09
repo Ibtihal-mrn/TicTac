@@ -8,84 +8,96 @@
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
 // |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
-// |  4  – US Front Trig  (1)     | 1   - US Back Trig  (4)
-// |  5  – US Front Trig  (1)     | 2   - US Back Trig  (4)
-// |  6  - US Front Echo  (1)     | 42  - US Back Echo  (4)
-// |  7  - US Front Trig  (2)     | 41  - US Back Trig  (5)
-// |  15 - US Front Echo  (2)     | 40  - US Back Echo  (5)
-// |  16 - US Front Trig  (3)     | 39  - US Back Trig  (6)
-// |  17 - US Front Echo  (3)     | 38  - US Back Echo  (6)
+// |  4  – US Front Trig  (1)     | 1   - US Back Trig  (7)
+// |  5  – US Front Echo  (1)     | 2   - US Back Trig  (7)
+// |  6  - US Front Echo  (2)     | 42  - US Back Echo  (8)
+// |  7  - US Front Trig  (2)     | 41  - US Back Trig  (8)
+// |  15 - US Front Echo  (3)     | 40  - US Back Echo  (9)
+// |  16 - US Front Trig  (3)     | 39  - US Back Trig  (9)
+// |  17 - US Front Echo  (4)     | 38  - US Back Trig  (10)
 // --------------------------------------------------------
-// |  18 - US Left Trig   (7)     | 37  - / (NO) PSRAM
-// |  8  - US Left Echo   (7)     | 36  - / (NO) PSRAM        
+// |  18 - US Left Trig   (4)     | 37  - / (NO) PSRAM
+// |  8  - US Left Echo   (5)     | 36  - / (NO) PSRAM        
 // |  3  - / (NO) STRAP           | 35  - / (NO) PSRAM
 // |  46 - / (NO) STRAP           | 0   - / (NO) BOOT
-// |  9  - US Left Trig   (8)     | 45  - / (NO) STRAP
-// |  10 - US Left Echo   (8)     | 48  - / (NO) 1.8V logic
-// |  11 - US Back Trig   (9)     | 47  - / (NO) 1.8V logic
+// |  9  - US Left Trig   (5)     | 45  - / (NO) STRAP
+// |  10 - US Left Echo   (6)     | 48  - / (NO) 1.8V logic
+// |  11 - US Back Trig   (6)     | 47  - / (NO) 1.8V logic
 // ----------------------------------------------------------
-// |  12 - STOP_PIN               | 21  - US Back Echo  (9) 
-// |  13 - RX                     | 20  - / (NO) USB+
-// |  14 - TX                     | 19  - / (NO) USB+
+// |  12 - STOP_PIN               | 21  - US Back Echo  (10) 
+// |  13 - SCL                    | 20  - / (NO) USB+
+// |  14 - SDA                     | 19  - / (NO) USB+
+
 // ~ around 23 free pins for general use
 // 10 US sensors (20pins) + UART and stop pin
 
 // RUN CMD
+//
 // robot_master :
-//          >> pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
-//          >> pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
+//      ACM0
+//          >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
+//      ACM1
+//          >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
+//      ACM2
+//          >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+//          >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM2
+//
 // Sensor_hub : 
-//          >> pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
-//          >> pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
+//      ACM0
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM0
+//      ACM1
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
+//      ACM2
+//          >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+//          >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM2
 
 
 
+//! TEST : 
+//!        FRONT | US1 (8 , 9 ) | US2 (1, 2)    | US3 (4, 5) | 
+//!        RIGHT | US4 (6 , 7 ) | US5 (15, 16)  |
+//!        BACK  | US6 (/, /)   | US7 (/, /)    | US8 (/, /) | 
+//!        LEFT  | US9 (40, 39) | US10 (42, 41) | 
 
 
 // I2C
-#define STOP_PIN_HUB    4
-#define SDA_PIN_HUB     5
-#define SCL_PIN_HUB     6
+#define STOP_PIN_HUB    12
+#define SCL_PIN_HUB     13
+#define SDA_PIN_HUB     14
+
 
 #define US_TIMEOUT 20000UL
 extern uint8_t US_OBSTACLE_THRESHOLD_CM;
 extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hysteresis
-#define STOP_HOLD_MS    150   // small debounce
+#define STOP_HOLD_MS        150   // sensor-level debounce
+#define STOP_CLEAR_HOLD_MS  800  // hub-level stop release hold
 
 
 // ==================
-//       FRONTs
+//       FRONT
 // ==================
-#define US_F1_TRIG 13     // Left
-#define US_F1_ECHO 14
+#define US_F1_TRIG 8     // Left
+#define US_F1_ECHO 9
 
-#define US_F2_TRIG 7     // Middle
-#define US_F2_ECHO 15
+#define US_F2_TRIG  1    // Middle
+#define US_F2_ECHO  2
 
-#define US_F3_TRIG 16    // Rigth
-#define US_F3_ECHO 17
-
-
-// ==================
-//       LEFT
-// ==================
-#define US_L1_TRIG      // Left
-#define US_L1_ECHO 
-#define US_L2_TRIG      // Middle
-#define US_L2_ECHO 
-#define US_L3_TRIG      // Rigth
-#define US_L3_ECHO 
+#define US_F3_TRIG  4    // Rigth
+#define US_F3_ECHO  5
 
 // ==================
 //        RIGHT
 // ==================
-#define US_R1_TRIG      // Left
-#define US_R1_ECHO 
-#define US_R2_TRIG      // Middle
-#define US_R2_ECHO 
-#define US_R3_TRIG      // Rigth
-#define US_R3_ECHO
-
+#define US_R1_TRIG  6    // Left
+#define US_R1_ECHO  7
+#define US_R2_TRIG  15   // Middle
+#define US_R2_ECHO  16
+// #define US_R3_TRIG      // Rigth
+// #define US_R3_ECHO
 
 // ==========
 //   BACK
@@ -96,6 +108,20 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define US_B2_ECHO
 #define US_B3_TRIG   // Rigth
 #define US_B3_ECHO
+
+
+// ==================
+//       LEFT
+// ==================
+#define US_L1_TRIG  40     // Left
+#define US_L1_ECHO  39
+#define US_L2_TRIG  42  // Middle
+#define US_L2_ECHO  41
+// #define US_L3_TRIG      // Rigth
+// #define US_L3_ECHO 
+
+
+
 
 
 

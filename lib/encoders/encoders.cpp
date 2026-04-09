@@ -1,5 +1,6 @@
 #include "encoders.h"
 #include "BLEBridge.h"
+#include "Debug.h"
 
 volatile long ticksL = 0;
 volatile long ticksR = 0;
