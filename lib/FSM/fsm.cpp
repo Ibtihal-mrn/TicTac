@@ -76,26 +76,19 @@ void rotate(float angle, int speed) {
 
 
 // -------- helpers ----------
-const char* robotStateToString(Robot state)
+const char* commandTypeToString(CommandType type)
 {
-    static const char* const stateList[] = {
-        "INIT",
-        "IDLE",
-        "DISPATCH_CMD",
-        "EXEC_MOVE",
-        "EXEC_ROTATE",
-        "TASK",
-        "TUNE_PID",
-        "TIMER_END",
-        "EMERGENCY_STOP"
-    };
-
-    const int index = static_cast<int>(state);
-    if (index < 0 || index >= (int)(sizeof(stateList) / sizeof(stateList[0]))) {
-        return "UNKNOWN";
+    switch (type) {
+        case CommandType::MoveForward:   return "MoveForward";
+        case CommandType::MoveBackward:   return "MoveBackward";
+        case CommandType::Rotate:         return "Rotate";
+        case CommandType::Wait:           return "Wait";
+        case CommandType::Stop:           return "Stop";
+        case CommandType::ClearQueue:     return "ClearQueue";
+        case CommandType::SetDistancePID: return "SetDistancePID";
+        case CommandType::SetAnglePID:    return "SetAnglePID";
+        default:                          return "Unknown";
     }
-
-    return stateList[index];
 }
 
 
@@ -105,15 +98,17 @@ void robot_step(Context &ctx)
     if (emergencyStop) {
         // motion.abort();
         // emergencyStop = false;
-        // ctx.currentAction = Robot::EMERGENCY_STOP;
+        ctx.currentAction = Robot::EMERGENCY_STOP;
     }
+
+    // BLE Stop & Updates
 
     #if DBG_FSM
         static unsigned long Lpwm = 0;
         if (millis() - Lpwm >= 2000){
-            Serial.print("state="); Serial.print(robotStateToString(ctx.currentAction));
-            Serial.print(" busy="); Serial.print(motion.isBusy());
-            Serial.print(" stop="); Serial.println(emergencyStop);
+            // Serial.print("state="); Serial.print(commandTypeToString(ctx.currentAction));
+            // Serial.print(" busy="); Serial.print(motion.isBusy());
+            // Serial.print(" stop="); Serial.println(emergencyStop);
             Lpwm = millis();
         }
     #endif
@@ -121,27 +116,100 @@ void robot_step(Context &ctx)
     switch (ctx.currentAction)
     {   
         case Robot::INIT:
-            // robot_init();  CALLED IN SETUP()
-            
-            // ctx.commandQueue.push({RobotCommandType::TUNE_PID, (float)TUNE_BOTH});
-            debugPrintf(DBG_FSM, "FSM -> IDLE");
-            driveForward(1000, 100);
-            // ctx.currentAction = Robot::IDLE;
-            ctx.currentAction = Robot::EXEC_MOVE;
+
+            // MOVE COMMANDS
+            // ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 400.0f, 100, 0});
+            ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
+            ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
+            ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
+            // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 400.0f, 100, 100});
+
+            ctx.currentAction = Robot::WAIT_START;
             break;
 
-        case Robot::IDLE:
+        case Robot::WAIT_START:
             // ADD LaunchTrigger HERE
             // start 100sec timer
             // startMatchTimer(ctx);
             // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
-            // ctx.currentAction = Robot::DISPATCH_CMD;
+            ctx.currentAction = Robot::DISPATCH_CMD;
             break;
 
-        case Robot::EXEC_MOVE  :
-        case Robot::EXEC_ROTATE:
+
+        case Robot::DISPATCH_CMD:
+            // 1. Empty Queue
+            if (ctx.commandQueue.empty()) { break; }
+
+            // 2. Get next command
+            ctx.currentCommand = ctx.commandQueue.front();
+            ctx.commandQueue.pop();
+
+            #if DBG_FSM
+                Serial.print("[FSM] START ");
+                Serial.print(commandTypeToString(ctx.currentCommand.type));
+                Serial.print(" value=");
+                Serial.print(ctx.currentCommand.value);
+                Serial.print(" speed=");
+                Serial.print(ctx.currentCommand.speed);
+                Serial.print(" waitMs=");
+                Serial.println(ctx.currentCommand.waitMs);
+                Serial.print(" queue=");
+                Serial.println(ctx.commandQueue.size());
+            #endif
+
+            // 3. Dispatch to movement
+            switch (ctx.currentCommand.type) {
+                case  CommandType::MoveForward:
+                    driveForward(ctx.currentCommand.value, ctx.currentCommand.speed);
+                    ctx.currentAction = Robot::EXEC;
+                    break;
+
+                case CommandType::MoveBackward:
+                    driveBackward(ctx.currentCommand.value, ctx.currentCommand.speed);
+                    ctx.currentAction = Robot::EXEC;
+                    break;
+
+                case CommandType::Rotate:
+                    rotate(ctx.currentCommand.value, ctx.currentCommand.speed);
+                    ctx.currentAction = Robot::EXEC;
+                    break;
+                
+                case CommandType::Wait:
+                    // TODO add simple non-blocking wait timer here 
+                    motion.abort();
+                    ctx.waitEndMs = millis() + ctx.currentCommand.waitMs;
+                    ctx.currentAction = Robot::WAIT_CMD;
+                    break;
+
+                // case STEPPER_UP:
+
+                default: ctx.currentAction = Robot::DISPATCH_CMD; break;
+            }
+            break;
+
+
+
+        case Robot::IDLE:
+            break;
+
+        case Robot::EXEC:
             if (motion.update()) {
-                ctx.currentAction = Robot::IDLE;
+                #if DBG_FSM
+                    Serial.print("[FSM] END   ");
+                    Serial.println(commandTypeToString(ctx.currentCommand.type));
+                #endif
+                ctx.currentAction = Robot::DISPATCH_CMD;
+            }
+            break;
+
+
+        case Robot::WAIT_CMD:
+            if ((long)(millis() - ctx.waitEndMs) >= 0) {
+                #if DBG_FSM
+                    Serial.print("[FSM] END   ");
+                    Serial.println(commandTypeToString(ctx.currentCommand.type));
+                #endif
+                ctx.currentAction = ctx.commandQueue.empty() ? Robot::IDLE : Robot::DISPATCH_CMD;
             }
             break;
 
@@ -152,6 +220,13 @@ void robot_step(Context &ctx)
                 ctx.currentAction = Robot::IDLE;
             }
             break;
+
+        case Robot::TIMER_END:
+        {
+            motion.abort();
+            ctx.matchActive = false;
+            break;
+        }
 
         default:
             break;
