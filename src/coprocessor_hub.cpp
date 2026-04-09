@@ -81,21 +81,60 @@ void handleCommand() {
     }
 }
 
+
+// ====== DEBUG Prints =====
+const char* zoneName(uint8_t zone) {
+    switch (zone) {
+        case ZONE_FRONT: return "FRONT";
+        case ZONE_LEFT:  return "LEFT";
+        case ZONE_RIGHT: return "RIGHT";
+        case ZONE_BACK:  return "BACK";
+        default:         return "UNKNOWN";
+    }
+}
+
 void debugSensors(bool stopState) {
     static unsigned long lastPrint = 0;
+    const unsigned long PRINT_MS = 250;
 
-    if (millis() - lastPrint < 200) return; // 5 Hz
+    if (millis() - lastPrint < PRINT_MS) return;
     lastPrint = millis();
 
-    for (int i = 0; i < us_count(); i++) {
-        Serial.print("S"); Serial.print(i);
-        // Serial.print(" Z:"); Serial.print(us_getZone(i));
-        Serial.print(" D:"); Serial.print(us_getDistance(i));
-        Serial.print(" | ");
+    Serial.println();
+    Serial.println(F("========== US HUB =========="));
+    Serial.print(F("STOP: "));
+    Serial.println(stopState ? F("TRIGGERED") : F("CLEAR"));
+
+    const uint8_t zones[] = {ZONE_FRONT, ZONE_LEFT, ZONE_RIGHT, ZONE_BACK};
+
+    for (uint8_t z = 0; z < 4; z++) {
+        uint8_t zone = zones[z];
+        Serial.print(F("["));
+        Serial.print(zoneName(zone));
+        Serial.println(F("]"));
+
+        bool found = false;
+
+        for (int i = 0; i < us_count(); i++) {
+            if (us_getZone(i) != zone) continue;
+
+            found = true;
+            Serial.print(F("  S"));
+            Serial.print(i);
+            Serial.print(F("  dist="));
+            Serial.print(us_getDistance(i));
+            Serial.print(F(" cm  obstacle="));
+            Serial.print(sensors[i].obstacle ? F("1") : F("0"));
+            Serial.print(F("  enabled="));
+            Serial.println(sensors[i].enabled ? F("1") : F("0"));
+        }
+
+        if (!found) {
+            Serial.println(F("  <no sensor>"));
+        }
     }
-    Serial.print("STOP:");
-    Serial.print(stopState ? "1" : "0");
-    Serial.println("");
+
+    Serial.println(F("============================"));
 }
 
 
@@ -176,6 +215,27 @@ bool debounceStopPin(bool rawStop){
     return stopLatched;
 }
 
+void setupUS(){
+    // FRONT
+    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
+    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+
+    // RIGHT
+    us_add(ZONE_RIGHT, US_R1_TRIG, US_R1_ECHO);
+    us_add(ZONE_RIGHT, US_R2_TRIG, US_R2_ECHO);
+
+    // LEFT
+    us_add(ZONE_LEFT, US_L1_TRIG, US_L1_ECHO);
+    us_add(ZONE_LEFT, US_L2_TRIG, US_L2_ECHO);
+
+    // BACK
+    // us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
+    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+
+}
+
 // ================== 
 //      SETUP 
 // ==================
@@ -190,10 +250,10 @@ void setup() {
     // Emergency pin setup
     pinMode(STOP_PIN_HUB, OUTPUT); // emergency stop pin (defined in config_coprocessor.h)
 
-    // Add here all the Ultrasonic sensors
-    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+    // -----
+    setupUS();
+
+
 
     us_setZones(enabled_zones); // apply initial config
 

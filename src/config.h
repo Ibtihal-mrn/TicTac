@@ -14,13 +14,13 @@
 // |  3V3                         | TX  - Reserved for PSRAM (DO NOT USE)
 // |  RST                         | RX  - Reserved for PSRAM (DO NOT USE)
 // --------------------------------------------------------
-// |  4  – STOP pin               | 1   -             
-// |  5  – SDA                    | 2   -    
+// |  4  – STOP pin               | 1   - Servo Left            
+// |  5  – SDA                    | 2   - Servo Right
 // |  6  - SCL                    | 42  -
-// |  7  -                        | 41  - 
-// |  15 - Encoder                | 40  -   
-// |  16 - Encoder                | 39  - 
-// |  17 - Encoder                | 38  -
+// |  7  -                        | 41  - RelaySwitch
+// |  15 - Encoder                | 40  - Relay
+// |  16 - Encoder                | 39  - Team Switch
+// |  17 - Encoder                | 38  - Start Switch
 // --------------------------------------------------------
 // |  18 - Encoder                | 37  - / (NO) PSRAM
 // |  8  - TeamSwitch             | 36  - / (NO) PSRAM        
@@ -65,14 +65,14 @@
 
 
 // =================== ACTUATORS PINS ====================
-#define LAUNCH_TRIGGER_PIN 1     // TODO: not used here, impl in main.cpp startSwitch !
-#define TEAM_SWITCH_PIN    8
+#define LAUNCH_TRIGGER_PIN 38     // TODO: not used here, impl in main.cpp startSwitch !
+#define TEAM_SWITCH_PIN    39
 // #define EBTN_PIN           48    //TODO: remove, changed to Hardware Switch
 
 
 // ==================== STEPPER ====================
-#define SERVO_RIGHT 42 // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
-#define SERVO_LEFT  41
+#define SERVO_LEFT  1 // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
+#define SERVO_RIGHT 2
 
 
 // ==================== MOTORS ====================
@@ -86,16 +86,17 @@
 // Power pins : out1, out2, out3, out4 (respectivement M1+, M1-, M2+, M2- sur le driver)
 
 // ==================== ENCODERS ====================
-#define ENC_L_A 15 // Pinout : Red (M+), Black (M-), Encoder_A = Yellow, Encoder_B = White, Blue (3.3VCC), Green (GND)
-#define ENC_L_B 16
-#define ENC_R_A 17 // Motor 2
-#define ENC_R_B 18
+#define ENC_R_A 15 // Pinout : Red (M+), Black (M-), Encoder_A = Yellow, Encoder_B = White, Blue (3.3VCC), Green (GND)
+#define ENC_R_B 16
+
+#define ENC_L_A 17 // Motor 2
+#define ENC_L_B 18
 
 
 
 // ==================== Electro Aimant ====================
-#define RELAY_PIN 38
-#define SWITCH_PIN 48
+#define RELAY_PIN 40
+#define SWITCH_PIN 41
 
 
 

@@ -34,7 +34,13 @@ struct Context {
 void driveDistancePID(float distance_mm, int speed);
 void rotateAnglePID(float angle_deg, int speed);
 
+// Avec US
+void driveForward(float mm, int speed);
+void driveBackward(float mm, int speed);
+void rotate(float angle, int speed);
 
+// Freinage
+void brakeForwardMotion(int initialSpeed);
 
 // ------------------- LEGACY -------------------------------------
 void robot_init();

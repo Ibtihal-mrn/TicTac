@@ -48,16 +48,69 @@ void robot_init()
 
 
 // ======= PID MOVEMENT =========
-
-void driveFroward(float mm, int speed){
+void driveForward(float mm, int speed){
   setZones(ZONE_FRONT);
   driveDistancePID(mm, speed);
 }
 
 void driveBackward(float mm, int speed){
   setZones(ZONE_BACK);
-  driveDistancePID(mm, speed);
+  driveDistancePID(-mm, speed);
 }
+
+void rotate(float angle, int speed){
+  // if (angle > 0) setZones(ZONE_RIGHT);
+  // else setZones(ZONE_LEFT);
+  setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
+  rotateAnglePID(angle, speed);
+}
+
+// FREINAGE
+void brakeForwardMotion(int initialSpeed)
+{
+    const uint16_t BRAKE_DT_MS = 10;
+    const uint32_t BRAKE_TIMEOUT_MS = 300;
+    const int MIN_BRAKE_PWM = 40;
+
+    unsigned long start = millis();
+    unsigned long tPrev = micros();
+
+    while (millis() - start < BRAKE_TIMEOUT_MS)
+    {
+        if (digitalRead(STOP_PIN) == LOW) break;
+
+        long curL, curR;
+        encoders_read(&curL, &curR);
+
+        // Estimate speed from encoder change here if you want
+        // or just use a small fixed reverse PWM
+        int brakePwm = MIN_BRAKE_PWM;
+
+        motors.applyMotorOutputs(-brakePwm, -brakePwm);
+
+        // Debug Prints
+      unsigned long lp6 = 0;
+      printMillis(DBG_MOTORS, "Emergency Button !\n", millis(), lp6, 1000);
+      #if DBG_MOTORS
+        static unsigned long LastPrint = 0;
+        if (millis() - LastPrint >= 1000){
+          SensorPacket p = getData();
+          Serial.print(F("Danger flags: ")); Serial.println(p.danger_flags);
+          Serial.print(F("Front: ")); Serial.print(p.front_mm);
+          Serial.print(F(" mm, Left: ")); Serial.print(p.left_mm);
+          Serial.print(F(" mm, Right: ")); Serial.print(p.right_mm);
+          Serial.print(F(" mm, Back: ")); Serial.print(p.back_mm);
+          LastPrint = millis();
+        }
+      #endif
+
+
+        delay(BRAKE_DT_MS);
+    }
+
+    motors.stopMotors();
+}
+
 
 
 
@@ -96,28 +149,13 @@ void driveDistancePID(float distance_mm, int speed)
     // ========== STOP MOTOR CONDITIONS ============
     if (emergencyStop)
     {
-      motors.stopMotors();
-
-      // Debug Prints
-      unsigned long lp6 = 0;
-      printMillis(DBG_MOTORS, "Emergency Button !\n", millis(), lp6, 1000);
-      #if DBG_MOTORS
-        static unsigned long LastPrint = 0;
-        if (millis() - LastPrint >= 1000){
-          SensorPacket p = getData();
-          Serial.print(F("Danger flags: ")); Serial.println(p.danger_flags);
-          Serial.print(F("Front: ")); Serial.print(p.front_mm);
-          Serial.print(F(" mm, Left: ")); Serial.print(p.left_mm);
-          Serial.print(F(" mm, Right: ")); Serial.print(p.right_mm);
-          Serial.print(F(" mm, Back: ")); Serial.print(p.back_mm);
-          LastPrint = millis();
-        }
-      #endif
+      brakeForwardMotion(speed);
+      // motors.stopMotors();
 
       // Yield
       while (digitalRead(STOP_PIN) == HIGH) { yield(); }
 
-      // Obstacle Cleared
+      // ======== Obstacle Cleared ===========
       emergencyStop = false;
 
       // Reset PID values after interruption
@@ -309,7 +347,6 @@ void rotateAnglePID(float angle_deg, int speed)
   motors.stopMotors();
   debugPrintf(DBG_MOTORS, "Target Angle reached\n");
 }
-
 
 
 

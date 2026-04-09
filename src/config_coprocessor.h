@@ -57,7 +57,11 @@
 
 
 
-//! TEST : | US1 (8, 9) | US2 (1, 2) | US3 (4, 5) | 
+//! TEST : 
+//!        FRONT | US1 (8 , 9 ) | US2 (1, 2)    | US3 (4, 5) | 
+//!        RIGHT | US4 (6 , 7 ) | US5 (15, 16)  |
+//!        BACK  | US6 (/, /)   | US7 (/, /)    | US8 (/, /) | 
+//!        LEFT  | US9 (40, 39) | US10 (42, 41) | 
 
 
 // I2C
@@ -86,25 +90,14 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define US_F3_ECHO  5
 
 // ==================
-//       LEFT
-// ==================
-#define US_L1_TRIG      // Left
-#define US_L1_ECHO 
-#define US_L2_TRIG      // Middle
-#define US_L2_ECHO 
-#define US_L3_TRIG      // Rigth
-#define US_L3_ECHO 
-
-// ==================
 //        RIGHT
 // ==================
-#define US_R1_TRIG      // Left
-#define US_R1_ECHO 
-#define US_R2_TRIG      // Middle
-#define US_R2_ECHO 
-#define US_R3_TRIG      // Rigth
-#define US_R3_ECHO
-
+#define US_R1_TRIG  6    // Left
+#define US_R1_ECHO  7
+#define US_R2_TRIG  15   // Middle
+#define US_R2_ECHO  16
+// #define US_R3_TRIG      // Rigth
+// #define US_R3_ECHO
 
 // ==========
 //   BACK
@@ -115,6 +108,20 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define US_B2_ECHO
 #define US_B3_TRIG   // Rigth
 #define US_B3_ECHO
+
+
+// ==================
+//       LEFT
+// ==================
+#define US_L1_TRIG  40     // Left
+#define US_L1_ECHO  39
+#define US_L2_TRIG  42  // Middle
+#define US_L2_ECHO  41
+// #define US_L3_TRIG      // Rigth
+// #define US_L3_ECHO 
+
+
+
 
 
 
