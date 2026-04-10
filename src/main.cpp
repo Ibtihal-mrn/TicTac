@@ -23,7 +23,6 @@
 #include "bras.h"
 #include "Relais.h"
 #include "encoders.h"
-#include "ultrasonic_function.h"
 #include "StartSwitch.h"
 #include "TeamSwitch.h"
 #include "motors.h"
@@ -150,14 +149,5 @@ void loop() {
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
-// ------ helpers ------
-void imAlive()
-{
-  static unsigned long millis_print = 0;
-  if (millis() - millis_print >= 2000)
-  {
-    bleSerial.println("I'm alive");
-    millis_print = millis();
-  }
-}
+
 

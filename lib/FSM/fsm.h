@@ -1,5 +1,7 @@
 #pragma once
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 // #include <queue>
 
 enum class Team { TEAM_YELLOW = 0, TEAM_BLUE = 1 };
@@ -28,7 +30,7 @@ static const char* const stateList[] = {
     "IDLE",
     "DISPATCH_CMD",
     "EXEC",
-    "WAIT_CMD",
+    "EXEC_WAIT",
     "EMERGENCY_STOP",
     "TIMER_END"
 };

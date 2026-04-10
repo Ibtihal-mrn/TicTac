@@ -107,7 +107,6 @@
 #define ROTATE_KP 2.2f
 #define ROTATE_KD 0.25f
 
-<<<<<<< HEAD
 
 // =================== WHEELS =======================
 #define WHEELDIAMM    68.44f     // perimetre=21.5cm donc p=2*pi*r <=> r = p/2pi et D=70.03mm
@@ -125,10 +124,3 @@
 #define FSM_TASK_STACK  4096
 #define BLE_TASK_PRIO   1
 #define FSM_TASK_PRIO   2    // FSM légèrement plus prioritaire
-=======
-// ==================== Ultrasonic (single sensor, main robot) ====================
-#define US_MAIN_TIMEOUT 20000UL
-#define US_TRIG_PIN 1  // US Left :  2, 42, 41, 40, 39, 38
-#define US_ECHO_PIN 2
-#define US_MAIN_OBSTACLE_THRESHOLD_CM 30
->>>>>>> BLE

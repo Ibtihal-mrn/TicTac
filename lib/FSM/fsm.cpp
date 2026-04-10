@@ -18,7 +18,6 @@
 // I2C sensors
 #include "i2c_comm.h"
 
-#include "pid.h"
 
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
@@ -27,7 +26,7 @@ static PIDController motion(motors);
 
 
 
-// TODO: add match timer init
+
 void hardware_init(Context &ctx)
 {
     // To be called in setup() in main.cpp
@@ -67,6 +66,7 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
     // Context
     ctx.currentAction = Robot::INIT;
     ctx.currentTeam = Team::TEAM_YELLOW;
+    // TOD: add match timer init
     // Init Match Timer
     // ctx.matchActive = false;
     // ctx.matchDurationMs = MATCH_DURATION_MS;
@@ -77,18 +77,15 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
 }
 
 
-// TODO: remove old legacy code
-// ---- US obstacle ------
+// ---- US obstacle movement -------
 void driveForward(float mm, int speed) {
     setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
     motion.startLinear(mm, speed);
 }
-
 void driveBackward(float mm, int speed) {
     setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
     motion.startLinear(-mm, speed);
 }
-
 void rotate(float angle, int speed) {
     setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
     motion.startRotate(angle, speed);
@@ -97,17 +94,16 @@ void rotate(float angle, int speed) {
 
 
 // ------- ROUTINES ----------
-
 void testRotation(Context &ctx){
     debugEnable(DBG_IMU);
     // clear queue
-    ctx.commandQueue = std::queue<RobotCommand>(); 
-    Serial.println("[TEST] rotation sequence start");
+    // ctx.commandQueue = std::queue<RobotCommand>(); 
+    // Serial.println("[TEST] rotation sequence start");
 
 
-    ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
-    ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
 
     // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
     // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
@@ -115,25 +111,21 @@ void testRotation(Context &ctx){
 
 
     Serial.print("[TEST] queued=");
-    Serial.println(ctx.commandQueue.size());
+    // Serial.println(ctx.commandQueue.size());
 }
-
-
 void testLinearMotion(Context &ctx){
-    ctx.commandQueue = std::queue<RobotCommand>();
-    Serial.println("[TEST] linear sequence start");
+    // ctx.commandQueue = std::queue<RobotCommand>();
+    // Serial.println("[TEST] linear sequence start");
 
-    debugEnable(DBG_ENCODER);
+    // debugEnable(DBG_ENCODER);
 
-    ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 2000.0f, 100, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 2000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 1000.0f, 100, 0});
+    // ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 2000.0f, 100, 0});
+    // // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 2000});
+    // // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 1000.0f, 100, 0});
 
-    Serial.print("[TEST] queued=");
-    Serial.println(ctx.commandQueue.size());
+    // Serial.print("[TEST] queued=");
+    // Serial.println(ctx.commandQueue.size());
 }
-
-
 void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
     RobotCommand cmd;
     cmd.type = CommandType::Rotate;
@@ -159,13 +151,14 @@ const char* commandTypeToString(CommandType type)
         case CommandType::MoveBackward:   return "MoveBackward";
         case CommandType::Rotate:         return "Rotate";
         case CommandType::Wait:           return "Wait";
-        case CommandType::Stop:           return "Stop";
+        case CommandType::DeployServo:    return "DeployServo";
+        case CommandType::RetractServo:   return "RetractServo";
+        case CommandType::Ping:           return "Ping";
         case CommandType::ClearQueue:     return "ClearQueue";
-        case CommandType::SetDistancePID: return "SetDistancePID";
-        case CommandType::SetAnglePID:    return "SetAnglePID";
         default:                          return "Unknown";
     }
 }
+
 
 void printCommand(const RobotCommand &cmd){
     Serial.print("[CMD] ");
@@ -204,7 +197,7 @@ void robot_step(Context &ctx)
     #endif
     // printIMUVal();
     // printIMUAngleTest();
-    printEncodersVal();
+    // printEncodersVal();
     
 
 
@@ -215,7 +208,7 @@ void robot_step(Context &ctx)
 
             // MOVE COMMANDS
             // testRotation(ctx);
-            testLinearMotion(ctx);
+            // testLinearMotion(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;
@@ -232,16 +225,16 @@ void robot_step(Context &ctx)
 
         case Robot::DISPATCH_CMD:
             // 1. Empty Queue
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+            if (!ctx.commandQueue) { break;}
 
             // 2. Get next command
-            // ctx.currentCommand = ctx.commandQueue.front();
-            // ctx.commandQueue.pop();
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+
 
             #if DBG_FSM
                 printCommand(ctx.currentCommand);
                 Serial.print(" queue=");
-                Serial.println(ctx.commandQueue.size());
+                Serial.println(ctx.commandQueue ? uxQueueMessagesWaiting(ctx.commandQueue) : 0);
             #endif
 
             // 3. Dispatch to movement
@@ -262,7 +255,6 @@ void robot_step(Context &ctx)
                     break;
                 
                 case CommandType::Wait:
-                    // TODO add simple non-blocking wait timer here 
                     motion.abort();
                     ctx.waitEndMs = millis() + ctx.currentCommand.waitMs;
                     ctx.currentAction = Robot::EXEC_WAIT;
@@ -296,8 +288,9 @@ void robot_step(Context &ctx)
                     Serial.print("[FSM] END   ");
                     Serial.println(commandTypeToString(ctx.currentCommand.type));
                 #endif
-                ctx.currentAction = ctx.commandQueue.empty() ? Robot::IDLE : Robot::DISPATCH_CMD;
-            }
+                ctx.currentAction = (ctx.commandQueue && uxQueueMessagesWaiting(ctx.commandQueue) > 0)
+                    ? Robot::DISPATCH_CMD
+                    : Robot::IDLE;            }
             break;
 
         case Robot::EMERGENCY_STOP:
