@@ -95,7 +95,7 @@ void rotate(float angle, int speed) {
 
 // ------- ROUTINES ----------
 void testRotation(Context &ctx){
-    debugEnable(DBG_IMU);
+    // debugEnable(DBG_IMU);
     // clear queue
     // ctx.commandQueue = std::queue<RobotCommand>(); 
     // Serial.println("[TEST] rotation sequence start");
@@ -179,7 +179,12 @@ void robot_step(Context &ctx)
     if (emergencyStop) {
         // motion.abort();
         // emergencyStop = false;
-        ctx.currentAction = Robot::EMERGENCY_STOP;
+        // ctx.currentAction = Robot::EMERGENCY_STOP;
+        static unsigned long Lpwm = 0;
+        if (millis() - Lpwm >= 2000){
+            bleSerial.println("EmergencyStop");
+            Lpwm = millis();
+        }
     }
 
     // BLE Stop & Updates
@@ -187,12 +192,15 @@ void robot_step(Context &ctx)
 
     // DBG
     #if DBG_FSM
-        static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){
-            // Serial.print("state="); Serial.print(commandTypeToString(ctx.currentAction));
-            // Serial.print(" busy="); Serial.print(motion.isBusy());
-            // Serial.print(" stop="); Serial.println(emergencyStop);
-            Lpwm = millis();
+        static unsigned long lastStatePrintMs = 0;
+        if (millis() - lastStatePrintMs >= 2000) {
+            Serial.print("[FSM] state=");
+            Serial.print(stateList[(int)ctx.currentAction]);
+            Serial.print(" stop=");
+            Serial.print(emergencyStop);
+            Serial.print(" busy=");
+            Serial.println(motion.isBusy());
+            lastStatePrintMs = millis();
         }
     #endif
     // printIMUVal();

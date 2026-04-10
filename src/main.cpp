@@ -103,7 +103,7 @@ void setup() {
     debugInit(115200,
           DBG_FSM |
           DBG_I2C_HUB |
-          DBG_PID |
+        //   DBG_PID |
           // DBG_MOTORS |
           // DBG_SENSORS |
           // DEBUG_TEAM_SWITCH |
@@ -111,7 +111,7 @@ void setup() {
           // DBG_ENCODER |
           // DBG_MAGNET
           // DBG_COMMS |  
-          DBG_IMU |
+        //   DBG_IMU |
           DBG_ENCODER 
           // DBG_LAUNCH_TGR       
           // comment to deactivate its related prints

@@ -15,6 +15,9 @@
 BLEBridge bleBridge;
 BleSerial bleSerial;
 
+static constexpr int DEFAULT_MOVE_SPEED = 80;
+static constexpr int DEFAULT_ROTATE_SPEED = 80;
+
 // ── Forward declaration ──────────────────────────────────────────────────────
 static void onRxWrite(NimBLECharacteristic* pChar);
 
@@ -181,12 +184,15 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
     if (strcmp(upper, "FORWARD") == 0 || strcmp(upper, "MOVE_FORWARD") == 0) {
         cmd.type = CommandType::MoveForward;
         cmd.value = param;
+        cmd.speed = DEFAULT_MOVE_SPEED;
     } else if (strcmp(upper, "BACKWARD") == 0 || strcmp(upper, "MOVE_BACKWARD") == 0) {
         cmd.type = CommandType::MoveBackward;
         cmd.value = param;
+        cmd.speed = DEFAULT_MOVE_SPEED;
     } else if (strcmp(upper, "ROTATE") == 0) {
         cmd.type = CommandType::Rotate;
         cmd.value = param;
+        cmd.speed = DEFAULT_ROTATE_SPEED;
     } else if (strcmp(upper, "WAIT") == 0) {
         cmd.type = CommandType::Wait;
         cmd.waitMs = (unsigned long)param;
