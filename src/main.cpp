@@ -56,9 +56,6 @@ void IRAM_ATTR stopISR() { emergencyStop = digitalRead(STOP_PIN); }
 // bool lastSwitchState = HIGH;   // INPUT_PULLUP
 // bool sequenceDone = false;     // Pour éviter répétition
 
-// ── Contexte FSM (utilisé uniquement par Core 1) ────────────────────────────
-static FsmContext fsmCtx;
-
 
 
 void bleTask(void* pvParameters) {
@@ -88,11 +85,12 @@ void fsmTask(void* pvParameters) {
     bleSerial.println("[FSM_TASK] Started on Core 1");
 
     // Initialiser la FSM avec la queue de commandes du BLEBridge
-    fsm_init(fsmCtx, bleBridge.getCommandQueue());
+    // fsm_init(fsmCtx, bleBridge.getCommandQueue()); //TODO: getCommandQueue?
+    // hardware_init(ctx);
 
     for (;;) {
         // Un pas de la FSM
-        fsm_step(fsmCtx);
+        robot_step(fsmCtx);
 
         // Petit yield pour ne pas affamer le watchdog
         // Note: fsm_step() contient déjà des vTaskDelay dans certains états
@@ -100,6 +98,8 @@ void fsmTask(void* pvParameters) {
     }
 }
 
+
+// ------------------
 void setup() {
     debugInit(115200,
           DBG_FSM |
@@ -145,8 +145,6 @@ void setup() {
   xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
   xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);                 
 }
-
-
 
 void loop() {
     vTaskDelay(pdMS_TO_TICKS(1000));
