@@ -133,6 +133,12 @@ bool PIDController::update() {
         linearCmd = constrain(linearCmd, -maxPwm_, maxPwm_);
         angularCmd = constrain(angularCmd, -maxPwm_, maxPwm_);
 
+        if (fabs(distanceError) > DONE_DISTANCE_MM) {
+            if (fabs(linearCmd) > 0.01f && fabs(linearCmd) < PWM_MIN) {
+                linearCmd = copysign(PWM_MIN, linearCmd);
+            }
+        }
+
         const float leftCmd = linearCmd - angularCmd;
         const float rightCmd = linearCmd + angularCmd;
 
@@ -175,50 +181,50 @@ bool PIDController::update() {
         return false;
     }
 
-        if (mode_ == Mode::Rotate) {
-        const float angleError = targetAngleDeg_ - headingDeg_;
-    
-        float turnCmd = updatePID_(anglePid_, angleError, dt);
-        turnCmd = constrain(turnCmd, -maxPwm_, maxPwm_);
-    
-        if (fabs(angleError) > DONE_ANGLE_DEG) {
-            if (fabs(turnCmd) > 0.01f && fabs(turnCmd) < PWM_MIN) {
-                turnCmd = copysign(PWM_MIN, turnCmd);
-            }
+    if (mode_ == Mode::Rotate) {
+    const float angleError = targetAngleDeg_ - headingDeg_;
+
+    float turnCmd = updatePID_(anglePid_, angleError, dt);
+    turnCmd = constrain(turnCmd, -maxPwm_, maxPwm_);
+
+    if (fabs(angleError) > DONE_ANGLE_DEG) {
+        if (fabs(turnCmd) > 0.01f && fabs(turnCmd) < PWM_MIN) {
+            turnCmd = copysign(PWM_MIN, turnCmd);
         }
-    
-        #if DBG_PID
-            static unsigned long lastPidPrintMs = 0;
-            if (millis() - lastPidPrintMs >= 500) {
-                Serial.print("[PID ROT] ");
-                Serial.print("dt="); Serial.print(dt, 3);
-                Serial.print(" lt="); Serial.print(leftTicks);
-                Serial.print(" rt="); Serial.print(rightTicks);
-                Serial.print(" dL="); Serial.print(deltaLeft);
-                Serial.print(" dR="); Serial.print(deltaRight);
-                Serial.print(" head="); Serial.print(headingDeg_, 2);
-                Serial.print(" angErr="); Serial.print(angleError, 2);
-                Serial.print(" gyro="); Serial.print(gyroRateDps, 2);
-                Serial.print(" turnCmd="); Serial.println(turnCmd, 2);
-                lastPidPrintMs = millis();
-            }
-        #endif
-    
-        motors_.applyMotorOutputs(-turnCmd, turnCmd);
-    
-        if (fabs(angleError) <= DONE_ANGLE_DEG && fabs(gyroRateDps) <= DONE_RATE_DPS) {
-            if (stableSinceMs_ == 0) stableSinceMs_ = millis();
-            if (millis() - stableSinceMs_ >= STABLE_MS) {
-                stopMotors_();
-                mode_ = Mode::Idle;
-                return true;
-            }
-        } else {
-            stableSinceMs_ = 0;
-        }
-    
-        return false;
     }
+
+    #if DBG_PID
+        static unsigned long lastPidPrintMs = 0;
+        if (millis() - lastPidPrintMs >= 500) {
+            Serial.print("[PID ROT] ");
+            Serial.print("dt="); Serial.print(dt, 3);
+            Serial.print(" lt="); Serial.print(leftTicks);
+            Serial.print(" rt="); Serial.print(rightTicks);
+            Serial.print(" dL="); Serial.print(deltaLeft);
+            Serial.print(" dR="); Serial.print(deltaRight);
+            Serial.print(" head="); Serial.print(headingDeg_, 2);
+            Serial.print(" angErr="); Serial.print(angleError, 2);
+            Serial.print(" gyro="); Serial.print(gyroRateDps, 2);
+            Serial.print(" turnCmd="); Serial.println(turnCmd, 2);
+            lastPidPrintMs = millis();
+        }
+    #endif
+
+    motors_.applyMotorOutputs(-turnCmd, turnCmd);
+
+    if (fabs(angleError) <= DONE_ANGLE_DEG && fabs(gyroRateDps) <= DONE_RATE_DPS) {
+        if (stableSinceMs_ == 0) stableSinceMs_ = millis();
+        if (millis() - stableSinceMs_ >= STABLE_MS) {
+            stopMotors_();
+            mode_ = Mode::Idle;
+            return true;
+        }
+    } else {
+        stableSinceMs_ = 0;
+    }
+
+    return false;
+}
 
     return true;
 }
