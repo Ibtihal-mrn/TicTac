@@ -16,15 +16,28 @@ extern volatile long ticksR;
 extern long prevL;
 extern long prevR;
 
-void encoders_init(void);
-void encoders_read(long *left, long *right);
-void encoders_computeDelta(long left, long right, long *dL, long *dR);
+void encoders_init();
+void encoders_reset();
+
+void encoders_read(long *leftTicks, long *rightTicks);
+void encoders_computeDelta(long leftTicks, long rightTicks, long *leftDelta, long *rightdelta);
 
 // ISR doivent être visibles pour attachInterrupt
 void ISR_left(void);
 void ISR_right(void);
 
-// Debug
-void printEncodersVal();
+void printEncodersVal();  // Debug
+
+// ------ geometry --------
+extern float wheelDiameterMm;
+extern float trackWidthMm;
+extern long ticksPerRevolution;
+
+float mm_per_tick();
+long ticks_for_distance_mm(float distanceMm);
+long ticks_for_rotation_deg(float angleDeg);
+
+
+
 
 #endif

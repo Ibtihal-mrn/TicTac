@@ -105,3 +105,21 @@
 #define ROTATE_TARGET_SCALE 1.13f
 #define ROTATE_KP 2.2f
 #define ROTATE_KD 0.25f
+
+
+// =================== WHEELS =======================
+#define WHEELDIAMM    68.44f     // perimetre=21.5cm donc p=2*pi*r <=> r = p/2pi et D=70.03mm
+#define TRACKWIDTHMM  200.0f   // entraxe (centre roue gauche a centre roue droite) = 20cm
+#define TICKSPERREV   3447 
+
+// ticks : 
+//      test1 : 200cm goal but actual 133cm (Encoders: L=21403 R=21242)
+//      avg = 21322.5 (L+R/2)
+//      ticksperrev = avg*wheelPerimeter/dist = 21322.5*215/1330 = 34 468.7
+
+
+// ================== FreeRTOS ====================
+#define BLE_TASK_STACK  4096
+#define FSM_TASK_STACK  4096
+#define BLE_TASK_PRIO   1
+#define FSM_TASK_PRIO   2    // FSM légèrement plus prioritaire

@@ -1,6 +1,7 @@
 #include "encoders.h"
 #include "BLEBridge.h"
 #include "Debug.h"
+#include "config.h"
 
 volatile long ticksL = 0;
 volatile long ticksR = 0;
@@ -8,20 +9,39 @@ volatile long ticksR = 0;
 long prevL = 0;
 long prevR = 0;
 
+
+float wheelDiameterMm = WHEELDIAMM;
+float trackWidthMm = TRACKWIDTHMM;
+long ticksPerRevolution = TICKSPERREV;
+
+static constexpr int LEFT_ENCODER_DIRECTION = +1;
+static constexpr int RIGHT_ENCODER_DIRECTION = +1;
+
 // ---------- INTERRUPTIONS ----------
-void ISR_left(void) {
+void IRAM_ATTR ISR_left(void) {
   bool A = digitalRead(ENC_L_A);
   bool B = digitalRead(ENC_L_B);
   if (A == B) ticksL++;
   else ticksL--;
 }
 
-void ISR_right(void) {
+void IRAM_ATTR ISR_right(void) {
   bool A = digitalRead(ENC_R_A);
   bool B = digitalRead(ENC_R_B);
   if (A == B) ticksR--;
   else ticksR++;
 }
+
+void encoders_reset() {
+    noInterrupts();
+    ticksL = 0;
+    ticksR = 0;
+    interrupts();
+
+    prevL = 0;
+    prevR = 0;
+}
+
 
 void encoders_init(void) {
   pinMode(ENC_L_A, INPUT_PULLUP);
@@ -31,6 +51,8 @@ void encoders_init(void) {
 
   attachInterrupt(digitalPinToInterrupt(ENC_L_A), ISR_left, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENC_R_A), ISR_right, CHANGE);
+
+  encoders_reset();
 }
 
 void encoders_read(long *left, long *right) {
@@ -51,8 +73,8 @@ void encoders_computeDelta(long left, long right, long *dL, long *dR) {
 
 // ------ Debug ------
 void printEncodersVal() {
-  static unsigned long millis_print = 0;
-  if(millis() - millis_print >= 1000) { 
+  static unsigned long lastPrintMs = 0;
+  if(millis() - lastPrintMs >= 1000) { 
     long left, right;
     encoders_read(&left, &right);
     bleSerial.print("Encoders: L=");
@@ -60,7 +82,35 @@ void printEncodersVal() {
     bleSerial.print(" R=");
     bleSerial.println(right);
 
-    millis_print = millis(); 
+    lastPrintMs = millis(); 
   }
 }
+
+
+// ------- Helpers --------
+float mm_per_tick() {
+    return (PI * wheelDiameterMm) / (float)ticksPerRevolution;
+}
+
+long ticks_for_distance_mm(float distanceMm) {
+    return lround(distanceMm / mm_per_tick());
+}
+
+long ticks_for_rotation_deg(float angleDeg) {
+    float arcMm = PI * trackWidthMm * (fabs(angleDeg) / 360.0f);
+    return ticks_for_distance_mm(arcMm);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
