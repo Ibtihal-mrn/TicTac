@@ -2,7 +2,14 @@
 #pragma once
 #include <Arduino.h>
 #include <Wire.h>
-#include "us.h"
+
+// ===== ZONES (shared between master and sensor hub) =====
+enum Zone {
+    ZONE_FRONT  = 1 << 0,
+    ZONE_LEFT   = 1 << 1,
+    ZONE_RIGHT  = 1 << 2,
+    ZONE_BACK   = 1 << 3
+};
 
 // Note :
 //      robot_master : SDA - 6 , SCL - 7 

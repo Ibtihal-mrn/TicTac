@@ -3,11 +3,12 @@
  *
  * Architecture dual-core ESP32 + FreeRTOS :
  *   Core 0 : tâche BLE (advertising, notifications logs, réception commandes)
- *   Core 1 : tâche FSM (machine à états du robot)
+ *   Core 1 : tâche FSM (machine à états du robot) et I2C (IMU, Sensor Hub)
  *
  * Communication inter-cœurs :
  *   cmdQueue (FreeRTOS queue) : commandes BLE → FSM
  *   logQueue (dans BLEBridge) : logs FSM → BLE notify → PC
+ * 
  */
 
 // main.cpp
@@ -71,7 +72,7 @@ void bleTask(void* pvParameters) {
         if (millis() - lastHeartbeat >= 5000) {
             char hb[64];
             snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus",
-                     bleBridge.isConnected(), millis() / 1000);
+                      bleBridge.isConnected(), millis() / 1000);
             bleSerial.println(hb);
             lastHeartbeat = millis();
         }

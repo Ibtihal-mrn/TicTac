@@ -3,18 +3,11 @@
 #include <Arduino.h>
 #include <Ultrasonic.h>
 #include "../../src/config_coprocessor.h"
+#include "i2c_comm.h"  // Zone enum
 
 // ====== CONFIG =======
 #define MAX_SENSORS 10
 #define US_DELAY = 30
-
-// ===== ZONES =====
-enum Zone {
-    ZONE_FRONT  = 1 << 0,
-    ZONE_LEFT   = 1 << 1,
-    ZONE_RIGHT  = 1 << 2,
-    ZONE_BACK   = 1 << 3
-};
 
 // ===== SENSOR STRUCT =====
 struct Sensor {

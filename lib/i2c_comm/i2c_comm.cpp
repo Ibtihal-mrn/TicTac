@@ -106,6 +106,7 @@ bool setThresholds(uint8_t obst_thr, uint8_t clear_thr) {
 
 SensorPacket getData() {
     SensorPacket p;
+    memset(&p, 0, sizeof(p));  // zero-init to avoid garbage if I2C fails
 
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_GET_DATA);

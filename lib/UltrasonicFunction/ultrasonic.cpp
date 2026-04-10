@@ -8,9 +8,9 @@
 // static int PIN_TRIG = US_TRIG_PIN;
 // static int PIN_ECHO = US_ECHO_PIN;
 
-Ultrasonic us(US_TRIG_PIN, US_ECHO_PIN, US_TIMEOUT);
+Ultrasonic us(US_TRIG_PIN, US_ECHO_PIN, US_MAIN_TIMEOUT);
 
-int obstcle_threshold_cm = US_OBSTACLE_THRESHOLD_CM;  // configurable dans config.h
+int obstcle_threshold_cm = US_MAIN_OBSTACLE_THRESHOLD_CM;  // configurable dans config.h
 
 // Public
 bool ultrasonic_isObstacle() {

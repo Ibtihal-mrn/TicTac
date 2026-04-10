@@ -62,12 +62,13 @@
 #define STOP_PIN    4
 #define SDA_PIN     5      // WhiteTrig  (4)
 #define SCL_PIN     6     // Yellow
-
+#define I2C_FREQ    100000
 
 // =================== ACTUATORS PINS ====================
 #define LAUNCH_TRIGGER_PIN 38     // TODO: not used here, impl in main.cpp startSwitch !
 #define TEAM_SWITCH_PIN    39
 // #define EBTN_PIN           48    //TODO: remove, changed to Hardware Switch
+#define EBTN_PIN           STOP_PIN  // Emergency button now shares STOP_PIN (hardware switch)
 
 
 // ==================== STEPPER ====================
@@ -106,6 +107,7 @@
 #define ROTATE_KP 2.2f
 #define ROTATE_KD 0.25f
 
+<<<<<<< HEAD
 
 // =================== WHEELS =======================
 #define WHEELDIAMM    68.44f     // perimetre=21.5cm donc p=2*pi*r <=> r = p/2pi et D=70.03mm
@@ -123,3 +125,10 @@
 #define FSM_TASK_STACK  4096
 #define BLE_TASK_PRIO   1
 #define FSM_TASK_PRIO   2    // FSM légèrement plus prioritaire
+=======
+// ==================== Ultrasonic (single sensor, main robot) ====================
+#define US_MAIN_TIMEOUT 20000UL
+#define US_TRIG_PIN 1  // US Left :  2, 42, 41, 40, 39, 38
+#define US_ECHO_PIN 2
+#define US_MAIN_OBSTACLE_THRESHOLD_CM 30
+>>>>>>> BLE

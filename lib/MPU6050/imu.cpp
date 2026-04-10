@@ -1,7 +1,11 @@
 #include "imu.h"
 #include <Wire.h>
 #include "../../src/config.h"
+<<<<<<< HEAD
 #include "Debug.h"
+=======
+#include "../../src/globals.h"  // i2cMutex
+>>>>>>> BLE
 
 static const uint8_t MPU_ADDR = 0x68;
 
@@ -26,23 +30,32 @@ static float gyroZ_bias_dps = 0.0f;
 // ------- R/W ----------
 static bool writeReg(uint8_t reg, uint8_t val)
 {
+  if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(reg);
   Wire.write(val);
-  return (Wire.endTransmission() == 0);
+  bool ok = (Wire.endTransmission() == 0);
+  if (i2cMutex) xSemaphoreGive(i2cMutex);
+  return ok;
 }
 
 static bool readBytes(uint8_t reg, uint8_t *buf, uint8_t len)
 {
+  if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(reg);
-  if (Wire.endTransmission(false) != 0)
-    return false; // repeated start
-  uint8_t n = Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)len, true);
-  if (n != len)
+  if (Wire.endTransmission(false) != 0) {
+    if (i2cMutex) xSemaphoreGive(i2cMutex);
     return false;
+  }
+  uint8_t n = Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)len, true);
+  if (n != len) {
+    if (i2cMutex) xSemaphoreGive(i2cMutex);
+    return false;
+  }
   for (uint8_t i = 0; i < len; i++)
     buf[i] = Wire.read();
+  if (i2cMutex) xSemaphoreGive(i2cMutex);
   return true;
 }
 

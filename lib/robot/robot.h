@@ -20,13 +20,13 @@
 
 #include "motors.h"
 #include "encoders.h"
-#include "ultrasonic_function.h"
 #include "EmergencyButton.h"
 #include "imu.h"
 
 #include "control.h"
 #include "kinematics.h"
 #include "safety.h"
+#include "bras.h"
 
 #include "utils.h"
 #include "Debug.h"
@@ -42,6 +42,8 @@ enum class FsmState : uint8_t {
     EXEC_ROTATE_LEFT,
     EXEC_ROTATE_RIGHT,
     EXEC_STOP,
+    EXEC_MOVE_SERVO,
+    EXEC_RETRACT_SERVO,
     EMERGENCY_STOP,
 };
 
@@ -64,6 +66,7 @@ void fsm_step(FsmContext& ctx);
 
 /// Obtenir le nom textuel d'un état
 const char* fsm_state_name(FsmState state);
+<<<<<<< HEAD
 // New
 void driveDistancePID(float distance_mm, int speed);
 void rotateAnglePID(float angle_deg, int speed);
@@ -86,3 +89,5 @@ void robot_rotate_gyro(float target_deg, int pwmMax);
 void robot_step();
 
 void newPIDTestForward(float mm, int speed);
+=======
+>>>>>>> BLE
