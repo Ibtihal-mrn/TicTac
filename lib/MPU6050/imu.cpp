@@ -1,6 +1,7 @@
 #include "imu.h"
 #include <Wire.h>
 #include "../../src/config.h"
+#include "Debug.h"
 
 static const uint8_t MPU_ADDR = 0x68;
 
@@ -20,6 +21,9 @@ static float gyroZ_bias_dps = 0.0f;
 #define IMU_GYRO_Z_SIGN 1.0f
 #endif
 
+
+
+// ------- R/W ----------
 static bool writeReg(uint8_t reg, uint8_t val)
 {
   Wire.beginTransmission(MPU_ADDR);
@@ -42,30 +46,29 @@ static bool readBytes(uint8_t reg, uint8_t *buf, uint8_t len)
   return true;
 }
 
+
+
+
+// ---------- API --------
 bool imu_init()
 {
-  // Wire.begin();
-
   // Réveil
-  if (!writeReg(REG_PWR_MGMT_1, 0x00))
-    return false;
+  if (!writeReg(REG_PWR_MGMT_1, 0x00)) return false;
   delay(50);
 
   // Filtre passe-bas (DLPF). 3 ~ 44Hz (souvent bien pour robot)
-  if (!writeReg(REG_CONFIG, 0x03))
-    return false;
+  if (!writeReg(REG_CONFIG, 0x03)) return false;
 
   // Sample rate divider (optionnel). Avec DLPF actif, base 1kHz -> /9 => 100Hz
-  if (!writeReg(REG_SMPLRT_DIV, 9))
-    return false;
+  if (!writeReg(REG_SMPLRT_DIV, 9)) return false;
 
   // Gyro ±250°/s
-  if (!writeReg(REG_GYRO_CONFIG, 0x00))
-    return false;
+  if (!writeReg(REG_GYRO_CONFIG, 0x00)) return false;
 
   // Accel (pas indispensable ici). Laisse par défaut ±2g
-  if (!writeReg(REG_ACCEL_CONFIG, 0x00))
-    return false;
+  if (!writeReg(REG_ACCEL_CONFIG, 0x00)) return false;
+
+  debugPrintf(DBG_IMU, "[IMU] init ok");
 
   return true;
 }
@@ -85,27 +88,85 @@ bool imu_calibrate(uint16_t samples, uint16_t delay_ms)
       float dps = raw / GYRO_SENS_250;
       sum += dps;
       ok++;
+
+      if (i < 5) {
+        debugPrintf(DBG_IMU, "[IMU] cal raw=%d dps=%.3f", raw, dps);
+      }
     }
     delay(delay_ms);
   }
 
-  if (ok < samples / 2)
+  if (ok < samples / 2) {
+    debugPrintf(DBG_IMU, "[IMU] calibration failed ok=%u/%u", ok, samples);
     return false;
+  }
 
   gyroZ_bias_dps = sum / ok;
+  debugPrintf(DBG_IMU, "[IMU] bias=%.4f dps", gyroZ_bias_dps);
   return true;
 }
 
 float imu_readGyroZ_dps()
 {
   uint8_t b[2];
-  if (!readBytes(REG_GYRO_ZOUT_H, b, 2))
+  if (!readBytes(REG_GYRO_ZOUT_H, b, 2)) {
+    debugPrintf(DBG_IMU, "[IMU] read failed");
     return 0.0f;
+  }
 
   int16_t raw = (int16_t)((b[0] << 8) | b[1]);
   float dps = raw / GYRO_SENS_250;
-  return (dps - gyroZ_bias_dps) * IMU_GYRO_Z_SIGN;
+  float corrected = (dps - gyroZ_bias_dps) * IMU_GYRO_Z_SIGN;
+
+  #if DBG_IMU
+    static unsigned long lastImuPrintMs = 0;
+    if (millis() - lastImuPrintMs >= 250) {
+      Serial.print("[IMU] raw=");
+      Serial.print(raw);
+      Serial.print(" dps=");
+      Serial.print(dps, 3);
+      Serial.print(" bias=");
+      Serial.print(gyroZ_bias_dps, 3);
+      Serial.print(" out=");
+      Serial.println(corrected, 3);
+      lastImuPrintMs = millis();
+    }
+  #endif
+
+  return corrected;
 }
 
+
+// ------ Debug Prints -------
+void printIMUVal() {
+    static unsigned long lastPrintMs = 0;
+    if (millis() - lastPrintMs >= 1000) {
+        float gyroZ = imu_readGyroZ_dps();
+        Serial.print("IMU: gyroZ=");
+        Serial.println(gyroZ, 4);
+        lastPrintMs = millis();
+    }
+}
+
+void printIMUAngleTest() {
+    static unsigned long lastUs = micros();
+    static float angleDeg = 0.0f;
+    static unsigned long lastPrintMs = 0;
+
+    unsigned long nowUs = micros();
+    float dt = (nowUs - lastUs) / 1000000.0f;
+    lastUs = nowUs;
+
+    float gyroZ = imu_readGyroZ_dps();
+    angleDeg += gyroZ * dt;
+
+    if (millis() - lastPrintMs >= 100) {
+        Serial.print("[IMU ANGLE] rate=");
+        Serial.print(gyroZ, 3);
+        Serial.print(" dps angle=");
+        Serial.println(angleDeg, 2);
+        lastPrintMs = millis();
+    }
+}
 
 

@@ -57,6 +57,8 @@ void hardware_init(Context &ctx)
     ctx.currentTeam = Team::TEAM_YELLOW;
 }
 
+
+// TODO: remove old legacy code
 // ---- US obstacle ------
 void driveForward(float mm, int speed) {
     setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
@@ -72,6 +74,48 @@ void rotate(float angle, int speed) {
     setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
     motion.startRotate(angle, speed);
 }
+
+
+
+// ------- ROUTINES ----------
+
+void testRotation(Context &ctx){
+    debugEnable(DBG_IMU);
+    // clear queue
+    ctx.commandQueue = std::queue<RobotCommand>(); 
+    Serial.println("[TEST] rotation sequence start");
+
+
+    ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
+    ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
+    ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
+
+    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
+
+
+    Serial.print("[TEST] queued=");
+    Serial.println(ctx.commandQueue.size());
+}
+
+
+void testLinearMotion(Context &ctx){
+    ctx.commandQueue = std::queue<RobotCommand>();
+    Serial.println("[TEST] linear sequence start");
+
+    debugEnable(DBG_ENCODER);
+
+    ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 2000.0f, 100, 0});
+    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 2000});
+    // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 1000.0f, 100, 0});
+
+    Serial.print("[TEST] queued=");
+    Serial.println(ctx.commandQueue.size());
+}
+
+
+// t1 : 2000 but actual 133 (Encoders: L=21403 R=21242)
 
 
 
@@ -91,6 +135,18 @@ const char* commandTypeToString(CommandType type)
     }
 }
 
+void printCommand(const RobotCommand &cmd){
+    Serial.print("[CMD] ");
+    Serial.print(commandTypeToString(cmd.type));
+    Serial.print(" value=");
+    Serial.print(cmd.value, 2);
+    Serial.print(" speed=");
+    Serial.print(cmd.speed);
+    Serial.print(" waitMs=");
+    Serial.println(cmd.waitMs);
+}
+
+
 
 // ========== FSM ============
 void robot_step(Context &ctx)
@@ -103,6 +159,8 @@ void robot_step(Context &ctx)
 
     // BLE Stop & Updates
 
+
+    // DBG
     #if DBG_FSM
         static unsigned long Lpwm = 0;
         if (millis() - Lpwm >= 2000){
@@ -112,17 +170,21 @@ void robot_step(Context &ctx)
             Lpwm = millis();
         }
     #endif
+    // printIMUVal();
+    // printIMUAngleTest();
+    printEncodersVal();
+    
 
+
+    // ===================================================
     switch (ctx.currentAction)
     {   
         case Robot::INIT:
 
             // MOVE COMMANDS
-            // ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 400.0f, 100, 0});
-            ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
-            ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-            ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
-            // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 400.0f, 100, 100});
+            // testRotation(ctx);
+            testLinearMotion(ctx);
+
 
             ctx.currentAction = Robot::WAIT_START;
             break;
@@ -145,14 +207,7 @@ void robot_step(Context &ctx)
             ctx.commandQueue.pop();
 
             #if DBG_FSM
-                Serial.print("[FSM] START ");
-                Serial.print(commandTypeToString(ctx.currentCommand.type));
-                Serial.print(" value=");
-                Serial.print(ctx.currentCommand.value);
-                Serial.print(" speed=");
-                Serial.print(ctx.currentCommand.speed);
-                Serial.print(" waitMs=");
-                Serial.println(ctx.currentCommand.waitMs);
+                printCommand(ctx.currentCommand);
                 Serial.print(" queue=");
                 Serial.println(ctx.commandQueue.size());
             #endif

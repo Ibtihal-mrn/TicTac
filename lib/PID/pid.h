@@ -36,6 +36,22 @@ public:
     bool isBusy() const;
     Mode mode() const;
 
+    static void printLinearDebug( float dt,
+        long leftTicks,
+        long rightTicks,
+        long deltaLeft,
+        long deltaRight,
+        float targetDistanceMm,
+        float traveledDistanceMm,
+        float distanceError,
+        float headingDeg,
+        float headingError,
+        float linearCmd,
+        float angularCmd,
+        float leftCmd,
+        float rightCmd,
+        int maxPwm);
+
 private:
     Motors& motors_;
     PID distancePid_;

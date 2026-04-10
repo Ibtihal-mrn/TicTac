@@ -3,7 +3,7 @@
 #include <math.h>
 
 const PID DISTANCE_PID_DEFAULT(0.6f, 0.0f, 0.2f);
-const PID ANGLE_PID_DEFAULT   (2.0f, 0.0f, 0.3f);
+const PID ANGLE_PID_DEFAULT(1.1f, 0.0f, 0.20f);
 
 PIDController::PIDController(Motors& motors)
     : motors_(motors),
@@ -38,6 +38,7 @@ void PIDController::resetState() {
 
     encoders_reset();
 }
+
 
 
 // ===== Start Movement =========
@@ -136,24 +137,27 @@ bool PIDController::update() {
         const float rightCmd = linearCmd + angularCmd;
 
         #if DBG_PID
-            static unsigned long lastPidPrintMs = 0;
-            if (millis() - lastPidPrintMs >= 500) {
-                Serial.print("[PID LIN] ");
-                Serial.print("dt="); Serial.print(dt, 3);
-                Serial.print(" lt="); Serial.print(leftTicks);
-                Serial.print(" rt="); Serial.print(rightTicks);
-                Serial.print(" dL="); Serial.print(deltaLeft);
-                Serial.print(" dR="); Serial.print(deltaRight);
-                Serial.print(" dist="); Serial.print(traveledDistanceMm_, 2);
-                Serial.print(" distErr="); Serial.print(distanceError, 2);
-                Serial.print(" head="); Serial.print(headingDeg_, 2);
-                Serial.print(" headErr="); Serial.print(headingError, 2);
-                Serial.print(" linCmd="); Serial.print(linearCmd, 2);
-                Serial.print(" angCmd="); Serial.print(angularCmd, 2);
-                Serial.print(" Lcmd="); Serial.print(leftCmd, 2);
-                Serial.print(" Rcmd="); Serial.println(rightCmd, 2);
-                lastPidPrintMs = millis();
-            }
+        static unsigned long lastPidPrintMs = 0;
+        if (millis() - lastPidPrintMs >= 500) {
+            printLinearDebug(
+                dt,
+                leftTicks,
+                rightTicks,
+                deltaLeft,
+                deltaRight,
+                targetDistanceMm_,
+                traveledDistanceMm_,
+                distanceError,
+                headingDeg_,
+                headingError,
+                linearCmd,
+                angularCmd,
+                leftCmd,
+                rightCmd,
+                maxPwm_
+            );
+            lastPidPrintMs = millis();
+        }
         #endif
         motors_.applyMotorOutputs(leftCmd, rightCmd);
 
@@ -171,11 +175,18 @@ bool PIDController::update() {
         return false;
     }
 
-    if (mode_ == Mode::Rotate) {
+        if (mode_ == Mode::Rotate) {
         const float angleError = targetAngleDeg_ - headingDeg_;
-
+    
         float turnCmd = updatePID_(anglePid_, angleError, dt);
         turnCmd = constrain(turnCmd, -maxPwm_, maxPwm_);
+    
+        if (fabs(angleError) > DONE_ANGLE_DEG) {
+            if (fabs(turnCmd) > 0.01f && fabs(turnCmd) < PWM_MIN) {
+                turnCmd = copysign(PWM_MIN, turnCmd);
+            }
+        }
+    
         #if DBG_PID
             static unsigned long lastPidPrintMs = 0;
             if (millis() - lastPidPrintMs >= 500) {
@@ -192,8 +203,9 @@ bool PIDController::update() {
                 lastPidPrintMs = millis();
             }
         #endif
+    
         motors_.applyMotorOutputs(-turnCmd, turnCmd);
-
+    
         if (fabs(angleError) <= DONE_ANGLE_DEG && fabs(gyroRateDps) <= DONE_RATE_DPS) {
             if (stableSinceMs_ == 0) stableSinceMs_ = millis();
             if (millis() - stableSinceMs_ >= STABLE_MS) {
@@ -204,9 +216,59 @@ bool PIDController::update() {
         } else {
             stableSinceMs_ = 0;
         }
-
+    
         return false;
     }
 
     return true;
 }
+
+
+// ------ dbg prints ------
+void PIDController::printLinearDebug(
+    float dt,
+    long leftTicks,
+    long rightTicks,
+    long deltaLeft,
+    long deltaRight,
+    float targetDistanceMm,
+    float traveledDistanceMm,
+    float distanceError,
+    float headingDeg,
+    float headingError,
+    float linearCmd,
+    float angularCmd,
+    float leftCmd,
+    float rightCmd,
+    int maxPwm
+    ) {
+    Serial.print("[PID LIN] ");
+    Serial.print("dt="); Serial.print(dt, 3);
+    Serial.print(" lt="); Serial.print(leftTicks);
+    Serial.print(" rt="); Serial.print(rightTicks);
+    Serial.print(" dL="); Serial.print(deltaLeft);
+    Serial.print(" dR="); Serial.print(deltaRight);
+    Serial.print(" target="); Serial.print(targetDistanceMm, 2);
+    Serial.print(" dist="); Serial.print(traveledDistanceMm, 2);
+    Serial.print(" distErr="); Serial.print(distanceError, 2);
+    Serial.print(" head="); Serial.print(headingDeg, 2);
+    Serial.print(" headErr="); Serial.print(headingError, 2);
+    Serial.print(" linCmd="); Serial.print(linearCmd, 2);
+    Serial.print(" angCmd="); Serial.print(angularCmd, 2);
+    Serial.print(" Lcmd="); Serial.print(leftCmd, 2);
+    Serial.print(" Rcmd="); Serial.print(rightCmd, 2);
+    Serial.print(" maxPwm="); Serial.println(maxPwm);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//----end

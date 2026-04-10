@@ -56,6 +56,7 @@ void setup()
             // DBG_ENCODER |
             // DBG_MAGNET
             // DBG_COMMS |  
+            DBG_IMU |
             DBG_ENCODER 
             // DBG_LAUNCH_TGR       
             // comment to deactivate its related prints

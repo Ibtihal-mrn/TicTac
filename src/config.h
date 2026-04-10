@@ -108,10 +108,12 @@
 
 
 // =================== WHEELS =======================
-#define WHEELDIAMM    60.62f     // rayon 3cm -> diamètre 6cm = 60mm
-#define TRACKWIDTHMM  213.0f   // entraxe 21.3cm = 213mm
-#define TICKSPERREV   2292      // 1 tour de roue = 2292 ticks (mesuré)
+#define WHEELDIAMM    68.44f     // perimetre=21.5cm donc p=2*pi*r <=> r = p/2pi et D=70.03mm
+#define TRACKWIDTHMM  200.0f   // entraxe (centre roue gauche a centre roue droite) = 20cm
+#define TICKSPERREV   3447 
 
-
-
+// ticks : 
+//      test1 : 200cm goal but actual 133cm (Encoders: L=21403 R=21242)
+//      avg = 21322.5 (L+R/2)
+//      ticksperrev = avg*wheelPerimeter/dist = 21322.5*215/1330 = 34 468.7
 
