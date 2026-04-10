@@ -19,7 +19,6 @@
 #include "BLEBridge.h"
 
 // Hardware
-// #include "robot.h" //! replaced by fsm.h
 #include "fsm.h"
 #include "bras.h"
 #include "Relais.h"
@@ -86,7 +85,7 @@ void fsmTask(void* pvParameters) {
     bleSerial.println("[FSM_TASK] Started on Core 1");
 
     // Initialiser la FSM avec la queue de commandes du BLEBridge
-    // fsm_init(fsmCtx, bleBridge.getCommandQueue()); //TODO: getCommandQueue?
+    fsm_init(fsmCtx, bleBridge.getCommandQueue()); //TODO: getCommandQueue?
     // hardware_init(ctx);
 
     for (;;) {
@@ -138,7 +137,7 @@ void setup() {
   // bras_init();                // must run FIRST
   // robot_init();
 
-  hardware_init(fsmCtx); //! called in fsm
+  hardware_init(fsmCtx);
 
   // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
   bleBridge.begin(BLE_DEVICE_NAME); bleSerial.println("[SETUP] BLE Bridge ready");

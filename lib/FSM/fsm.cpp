@@ -6,8 +6,9 @@
 #include "encoders.h"
 #include "us.h"
 #include "imu.h"
+#include "pid.h"
 
-#include "control.h"
+// #include "control.h"
 // #include "kinematics.h"
 
 //
@@ -53,8 +54,26 @@ void hardware_init(Context &ctx)
     // ctx.matchDurationMs = MATCH_DURATION_MS;
     // ctx.matchStartMs = 0;
     // debugPrintf(DBG_FSM, "FSM -> INIT");
+    // ctx.currentAction = Robot::INIT;
+    // ctx.currentTeam = Team::TEAM_YELLOW;
+}
+
+void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
+    
+    // Init freeRtos Queue
+    ctx.commandQueue = cmdQueue;
+    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
+
+    // Context
     ctx.currentAction = Robot::INIT;
     ctx.currentTeam = Team::TEAM_YELLOW;
+    // Init Match Timer
+    // ctx.matchActive = false;
+    // ctx.matchDurationMs = MATCH_DURATION_MS;
+    // ctx.matchStartMs = 0;
+    // debugPrintf(DBG_FSM, "FSM -> INIT");
+    
+    bleSerial.println("[FSM] Context initialized");
 }
 
 
@@ -115,7 +134,20 @@ void testLinearMotion(Context &ctx){
 }
 
 
+void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
+    RobotCommand cmd;
+    cmd.type = CommandType::Rotate;
+    cmd.value = 180.0f;
+    cmd.speed = 80;
+    cmd.waitMs = 0;
+    xQueueSendToBack(q, &cmd, 0);
 
+    cmd.type = CommandType::Wait;
+    cmd.value = 0;
+    cmd.speed = 0;
+    cmd.waitMs = 3000;
+    xQueueSendToBack(q, &cmd, 0);
+}
 
 
 
@@ -200,11 +232,11 @@ void robot_step(Context &ctx)
 
         case Robot::DISPATCH_CMD:
             // 1. Empty Queue
-            if (ctx.commandQueue.empty()) { break; }
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
 
             // 2. Get next command
-            ctx.currentCommand = ctx.commandQueue.front();
-            ctx.commandQueue.pop();
+            // ctx.currentCommand = ctx.commandQueue.front();
+            // ctx.commandQueue.pop();
 
             #if DBG_FSM
                 printCommand(ctx.currentCommand);
@@ -233,7 +265,7 @@ void robot_step(Context &ctx)
                     // TODO add simple non-blocking wait timer here 
                     motion.abort();
                     ctx.waitEndMs = millis() + ctx.currentCommand.waitMs;
-                    ctx.currentAction = Robot::WAIT_CMD;
+                    ctx.currentAction = Robot::EXEC_WAIT;
                     break;
 
                 // case STEPPER_UP:
@@ -258,7 +290,7 @@ void robot_step(Context &ctx)
             break;
 
 
-        case Robot::WAIT_CMD:
+        case Robot::EXEC_WAIT:
             if ((long)(millis() - ctx.waitEndMs) >= 0) {
                 #if DBG_FSM
                     Serial.print("[FSM] END   ");

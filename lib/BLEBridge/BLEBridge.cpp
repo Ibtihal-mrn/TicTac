@@ -152,25 +152,25 @@ void BLEBridge::flushQueue_() {
 void BLEBridge::parseCommand_(const char* raw, size_t len) {
     if (!cmdQueue_ || len == 0) return;
 
-    RobotCommand cmd = {};
-    // Copier le texte brut
-    size_t cpLen = (len < BLE_MAX_MSG_LEN - 1) ? len : (BLE_MAX_MSG_LEN - 1);
-    memcpy(cmd.raw, raw, cpLen);
-    cmd.raw[cpLen] = '\0';
+    RobotCommand cmd{};
 
-    // Trim trailing whitespace/newline
-    for (int i = cpLen - 1; i >= 0; i--) {
-        if (cmd.raw[i] == '\n' || cmd.raw[i] == '\r' || cmd.raw[i] == ' ')
-            cmd.raw[i] = '\0';
+    char localRaw[BLE_MAX_MSG_LEN] = {};
+    size_t cpLen = (len < BLE_MAX_MSG_LEN - 1) ? len : (BLE_MAX_MSG_LEN - 1);
+    memcpy(localRaw, raw, cpLen);
+    localRaw[cpLen] = '\0';
+
+    for (int i = (int)cpLen - 1; i >= 0; i--) {
+        if (localRaw[i] == '\n' || localRaw[i] == '\r' || localRaw[i] == ' ')
+            localRaw[i] = '\0';
         else
             break;
     }
 
-    // Parser la commande (case-insensitive)
-    char upper[BLE_MAX_MSG_LEN];
-    for (size_t i = 0; i <= cpLen; i++) upper[i] = toupper(cmd.raw[i]);
+    char upper[BLE_MAX_MSG_LEN] = {};
+    for (size_t i = 0; i <= cpLen; i++) {
+        upper[i] = (char)toupper((unsigned char)localRaw[i]);
+    }
 
-    // Extraire le premier mot et un éventuel paramètre
     char* space = strchr(upper, ' ');
     float param = 0.0f;
     if (space) {
@@ -178,58 +178,46 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         param = atof(space + 1);
     }
 
-    if (strcmp(upper, "MOVE") == 0) {
-        cmd.type = RobotCommandType::MOVE;
+    if (strcmp(upper, "FORWARD") == 0 || strcmp(upper, "MOVE_FORWARD") == 0) {
+        cmd.type = CommandType::MoveForward;
         cmd.value = param;
-    } else if (strcmp(upper, "FORWARD") == 0) {
-        cmd.type = RobotCommandType::MOVE_FORWARD;
-        cmd.value = param;
-    } else if (strcmp(upper, "BACKWARD") == 0) {
-        cmd.type = RobotCommandType::MOVE_BACKWARD;
+    } else if (strcmp(upper, "BACKWARD") == 0 || strcmp(upper, "MOVE_BACKWARD") == 0) {
+        cmd.type = CommandType::MoveBackward;
         cmd.value = param;
     } else if (strcmp(upper, "ROTATE") == 0) {
-        cmd.type = RobotCommandType::ROTATE;
+        cmd.type = CommandType::Rotate;
         cmd.value = param;
-    } else if (strcmp(upper, "LEFT") == 0) {
-        cmd.type = RobotCommandType::ROTATE_LEFT;
-        cmd.value = param;
-    } else if (strcmp(upper, "RIGHT") == 0) {
-        cmd.type = RobotCommandType::ROTATE_RIGHT;
-        cmd.value = param;
-    } else if (strcmp(upper, "STOP") == 0) {
-        cmd.type = RobotCommandType::STOP;
+    } else if (strcmp(upper, "WAIT") == 0) {
+        cmd.type = CommandType::Wait;
+        cmd.waitMs = (unsigned long)param;
     } else if (strcmp(upper, "DEPLOY") == 0) {
-        cmd.type = RobotCommandType::DEPLOY_SERVO;
+        cmd.type = CommandType::DeployServo;
     } else if (strcmp(upper, "RETRACT") == 0) {
-        cmd.type = RobotCommandType::RETRACT_SERVO;
-    } else if (strcmp(upper, "STATUS") == 0) {
-        cmd.type = RobotCommandType::STATUS;
-    } else if (strcmp(upper, "RESET") == 0) {
-        cmd.type = RobotCommandType::RESET;
+        cmd.type = CommandType::RetractServo;
     } else if (strcmp(upper, "PING") == 0) {
-        cmd.type = RobotCommandType::PING;
+        cmd.type = CommandType::Ping;
+    } else if (strcmp(upper, "CLEAR") == 0 || strcmp(upper, "CLEARQUEUE") == 0) {
+        cmd.type = CommandType::ClearQueue;
     } else {
-        // Commande inconnue — on l'envoie quand même avec NONE
-        cmd.type = RobotCommandType::NONE;
-        Serial.printf("[BLE] Commande inconnue: '%s'\n", cmd.raw);
-        // Envoyer un feedback au PC
+        Serial.printf("[BLE] Commande inconnue: '%s'\n", localRaw);
         char fb[BLE_MAX_MSG_LEN];
-        snprintf(fb, sizeof(fb), "[ESP32] Commande inconnue: '%s'", cmd.raw);
+        snprintf(fb, sizeof(fb), "[ESP32] Commande inconnue: '%s'", localRaw);
         bleBridge.sendLog(fb);
         return;
     }
 
-    // Enqueue la commande (non-bloquant)
     if (xQueueSendToBack(cmdQueue_, &cmd, 0) != pdTRUE) {
         Serial.println("[BLE] Queue de commandes pleine !");
         bleBridge.sendLog("[ESP32] ERREUR: Queue de commandes pleine !");
     } else {
         char fb[BLE_MAX_MSG_LEN];
-        snprintf(fb, sizeof(fb), "[ESP32] CMD reçue: '%s' (val=%.1f)", cmd.raw, cmd.value);
+        snprintf(fb, sizeof(fb), "[ESP32] CMD reçue: '%s' (val=%.1f)", localRaw, cmd.value);
         Serial.println(fb);
         bleBridge.sendLog(fb);
     }
 }
+
+
 
 // ── Callback RX statique ─────────────────────────────────────────────────────
 static void onRxWrite(NimBLECharacteristic* pChar) {

@@ -21,23 +21,15 @@
 
 // #define           (1<<12)
 // Global debug mask (0 = none). You can set this at runtime.
-<<<<<<< HEAD
 extern uint32_t debugMask;
 
 // Initialize Serial and debug mask
 inline void debugInit(uint32_t baud, uint32_t mask = 0) {
-=======
-extern uint16_t debugMask;
-
-// Initialize Serial and debug mask
-inline void debugInit(uint32_t baud, uint16_t mask=0) {
->>>>>>> BLE
   Serial.begin(baud);
   debugMask = mask;
 }
 
 // Set mask at runtime
-<<<<<<< HEAD
 inline void debugSetMask(uint32_t mask) { debugMask = mask; }
 inline void debugEnable(uint32_t bits) { debugMask |= bits; }
 inline void debugDisable(uint32_t bits) { debugMask &= ~bits; }
@@ -46,16 +38,6 @@ inline void debugDisable(uint32_t bits) { debugMask &= ~bits; }
 inline void debugPrintf(uint32_t feature, const char *fmt, ...) {
   if (!(debugMask & feature)) return;
   char buf[64];
-=======
-inline void debugSetMask(uint16_t mask) { debugMask = mask; }
-inline void debugEnable(uint16_t bits) { debugMask |= bits; }
-inline void debugDisable(uint16_t bits) { debugMask &= ~bits; }
-
-// Minimum safe formatted print for AVR
-inline void debugPrintf(uint16_t feature, const char *fmt, ...) {
-  if (!(debugMask & feature)) return;
-  char buf[128];
->>>>>>> BLE
   va_list args;
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);

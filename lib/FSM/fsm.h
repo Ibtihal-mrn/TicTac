@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include <queue>
+// #include <queue>
 
 enum class Team { TEAM_YELLOW = 0, TEAM_BLUE = 1 };
 
@@ -10,7 +10,8 @@ enum class Robot {
 	IDLE,			  // Wait for commands
 	DISPATCH_CMD,     // Send to Command
 	EXEC,	          // Exec Commands
-	WAIT_CMD,		  // Wait ms
+	EXEC_WAIT,		  // Wait ms
+    EXEC_SERVO,
 	EMERGENCY_STOP,   // Obstacle Detected (Hardware US)
 	
 	// EXEC_MOVE,
@@ -40,14 +41,18 @@ enum class CommandType {
     MoveBackward,
     Rotate,
     Wait,
-    Stop,
+    DeployServo,
+    RetractServo,
+
+    //
+    Ping,
     ClearQueue,
-    SetDistancePID,
-    SetAnglePID
+    // SetDistancePID,
+    // SetAnglePID
 };
 
 struct RobotCommand {
-    CommandType type = CommandType::Stop;
+    CommandType type;
     float value = 0.0f;
     int speed = 0;
     unsigned long waitMs = 0;
@@ -69,7 +74,7 @@ struct Context {
     unsigned long waitEndMs = 0;
 
      // Queue of robot commands
-    std::queue<RobotCommand> commandQueue;
+    QueueHandle_t commandQueue = nullptr;
     RobotCommand currentCommand{}; // Optionally keep a pointer to the current command
 };
 
@@ -77,7 +82,7 @@ struct Context {
 
 
 // Fsm
-void robot_init();
+void fsm_init(Context& ctx, QueueHandle_t cmdQueue);
 void hardware_init(Context &ctx);
 void robot_step(Context &ctx);
 
