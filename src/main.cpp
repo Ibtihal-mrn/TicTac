@@ -19,6 +19,7 @@
 #include "robot.h"
 #include "config.h"          // Pins, adresses, config
 #include "globals.h"         // Mutex I2C
+#include "TeamSwitch.h"      // Team switch hardware
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  DÉFINITION DES GLOBALES (déclarées "extern" dans globals.h)
@@ -29,6 +30,10 @@
 SemaphoreHandle_t i2cMutex        = nullptr;  // Mutex pour protéger le bus I2C
 
 volatile bool emergencyStop = false;  // Flag d'arrêt d'urgence (utilisé par robot.cpp)
+
+// Équipe lue depuis le team switch au boot
+TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
+const char* currentTeam = "BLUE";  // par défaut, mis à jour dans setup()
 
 // ── Contexte FSM (utilisé uniquement par Core 1) ────────────────────────────
 static FsmContext fsmCtx;
@@ -58,9 +63,9 @@ void bleTask(void* pvParameters) {
         // Heartbeat toutes les 5 secondes
         if (millis() - lastHeartbeat >= 5000) {
             char hb[96];
-            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus | FSM=%s",
+            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus | FSM=%s | team=%s",
                      bleBridge.isConnected(), millis() / 1000,
-                     fsmAlive ? "OK" : "DEAD");
+                     fsmAlive ? "OK" : "DEAD", currentTeam);
             bleSerial.println(hb);
             fsmAlive = false;  // Reset — doit être remis à true par fsmTask
             lastHeartbeat = millis();
@@ -113,7 +118,10 @@ void setup() {
     //  i2cMutex : empêche 2 tâches d'accéder au bus I2C simultanément
     i2cMutex        = xSemaphoreCreateMutex();
     Serial.println("[SETUP] I2C mutex created");
-
+    // ── Team Switch : lire l'équipe physique ─────────────────────────────
+    teamSwitch.begin();
+    currentTeam = (teamSwitch.readTeam() == TeamSwitchTeam::A) ? "BLUE" : "YELLOW";
+    Serial.printf("[SETUP] Team switch: %s\n", currentTeam);
     // ── Timers pour ESP32Servo (DOIT être fait avant bras_init) ──────────────
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);

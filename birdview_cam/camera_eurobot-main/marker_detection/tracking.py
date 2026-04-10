@@ -17,30 +17,44 @@ class Tracker:
         self.min_hits = min_hits
 
     def update(self, keys: list[Any], values: list[np.ndarray]) -> tuple[list[Any], list[np.ndarray]]:
-        """Met a jour l'historique et renvoie uniquement les detections stables."""
-        current = dict(zip(keys, values))
+        """Met a jour l'historique et renvoie uniquement les detections stables.
 
-        for key, val in current.items():
-            if key not in self.buf:
-                self.buf[key] = []
-                self.hits[key] = 0
-            self.buf[key].append(val)
-            self.hits[key] += 1
-            if len(self.buf[key]) > self.buf_size:
-                self.buf[key].pop(0)
+        Supporte les IDs en double (ex: plusieurs markers 36 sur la table)
+        en utilisant (id, instance_index) comme cle interne.
+        """
+        # Construire des cles uniques pour gerer les doublons :
+        # si le marker 36 apparait 3 fois, on obtient (36,0), (36,1), (36,2)
+        count: dict[Any, int] = {}
+        unique_keys: list[tuple[Any, int]] = []
+        for key in keys:
+            idx = count.get(key, 0)
+            count[key] = idx + 1
+            unique_keys.append((key, idx))
 
-        for key in list(self.buf):
-            if key not in current:
-                self.hits[key] -= 1
-                if self.hits[key] <= 0:
-                    del self.buf[key]
-                    del self.hits[key]
+        current = dict(zip(unique_keys, values))
 
+        for ukey, val in current.items():
+            if ukey not in self.buf:
+                self.buf[ukey] = []
+                self.hits[ukey] = 0
+            self.buf[ukey].append(val)
+            self.hits[ukey] += 1
+            if len(self.buf[ukey]) > self.buf_size:
+                self.buf[ukey].pop(0)
+
+        for ukey in list(self.buf):
+            if ukey not in current:
+                self.hits[ukey] -= 1
+                if self.hits[ukey] <= 0:
+                    del self.buf[ukey]
+                    del self.hits[ukey]
+
+        # Sortie : restituer les cles originales (sans l'index d'instance)
         out_keys: list[Any] = []
         out_vals: list[np.ndarray] = []
-        for key, history in self.buf.items():
+        for ukey, history in self.buf.items():
             if len(history) >= self.min_hits:
-                out_keys.append(key)
+                out_keys.append(ukey[0])  # cle originale
                 out_vals.append(np.mean(history, axis=0))
 
         return out_keys, out_vals

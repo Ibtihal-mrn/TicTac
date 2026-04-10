@@ -25,23 +25,36 @@ CELL_H_MM = TABLE_H_MM / GRID_ROWS   # 100 mm
 #   11‑50 → zones/objets sur la table  (sauf 20‑23)
 #   20‑23 → coins de table (calibration)
 # Tags :
-#   36 → Bleu (A36) — objectif à prendre
+#   36 → Bleu (A36) — objectif à prendre   (plusieurs exemplaires sur la table)
 #   47 → Jaune (A47) — objectif à prendre
-#   51 → Noir (A51) — à éviter
-#   41 → Notre robot (A41)
+#   51 → Noir (A51) — à éviter             (plusieurs exemplaires sur la table)
+#   41 → Zone à éviter (anciennement robot)
+#
+# Notre robot :
+#   Team BLUE   → marker 1 (BR1)
+#   Team YELLOW → marker 6 (YR1)
 CORNER_IDS = {20, 21, 22, 23}
 
-OUR_ROBOT_ID = 41                        # Tag du robot A41
+# Notre robot est identifié par le marker de l'équipe (1 si bleu, 6 si jaune)
+OUR_ROBOT_BLUE_ID   = 1   # Marker ArUco 1 → BR1
+OUR_ROBOT_YELLOW_ID = 6   # Marker ArUco 6 → YR1
 
 BLUE_ROBOT_IDS  = set(range(1, 6))     # 1‑5
 YELLOW_ROBOT_IDS = set(range(6, 11))   # 6‑10
 
-BLUE_OBJECT_IDS   = {36}                 # Bleu A36
+BLUE_OBJECT_IDS   = {36}                 # Bleu A36 (plusieurs sur la table)
 YELLOW_OBJECT_IDS = {47}                 # Jaune A47
-BLACK_OBJECT_IDS  = {51}                 # Noir A51 (à éviter)
+BLACK_OBJECT_IDS  = {51}                 # Noir A51 (plusieurs sur la table, à éviter)
 
-# IDs 11‑50 (hors coins, robot et objectifs) sont des zones/obstacles
-AREA_IDS = set(range(11, 51)) - CORNER_IDS - {OUR_ROBOT_ID} - BLUE_OBJECT_IDS - YELLOW_OBJECT_IDS - BLACK_OBJECT_IDS
+# IDs à éviter (obstacles spécifiques)
+AVOID_IDS = {41}                          # A41 — zone à éviter
+
+# Markers pouvant apparaître en plusieurs exemplaires sur la table
+MULTI_INSTANCE_IDS = {36, 47, 51}
+
+# IDs 11‑50 (hors coins, objets spéciaux et avoid) sont des zones/obstacles
+AREA_IDS = (set(range(11, 51)) - CORNER_IDS - BLUE_OBJECT_IDS
+            - YELLOW_OBJECT_IDS - BLACK_OBJECT_IDS - AVOID_IDS)
 
 # ── Équipe ───────────────────────────────────────────────────────────────────
 TEAM_BLUE   = "blue"

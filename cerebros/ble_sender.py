@@ -28,6 +28,7 @@ class BLEBridge:
         self._client: Optional[BleakClient] = None
         self._rx_char = None
         self._connected = False
+        self._detected_team: Optional[str] = None  # "BLUE" ou "YELLOW", lu depuis le heartbeat
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -83,6 +84,19 @@ class BLEBridge:
         text = data.decode("utf-8", errors="replace").strip()
         if text:
             print(f"[BLE <-] {text}")
+            # Parse team from heartbeat: "[BLE] Heartbeat | ... | team=BLUE"
+            if "team=" in text and self._detected_team is None:
+                for part in text.split("|"):
+                    part = part.strip()
+                    if part.startswith("team="):
+                        self._detected_team = part.split("=", 1)[1].strip()
+                        print(f"[BLEBridge] Team détectée depuis ESP32: {self._detected_team}")
+                        break
+
+    @property
+    def detected_team(self) -> Optional[str]:
+        """Retourne l'équipe lue depuis le heartbeat ESP32, ou None si pas encore reçu."""
+        return self._detected_team
 
     # -- Envoi (sync, utilisable comme callback Executor) --------------
 

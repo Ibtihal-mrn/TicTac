@@ -56,9 +56,30 @@ def main() -> None:
     except Exception as e:
         print(f"[WARN] BLE non connecté: {e} — commandes loggées uniquement")
 
+    # ── Attendre l'équipe depuis le team switch ESP32 (via heartbeat BLE) ─
+    import time as _time
+    print("[INIT] Attente de l'équipe depuis le team switch ESP32...")
+    _team_wait_start = _time.time()
+    while ble.detected_team is None and (_time.time() - _team_wait_start) < 10.0:
+        _time.sleep(0.2)
+
+    if ble.detected_team == "YELLOW":
+        team = Team.YELLOW
+        robot_id = "YR1"
+        our_robot_marker_id = cerebros_config.OUR_ROBOT_YELLOW_ID  # =6
+    else:
+        team = Team.BLUE
+        robot_id = "BR1"
+        our_robot_marker_id = cerebros_config.OUR_ROBOT_BLUE_ID    # =1
+
+    if ble.detected_team is not None:
+        print(f"[INIT] Équipe reçue du robot: {ble.detected_team}")
+    else:
+        print("[INIT] Timeout — équipe par défaut: BLUE")
+
     brain = Brain(
-        team=Team.BLUE,
-        robot_id="BR1",
+        team=team,
+        robot_id=robot_id,
         initial_pos=Position(150, 1000),
         initial_heading=0.0,
     )
@@ -135,7 +156,7 @@ def main() -> None:
 
             # Calculer le heading du robot depuis les corners ArUco
             robot_heading = get_marker_heading(
-                cerebros_config.OUR_ROBOT_ID, obj_aruco, h_img_to_grid)
+                our_robot_marker_id, obj_aruco, h_img_to_grid)
 
             if detections:
                 brain.feed_vision(detections, robot_heading=robot_heading)

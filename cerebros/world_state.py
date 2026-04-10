@@ -23,25 +23,26 @@ def _classify_marker(marker_id: int, team: Team) -> ObjectType:
     if marker_id in config.CORNER_IDS:
         return ObjectType.CALIBRATION
 
-    # Notre robot (A41)
-    if marker_id == config.OUR_ROBOT_ID:
-        return ObjectType.ROBOT_ALLY
+    # IDs à éviter explicitement (ex: A41)
+    if marker_id in config.AVOID_IDS:
+        return ObjectType.ROBOT_AVOID
 
-    # Robots bleus
+    # Robots bleus (1-5)
     if marker_id in config.BLUE_ROBOT_IDS:
         if team == Team.BLUE:
             return ObjectType.ROBOT_ALLY
         return ObjectType.ROBOT_ENEMY
 
-    # Robots jaunes
+    # Robots jaunes (6-10)
     if marker_id in config.YELLOW_ROBOT_IDS:
         if team == Team.YELLOW:
             return ObjectType.ROBOT_ALLY
         return ObjectType.ROBOT_ENEMY
 
-    # Objets bleus et jaunes → GOAL (à prendre)
+    # Objets bleus → GOAL (à prendre)
     if marker_id in config.BLUE_OBJECT_IDS:
         return ObjectType.GOAL
+    # Objets jaunes → GOAL (à prendre)
     if marker_id in config.YELLOW_OBJECT_IDS:
         return ObjectType.GOAL
 
@@ -49,7 +50,7 @@ def _classify_marker(marker_id: int, team: Team) -> ObjectType:
     if marker_id in config.BLACK_OBJECT_IDS:
         return ObjectType.ROBOT_AVOID
 
-    # Zones/Areas → OBSTACLE par défaut (configurable)
+    # Zones/Areas → OBSTACLE par défaut
     if marker_id in config.AREA_IDS:
         return ObjectType.OBSTACLE
 
@@ -60,8 +61,6 @@ def _label_from_id(marker_id: int) -> str:
     """Génère un label lisible depuis un marker ID (compatible markers.py)."""
     if marker_id in config.CORNER_IDS:
         return f"TABLE{marker_id}"
-    if marker_id == config.OUR_ROBOT_ID:
-        return "BR1"
     if 1 <= marker_id <= 5:
         return f"BR{marker_id}"
     if 6 <= marker_id <= 10:
@@ -137,8 +136,15 @@ class WorldState:
                 continue
 
             # ── Mise à jour / création d'un objet ────────────────────
-            if marker_id in self.objects:
-                obj = self.objects[marker_id]
+            # Markers multi-instance (36, 51) : clé = (marker_id, grid_x, grid_y)
+            # Markers uniques : clé = marker_id
+            if marker_id in config.MULTI_INSTANCE_IDS:
+                obj_key = (marker_id, grid_x, grid_y)
+            else:
+                obj_key = marker_id
+
+            if obj_key in self.objects:
+                obj = self.objects[obj_key]
                 obj.position = pos_mm
                 obj.grid_x = grid_x
                 obj.grid_y = grid_y
@@ -153,7 +159,7 @@ class WorldState:
                     grid_x=grid_x,
                     grid_y=grid_y,
                 )
-                self.objects[marker_id] = obj
+                self.objects[obj_key] = obj
                 if DEBUG:
                     print(f"[WorldState] Nouvel objet détecté : {obj}")
 
@@ -222,9 +228,16 @@ class WorldState:
         return list(self.objects.values())
 
     def remove_object(self, marker_id: int) -> None:
-        """Retire un objet du monde (ex: objet ramassé)."""
-        if marker_id in self.objects:
-            obj = self.objects.pop(marker_id)
+        """Retire un objet du monde (ex: objet ramassé).
+
+        Pour les markers multi-instance, retire toutes les instances.
+        """
+        keys_to_remove = [
+            k for k in self.objects
+            if (k == marker_id) or (isinstance(k, tuple) and k[0] == marker_id)
+        ]
+        for k in keys_to_remove:
+            obj = self.objects.pop(k)
             if DEBUG:
                 print(f"[WorldState] Objet retiré : {obj}")
 
