@@ -14,6 +14,7 @@
 // main.cpp
 #include <Arduino.h>
 #include <Wire.h>            // Bus I2C (partagé entre IMU et Sensor Hub)
+#include <ESP32Servo.h>      // ESP32PWM::allocateTimer()
 #include "BLEBridge.h"
 #include "robot.h"
 #include "config.h"          // Pins, adresses, config
@@ -112,6 +113,10 @@ void setup() {
     //  i2cMutex : empêche 2 tâches d'accéder au bus I2C simultanément
     i2cMutex        = xSemaphoreCreateMutex();
     Serial.println("[SETUP] I2C mutex created");
+
+    // ── Timers pour ESP32Servo (DOIT être fait avant bras_init) ──────────────
+    ESP32PWM::allocateTimer(0);
+    ESP32PWM::allocateTimer(1);
 
     // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
     bleBridge.begin(BLE_DEVICE_NAME);

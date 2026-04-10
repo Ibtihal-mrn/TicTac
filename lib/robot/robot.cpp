@@ -28,18 +28,18 @@ void robot_init()
   // Launch trigger (tirette)
   pinMode(LAUNCH_TRIGGER_PIN, INPUT_PULLUP);
 
-  // IMU
-  if (!imu_init())
-  {
-    Serial.println("[robot_init] MPU6050 FAIL — skipping calibration.");
-  }
-  else
-  {
-    delay(200);
-    Serial.println("[robot_init] MPU6050 connected.");
-    imu_calibrate(600, 2); // ~1.2s, robot immobile
-    Serial.println("[robot_init] IMU calibrated.");
-  }
+  // IMU — pas de MPU6050 sur ce robot
+  // if (!imu_init())
+  // {
+  //   Serial.println("[robot_init] MPU6050 FAIL — skipping calibration.");
+  // }
+  // else
+  // {
+  //   delay(200);
+  //   Serial.println("[robot_init] MPU6050 connected.");
+  //   imu_calibrate(600, 2);
+  //   Serial.println("[robot_init] IMU calibrated.");
+  // }
   Serial.println("[robot_init] DONE");
 }
 
@@ -220,42 +220,53 @@ void driveDistancePID(float distance_mm, int speed)
 
 void rotateAnglePID(float angle_deg, int speed)
 {
-  // Important :
-  //    - this is a PD controller (no I-term), rate is dirctly used as D-term (gyro rate = damping).
+  // ╔═══════════════════════════════════════════════════════════════════════╗
+  // ║  TEMPORAIRE — PID rotation basé sur ENCODEURS (pas d'IMU connectée) ║
+  // ║  À remplacer par une version gyro quand le MPU6050 sera câblé.      ║
+  // ╚═══════════════════════════════════════════════════════════════════════╝
 
   // ----- Setup Timing -----
-  const uint16_t DT_MS = 10;      // Loop runs every 10ms
-  unsigned long tPrev = micros(); // Control freq = 100Hz
+  const uint16_t DT_MS = 10;
+  unsigned long tPrev = micros();
   unsigned long startMs = millis();
-  const float targetDeg = angle_deg * ROTATE_TARGET_SCALE;
 
-  // ----- Variables -------
-  float angle = 0.0f;
+  // ----- Encoder baseline -----
+  long startL, startR;
+  encoders_read(&startL, &startR);
+
+  // ----- Target (degrés) -----
+  const float targetDeg = angle_deg;  // positif = droite, négatif = gauche
+
+  // ----- Variables -----
   int pwmLimit = 0;
   unsigned long stableStart = 0;
+  float prevError = 0.0f;
 
-  // ---- Parameters (à ajuster) ------
-  const float KP = ROTATE_KP;
-  const float KD = ROTATE_KD;
+  // ----- Paramètres PID (TEMPORAIRE — à tuner) -----
+  const float KP = 3.0f;
+  const float KI = 0.05f;
+  const float KD = 0.8f;
+  float integral = 0.0f;
+  const float INTEGRAL_MAX = 5000.0f;
 
-  const int PWM_MIN = 55;
+  const int PWM_MIN = 60;
   const int RAMP_STEP = 8;
-  const float BRAKE_START_DEG = 45.0f;
+  const float BRAKE_START_DEG = 30.0f;
 
-  const float ANGLE_TOL = 1.5f;
-  const float RATE_TOL = 8.0f;
-  const uint16_t STABLE_MS = 120;
-  const uint32_t MAX_ROTATE_MS = (uint32_t)(2500.0f + 22.0f * fabs(targetDeg));
+  const float ANGLE_TOL = 2.0f;
+  const uint16_t STABLE_MS = 150;
+  const uint32_t MAX_ROTATE_MS = (uint32_t)(3000.0f + 25.0f * fabs(targetDeg));
 
   // ----- Control Loop -----
   while (true)
   {
-    // Fixed 100Hz timing -----
     unsigned long now = micros();
     if ((unsigned long)(now - tPrev) < (unsigned long)DT_MS * 1000UL){ yield(); continue; }
-    tPrev += (unsigned long)DT_MS * 1000UL;
+    float dt = (float)(now - tPrev) / 1000000.0f;
+    tPrev = now;
+    dt = constrain(dt, 0.005f, 0.05f);
 
-    // COMMAND STOP BLE — check without blocking
+    // ── BLE STOP check ──
     {
       RobotCommand peekCmd;
       if (xQueuePeek(bleBridge.getCommandQueue(), &peekCmd, 0) == pdTRUE
@@ -266,7 +277,7 @@ void rotateAnglePID(float angle_deg, int speed)
       }
     }
 
-    // Ultrasons (via I2C coprocesseur)
+    // ── Safety (ultrasons) ──
     if (safety_update()) {
       motors.stopMotors();
       bleSerial.println("[ROTATE] Safety triggered — waiting...");
@@ -276,69 +287,68 @@ void rotateAnglePID(float angle_deg, int speed)
       continue;
     }
 
-    float dt = (float)(now - tPrev) / 1000000.0f;
-    tPrev = now;
-    dt = constrain(dt, 0.005f, 0.03f);
-
+    // ── Timeout ──
     if (millis() - startMs >= MAX_ROTATE_MS)
     {
-      debugPrintf(DBG_MOTORS, "rotateAnglePID timeout\n");
+      bleSerial.println("[ROTATE] Timeout!");
       break;
     }
-    // Read Gyro -----
-    float rate = imu_readGyroZ_dps(); // deg/s
-    angle += rate * dt;               // integrate
 
-    // Compute Error -----
-    float error = targetDeg - angle;
+    // ── Angle estimé via encodeurs ──
+    long curL, curR;
+    encoders_read(&curL, &curR);
+    float distL_mm = (float)(curL - startL) * mm_per_tick();
+    float distR_mm = (float)(curR - startR) * mm_per_tick();
+    float angleDeg = (distL_mm - distR_mm) / trackWidth_mm * (180.0f / PI);
 
-    // Ramp PWM Limit -----
+    // ── PID ──
+    float error = targetDeg - angleDeg;
+
+    integral += error * dt;
+    integral = constrain(integral, -INTEGRAL_MAX, INTEGRAL_MAX);
+
+    float derivative = (error - prevError) / dt;
+    prevError = error;
+
+    // Ramp
     if (pwmLimit < speed)
       pwmLimit = min(pwmLimit + RAMP_STEP, speed);
 
-    // PD Control -----
-    float control = KP * error - KD * rate;
+    float control = KP * error + KI * integral + KD * derivative;
 
-    // Freinage progressif en approche de la cible
+    // Freinage progressif
     int pwmCap = pwmLimit;
     float absErr = fabs(error);
     if (absErr < BRAKE_START_DEG)
     {
-      float ratio = absErr / BRAKE_START_DEG; // 1 loin -> 0 proche cible
+      float ratio = absErr / BRAKE_START_DEG;
       int brakeCap = PWM_MIN + (int)((speed - PWM_MIN) * ratio);
       pwmCap = min(pwmCap, brakeCap);
     }
 
-    // Convert to PWM -----
     int pwm = (int)fabs(control);
     pwm = constrain(pwm, 0, pwmCap);
     if (pwm > 0)
       pwm = max(pwm, PWM_MIN);
 
-    // ----- Apply Direction -----
+    // ── Apply Direction ──
     if (control > 0)
-      motors.applyMotorOutputs(-pwm, pwm); // rotate right
+      motors.applyMotorOutputs(pwm, -pwm);  // rotate right
     else
-      motors.applyMotorOutputs(pwm, -pwm); // rotate left
+      motors.applyMotorOutputs(-pwm, pwm);  // rotate left
 
-    // ----- Debug -----
+    // ── Debug (1x/s) ──
     #if DBG_MOTORS
       static unsigned long Lpwm = 0;
-      if (millis() - Lpwm >= 1000){
-        Serial.print("Angle: ");
-        Serial.print(angle);
-        Serial.print(" | Error: ");
-        Serial.print(error);
-        Serial.print(" | Rate: ");
-        Serial.print(rate);
-        Serial.print(" | PWM: ");
-        Serial.println(pwm);
+      if (millis() - Lpwm >= 500){
+        Serial.printf("Angle: %.1f | Err: %.1f | I: %.1f | PWM: %d\n",
+                       angleDeg, error, integral, pwm);
         Lpwm = millis();
       }
     #endif
 
-    // ----- Stop Condition -----
-    if (fabs(error) < ANGLE_TOL && fabs(rate) < RATE_TOL)
+    // ── Stop Condition ──
+    if (fabs(error) < ANGLE_TOL)
     {
       if (stableStart == 0)
         stableStart = millis();
@@ -351,7 +361,7 @@ void rotateAnglePID(float angle_deg, int speed)
       stableStart = 0;
     }
   }
-    motors.stopMotors();
+  motors.stopMotors();
 }
 
 
@@ -722,19 +732,19 @@ switch (ctx.currentState) {
         }
 
         // ── EXEC_ROTATE_LEFT : tourner à gauche ─────────────────────────
-        case FsmState::EXEC_ROTATE_RIGHT: {
+        case FsmState::EXEC_ROTATE_LEFT: {
             float angle = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 90;
-            bleSerial.println("[FSM] EXEC_ROTATE_RIGHT");
-            rotateAnglePID(fabs(angle), 200);  // angle positif = droite
+            bleSerial.println("[FSM] EXEC_ROTATE_LEFT");
+            rotateAnglePID(-fabs(angle), 200);   // angle négatif = gauche
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
 
         // ── EXEC_ROTATE_RIGHT : tourner à droite ────────────────────────
-        case FsmState::EXEC_ROTATE_LEFT: {
+        case FsmState::EXEC_ROTATE_RIGHT: {
             float angle = ctx.currentCommand.value != 0 ? ctx.currentCommand.value : 90;
-            bleSerial.println("[FSM] EXEC_ROTATE_LEFT");
-            rotateAnglePID(-fabs(angle), 200);   // angle négatif = gauche
+            bleSerial.println("[FSM] EXEC_ROTATE_RIGHT");
+            rotateAnglePID(fabs(angle), 200);  // angle positif = droite
             fsm_change_state(ctx, FsmState::DISPATCH_CMD);
             break;
         }
