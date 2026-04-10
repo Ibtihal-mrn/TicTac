@@ -1,5 +1,4 @@
 #include "robot.h"
-<<<<<<< HEAD
 #include "../../src/config.h"
 #include "../../src/globals.h"
 
@@ -14,91 +13,16 @@
 //
 #include "utils.h"
 #include "Debug.h"
-=======
->>>>>>> BLE
 
 // I2C sensors
 #include "i2c_comm.h"
 
-<<<<<<< HEAD
-#include "pid.h"
-
-
-Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
-static PIDController motion(motors);
-
-
-void driveForward(float mm, int speed) {
-    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
-    motion.startLinear(mm, speed);
-}
-
-void driveBackward(float mm, int speed) {
-    setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
-    motion.startLinear(-mm, speed);
-}
-
-void rotate(float angle, int speed) {
-    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
-    motion.startRotate(angle, speed);
-}
-
-
-
-void robot_step(Context &ctx)
-{
-    if (emergencyStop) {
-        motion.abort();
-        ctx.currentAction = Robot::EMERGENCY_STOP;
-    }
-
-    switch (ctx.currentAction)
-    {
-        case Robot::EXEC_MOVE  :
-        case Robot::EXEC_ROTATE:
-            if (motion.update()) {
-                ctx.currentAction = Robot::IDLE;
-            }
-            break;
-
-        case Robot::EMERGENCY_STOP:
-            motion.abort();
-            if (digitalRead(STOP_PIN) == LOW) {
-                emergencyStop = false;
-                ctx.currentAction = Robot::IDLE;
-            }
-            break;
-
-        default:
-            break;
-    }
-}
-
-
-
-
-
-
-
-
-// ====================================
-// ====================================
-// ====================================
-// ====================================
-
-
-
-
-
-// TODO: Replace by hardware_init()
-=======
 // Forward declarations
 void driveDistancePID(float distance_mm, int speed);
 void rotateAnglePID(float angle_deg, int speed);
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 // Variables globales pour le PID de déplacement et l'initiation
->>>>>>> BLE
 void robot_init()
 {
   Serial.println("[robot_init] START");
@@ -713,15 +637,6 @@ switch (ctx.currentState) {
         case FsmState::DISPATCH_CMD: {
             RobotCommand cmd;
 
-<<<<<<< HEAD
-  case Robot::EMERGENCY_STOP:
-    motors.stopMotors();
-    break;
-  }
-}
-
-
-=======
             // Attendre une commande pendant 500ms max (bloquant, libère le CPU)
             if (xQueueReceive(ctx.cmdQueue, &cmd, pdMS_TO_TICKS(500)) == pdTRUE) {
                 ctx.currentCommand = cmd;
@@ -904,4 +819,3 @@ switch (ctx.currentState) {
         }
     }
 }
->>>>>>> BLE

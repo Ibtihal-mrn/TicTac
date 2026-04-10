@@ -23,9 +23,7 @@
 #include "EmergencyButton.h"
 #include "imu.h"
 
-#include "control.h"
-#include "kinematics.h"
-#include "safety.h"
+
 #include "bras.h"
 
 #include "utils.h"
@@ -66,28 +64,3 @@ void fsm_step(FsmContext& ctx);
 
 /// Obtenir le nom textuel d'un état
 const char* fsm_state_name(FsmState state);
-<<<<<<< HEAD
-// New
-void driveDistancePID(float distance_mm, int speed);
-void rotateAnglePID(float angle_deg, int speed);
-
-// Avec US
-void driveForward(float mm, int speed);
-void driveBackward(float mm, int speed);
-void rotate(float angle, int speed);
-
-// Freinage
-void brakeForwardMotion(int initialSpeed);
-
-// ------------------- LEGACY -------------------------------------
-void robot_init();
-
-void robot_move_distance(float dist_mm, int speed);
-void robot_rotate(float angle_deg, int speed);
-void robot_rotate_gyro(float target_deg, int pwmMax);
-
-void robot_step();
-
-void newPIDTestForward(float mm, int speed);
-=======
->>>>>>> BLE
