@@ -115,7 +115,7 @@ void testLinearMotion(Context &ctx){
 }
 
 
-// t1 : 2000 but actual 133 (Encoders: L=21403 R=21242)
+
 
 
 

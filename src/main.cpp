@@ -100,12 +100,5 @@ void setup()
 
 void loop()
 {
-
-  // motors.forward(150, 150);
-  // delay(2000);
-  // motors.stopMotors();
-  // delay(5000);
-  // return;
   robot_step(fsmCtx);
-
 }
