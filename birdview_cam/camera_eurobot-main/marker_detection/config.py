@@ -5,7 +5,7 @@ from __future__ import annotations
 FRAME_W = 3840
 FRAME_H = 2160
 CAMERA_INDEX = 0
-CAMERA_FPS = 10
+CAMERA_FPS = 5
 
 WINDOW_CAMERA = "Camera"
 WINDOW_AERIAL = "Aerial View"
