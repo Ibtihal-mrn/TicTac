@@ -11,14 +11,14 @@
 #include <cstring>
 #include <cstdlib>
 
-#include "globals.h"
+#include "../../src/globals.h"
 
 // ── Singletons ───────────────────────────────────────────────────────────────
 BLEBridge bleBridge;
 BleSerial bleSerial;
 
 static constexpr int DEFAULT_MOVE_SPEED = 80;
-static constexpr int DEFAULT_ROTATE_SPEED = 80;
+static constexpr int DEFAULT_ROTATE_SPEED = 200;
 
 // ── Forward declaration ──────────────────────────────────────────────────────
 static void onRxWrite(NimBLECharacteristic* pChar);

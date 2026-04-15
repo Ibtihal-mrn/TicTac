@@ -66,8 +66,12 @@ private:
     unsigned long lastUpdateUs_;
     unsigned long stableSinceMs_;
 
-    static constexpr int PWM_MIN = 40;
+    // PID min/max values
+    static constexpr int PWM_MIN_LINEAR = 40;
+    static constexpr int PWM_MIN_ROTATE = 80;
     static constexpr int PWM_MAX = 255;
+
+
     static constexpr float DONE_DISTANCE_MM = 10.0f;    // linear precision
     static constexpr float DONE_ANGLE_DEG = 5.0f;       // angle  precision
     static constexpr float DONE_RATE_DPS = 8.0f;
