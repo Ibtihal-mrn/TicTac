@@ -7,7 +7,6 @@ en évitant les obstacles. Convertit ensuite le chemin en actions robot.
 
 from __future__ import annotations
 
-import math
 from typing import List
 
 from cerebros.astar import (

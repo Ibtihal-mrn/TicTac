@@ -7,7 +7,7 @@ import cv2
 from marker_detection import config
 from marker_detection.detection import detect_all
 from marker_detection.geometry import build_transforms
-from marker_detection.markers import print_detected_objects, separate_markers
+from marker_detection.markers import separate_markers
 from marker_detection.runtime import (
     create_aruco_detector,
     create_capture,
@@ -157,7 +157,6 @@ def main() -> None:
 
         # envoies des donnees detectees dans l'ESP32 (ou la console si pas de connexion).
         if h_img_to_grid is not None and frame_count % 2 == 0:
-            # print_detected_objects(corners_by_id, obj_aruco, h_img_to_grid)
             send_detected_objects(corners_by_id,
                                   obj_aruco, h_img_to_grid, sender)
 

@@ -29,14 +29,14 @@ from __future__ import annotations
 
 import time
 from enum import Enum, auto
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from cerebros import config
 from cerebros.actions import ActionQueue
 from cerebros.config import DEBUG
 from cerebros.executor import Executor, SendActionFn
 from cerebros.mission_manager import MissionManager
-from cerebros.models import Position, RobotStatus, Team
+from cerebros.models import Position, Team
 from cerebros.planner import Planner
 from cerebros.robot_state import RobotState
 from cerebros.world_state import WorldState
@@ -83,7 +83,7 @@ class Brain:
         # ── Monitoring ────────────────────────────────────────────────
         self._monitoring_deviation_threshold_mm = config.REPLAN_DISTANCE_MM
         self._monitoring_stuck_ticks = 0
-        self._monitoring_stuck_threshold = 30   # ~3s à 10Hz
+        self._monitoring_stuck_threshold = config.MONITORING_STUCK_THRESHOLD
         self._last_robot_pos = Position(self.robot.position.x,
                                         self.robot.position.y)
 
@@ -259,7 +259,7 @@ class Brain:
         # ── Détection de blocage (ultrasons / immobilité) ─────────────
         dist_moved = self.robot.position.distance_to(self._last_robot_pos)
 
-        if dist_moved < 5:  # < 5mm de mouvement
+        if dist_moved < config.MONITORING_STUCK_MIN_MOVE_MM:
             self._monitoring_stuck_ticks += 1
         else:
             self._monitoring_stuck_ticks = 0

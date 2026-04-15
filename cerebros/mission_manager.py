@@ -12,7 +12,7 @@ Responsable de :
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 from cerebros.config import DEBUG, GOAL_REACHED_THRESHOLD_MM
