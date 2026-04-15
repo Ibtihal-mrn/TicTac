@@ -74,22 +74,17 @@ def main() -> None:
     brain.dump()
 
     # ══════════════════════════════════════════════════════════════════
-    # PHASE 2 — RUN : Tirette tirée → queue envoyée au robot
+    # PHASE 2 — RUN : monitoring continu pendant le match
     # ══════════════════════════════════════════════════════════════════
-    print("\n[Test] === PHASE RUN (simulation) ===")
-    print("[Test] start_match() envoie la queue complete au robot...")
-
-    brain.start_match()
-
-    # La queue a ete envoyee d'un coup au robot dans start_match().
-    # On simule quelques ticks de monitoring.
-    for i in range(10):
-        brain.tick()
-        time.sleep(0.05)
+    # init_plan() appelle déjà start_match() (tirette bypassée).
+    # run() boucle à 10 Hz pendant toute la durée du match,
+    # avec monitoring stuck/déviation + replan automatique.
+    print("\n[Test] === PHASE RUN — monitoring à 10 Hz ===")
+    brain.run()
 
     brain.dump()
     print(f"\n[Test] Progression finale: {brain.mission_mgr.progress}")
-    print("[Test] Test termine.")
+    print("[Test] Test terminé.")
 
 
 if __name__ == "__main__":

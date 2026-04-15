@@ -238,7 +238,7 @@ void robot_step(Context &ctx)
 
             // MOVE COMMANDS
             // testRotation(ctx);
-            testLinearMotion(ctx);
+            // testLinearMotion(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;
