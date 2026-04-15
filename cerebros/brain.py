@@ -88,6 +88,8 @@ class Brain:
         self._monitoring_stuck_threshold = config.MONITORING_STUCK_THRESHOLD
         self._last_robot_pos = Position(self.robot.position.x,
                                         self.robot.position.y)
+        self._last_replan_tick = 0
+        self._replan_cooldown_ticks = 50   # ~5s à 10Hz entre deux replans
 
         print(f"[Brain] Prêt. Robot à {self.robot.position}, "
               f"heading={self.robot.heading_deg}°")
@@ -288,7 +290,7 @@ class Brain:
             )
 
         if self._monitoring_stuck_ticks >= self._monitoring_stuck_threshold:
-            if not self.action_queue.is_empty():
+            if not self.mission_mgr.is_route_complete:
                 print(f"[Brain] MONITORING: Robot bloqué depuis "
                       f"{self._monitoring_stuck_ticks} ticks — replan!")
                 self._replan_from_current()
@@ -298,21 +300,29 @@ class Brain:
         # ── Vérification de la trajectoire ────────────────────────────
         target = self.mission_mgr.current_target_position
         if target is not None:
-            # Si le robot est très loin de sa cible actuelle par rapport
-            # à la distance attendue, il s'est peut-être écarté
             expected_dist = self.robot.position.distance_to(target)
             if expected_dist > self._monitoring_deviation_threshold_mm * 3:
-                # On ne replan que si la queue n'est pas en train de corriger
-                if self._tick_count % 100 == 0 and DEBUG:
-                    print(f"[Brain] MONITORING: dist au target={expected_dist:.0f}mm")
+                print(f"[Brain] MONITORING: Déviation trop grande "
+                      f"(dist={expected_dist:.0f}mm) — replan!")
+                self._replan_from_current()
+                self._monitoring_stuck_ticks = 0
+                return
 
     def _replan_from_current(self) -> None:
         """Replanifie depuis la position actuelle vers les objectifs restants.
 
-        1. Clear la queue du robot
+        1. Clear la queue du robot (CLEAR_QUEUE via BLE)
         2. Recalcule A* pour les objectifs non atteints
         3. Envoie la nouvelle queue
         """
+        # Cooldown : pas de replan trop fréquent
+        if self._tick_count - self._last_replan_tick < self._replan_cooldown_ticks:
+            if DEBUG:
+                print(f"[Brain] REPLAN ignoré — cooldown "
+                      f"({self._replan_cooldown_ticks - (self._tick_count - self._last_replan_tick)} ticks restants)")
+            return
+        self._last_replan_tick = self._tick_count
+
         print("\n" + "-" * 40)
         print("[Brain] REPLAN depuis position actuelle")
         print("-" * 40)
