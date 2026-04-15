@@ -17,6 +17,8 @@
 #include <freertos/queue.h>
 #include <Arduino.h>
 
+#include "../FSM/fsm.h"
+
 // ── NUS UUIDs ────────────────────────────────────────────────────────────────
 #define NUS_SERVICE_UUID "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 #define NUS_TX_CHAR_UUID "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  // ESP32 → PC
@@ -30,28 +32,7 @@
 #define BLE_MTU           247
 
 // ── Types de commandes robot ─────────────────────────────────────────────────
-enum class RobotCommandType : uint8_t {
-    NONE = 0,
-    MOVE,
-    MOVE_FORWARD,
-    MOVE_BACKWARD,
-    ROTATE,
-    ROTATE_LEFT,
-    ROTATE_RIGHT,
-    STOP,
-    DEPLOY_SERVO,
-    RETRACT_SERVO,
-    STATUS,
-    RESET,
-    PING,
-    CLEAR_QUEUE,
-};
-
-struct RobotCommand {
-    RobotCommandType type = RobotCommandType::NONE;
-    float value = 0.0f;        // paramètre optionnel (distance, angle, …)
-    char raw[BLE_MAX_MSG_LEN]; // commande brute reçue
-};
+// from fsm.h
 
 // ── BLEBridge ────────────────────────────────────────────────────────────────
 class BLEBridge : public NimBLEServerCallbacks {
