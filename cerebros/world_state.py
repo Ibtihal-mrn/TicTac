@@ -213,14 +213,16 @@ class WorldState:
                     obstacles.append(obj)
 
         # Robots ennemis comme obstacles dynamiques
-        for enemy in self.enemy_robots.values():
-            obstacles.append(ObjectInfo(
-                marker_id=-1,
-                label=f"enemy_{enemy.robot_id}",
-                obj_type=ObjectType.OBSTACLE,
-                position=enemy.position,
-                last_seen=enemy.last_update,
-            ))
+        # DÉSACTIVÉ : les ennemis sont dynamiques, les traiter comme
+        # obstacles statiques fausse la planification A*.
+        # for enemy in self.enemy_robots.values():
+        #     obstacles.append(ObjectInfo(
+        #         marker_id=-1,
+        #         label=f"enemy_{enemy.robot_id}",
+        #         obj_type=ObjectType.OBSTACLE,
+        #         position=enemy.position,
+        #         last_seen=enemy.last_update,
+        #     ))
 
         return obstacles
 

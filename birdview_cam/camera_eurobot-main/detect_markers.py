@@ -7,7 +7,7 @@ import cv2
 from marker_detection import config
 from marker_detection.detection import detect_all
 from marker_detection.geometry import build_transforms
-from marker_detection.markers import print_detected_objects, separate_markers
+from marker_detection.markers import separate_markers
 from marker_detection.runtime import (
     create_aruco_detector,
     create_capture,
@@ -31,7 +31,7 @@ from marker_detection.markers import send_detected_objects, _build_detected_list
 import sys, os
 # Ajouter le dossier racine TicTac au path pour importer cerebros
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from cerebros.brain import Brain
+from cerebros.brain import Brain, BrainPhase
 from cerebros.models import Position, Team
 from cerebros import config as cerebros_config
 
@@ -85,6 +85,15 @@ def main() -> None:
     )
     brain.set_send_function(ble.send)
 
+    # ── PHASE INIT : mission hardcodee ────────────────────────────────
+    #  Mission : milieu de la table, puis milieu tout a droite
+    targets = [
+        Position(1500, 1000),   # Centre de la table
+        Position(2850, 1000),   # Centre-droit
+    ]
+    labels = ["CENTRE_TABLE", "CENTRE_DROIT"]
+    print(f"[INIT] Mission : {labels}")
+
     create_windows()  # Ouverture des fenetres camera / aerienne.
 
     detector = create_aruco_detector()
@@ -99,6 +108,8 @@ def main() -> None:
 
     last_h_aerial = None
     frame_count = 0
+    init_plan_done = False       # A* calcule une seule fois
+    init_vision_frames = 0       # Compteur de frames avec vision valide
 
     while True:
 
@@ -146,7 +157,6 @@ def main() -> None:
 
         # envoies des donnees detectees dans l'ESP32 (ou la console si pas de connexion).
         if h_img_to_grid is not None and frame_count % 2 == 0:
-            # print_detected_objects(corners_by_id, obj_aruco, h_img_to_grid)
             send_detected_objects(corners_by_id,
                                   obj_aruco, h_img_to_grid, sender)
 
@@ -160,7 +170,29 @@ def main() -> None:
 
             if detections:
                 brain.feed_vision(detections, robot_heading=robot_heading)
-                brain.tick()
+                init_vision_frames += 1
+
+                # ── INIT : lancer A* apres quelques frames stables ────
+                if not init_plan_done and init_vision_frames >= 10:
+                    print("[INIT] Vision stable — lancement planification A*")
+                    ok = brain.init_plan(
+                        target_positions=targets, target_labels=labels)
+                    if ok:
+                        init_plan_done = True
+                        print("[INIT] Plan OK. Insere la tirette puis retire-la pour lancer le match.")
+                    else:
+                        print("[INIT] Echec planification — nouvel essai dans quelques frames")
+                        init_vision_frames = 0  # retry
+
+                # ── TIRETTE : demarrer le match quand elle est retiree ─
+                if init_plan_done and brain.phase == BrainPhase.READY:
+                    if ble.match_started:
+                        print("[MATCH] Tirette retiree — MATCH START!")
+                        brain.start_match()
+
+                # ── RUN : tick de monitoring ───────────────────────────
+                if brain.phase == BrainPhase.RUNNING:
+                    brain.tick()
 
         draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
 

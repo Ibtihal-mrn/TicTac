@@ -1,168 +1,120 @@
 """
-cerebros/planner.py — Planificateur de trajectoire.
+cerebros/planner.py — Planificateur de trajectoire A*.
 
-MVP : ligne droite vers le goal avec évitement simple des obstacles.
-Stratégie d'évitement :
-  1. Calculer un chemin direct (waypoints en ligne droite)
-  2. Pour chaque segment, vérifier s'il croise un obstacle
-  3. Si oui, insérer un waypoint de contournement (décalage latéral)
+Utilise A* sur la grille de la table pour trouver le chemin optimal
+en évitant les obstacles. Convertit ensuite le chemin en actions robot.
 """
 
 from __future__ import annotations
 
-import math
 from typing import List
 
-from cerebros.config import (
-    DEBUG,
-    OBSTACLE_SAFETY_MARGIN_MM,
-    TABLE_H_MM,
-    TABLE_W_MM,
+from cerebros.astar import (
+    AStarGrid,
+    astar,
+    mm_to_grid,
+    path_cells_to_mm,
+    simplify_path,
 )
+from cerebros.config import DEBUG
 from cerebros.models import Action, ActionType, ObjectInfo, Position
 
 
 class Planner:
-    """Planificateur de trajectoire simple."""
+    """Planificateur de trajectoire basé sur A*."""
 
     def __init__(self):
+        self._grid = AStarGrid()
         if DEBUG:
-            print("[Planner] Initialisé — mode ligne droite + évitement basique")
+            print("[Planner] Initialisé — mode A* grid pathfinding")
 
     # ── Planification de trajectoire ──────────────────────────────────────
 
     def plan_path(self, start: Position, goal: Position,
                   obstacles: List[ObjectInfo]) -> List[Position]:
-        """Planifie un chemin de start vers goal en évitant les obstacles.
+        """Planifie un chemin A* de start vers goal en évitant les obstacles.
 
         Retourne une liste de waypoints (positions en mm).
-        MVP : ligne droite, avec détour si obstacle sur le chemin.
         """
         if DEBUG:
-            print(f"[Planner] Planification: {start} → {goal}")
+            print(f"[Planner] A* planification: {start} → {goal}")
             print(f"[Planner] {len(obstacles)} obstacles à éviter")
 
-        # Chemin direct
-        path = [Position(start.x, start.y), Position(goal.x, goal.y)]
+        # Préparer la grille
+        self._grid.reset()
+        self._grid.mark_obstacles(obstacles)
 
-        # Tentative d'évitement (max 5 itérations pour éviter boucle infinie)
-        for iteration in range(5):
-            collision_found = False
-            new_path: List[Position] = [path[0]]
-
-            for i in range(len(path) - 1):
-                seg_start = path[i]
-                seg_end = path[i + 1]
-
-                blocking = self._find_blocking_obstacle(
-                    seg_start, seg_end, obstacles
-                )
-
-                if blocking is not None:
-                    collision_found = True
-                    # Insérer un waypoint de contournement
-                    detour = self._compute_detour(
-                        seg_start, seg_end, blocking.position
-                    )
-                    if DEBUG:
-                        print(f"[Planner] Obstacle {blocking.label} détecté "
-                              f"entre {seg_start} et {seg_end}")
-                        print(f"[Planner] Détour via {detour}")
-                    new_path.append(detour)
-
-                new_path.append(seg_end)
-
-            path = new_path
-
-            if not collision_found:
-                break
+        # Convertir start/goal en cellules grille
+        start_cell = mm_to_grid(start.x, start.y)
+        goal_cell = mm_to_grid(goal.x, goal.y)
 
         if DEBUG:
-            print(f"[Planner] Chemin final: {len(path)} waypoints")
-            for i, wp in enumerate(path):
+            blocked = self._grid.get_blocked_cells()
+            print(f"[Planner] Grille: {len(blocked)} cellules bloquées")
+            print(f"[Planner] Start cell: {start_cell}, Goal cell: {goal_cell}")
+
+        # Exécuter A*
+        cell_path = astar(self._grid, start_cell, goal_cell)
+
+        if cell_path is None:
+            if DEBUG:
+                print("[Planner] A* n'a pas trouvé de chemin! "
+                      "Fallback: ligne droite")
+            return [Position(start.x, start.y), Position(goal.x, goal.y)]
+
+        # Simplifier (supprimer les points colinéaires)
+        simplified = simplify_path(cell_path)
+
+        if DEBUG:
+            print(f"[Planner] A* brut: {len(cell_path)} cellules → "
+                  f"simplifié: {len(simplified)} waypoints")
+
+        # Convertir en mm
+        path_mm = path_cells_to_mm(simplified)
+
+        # Remplacer le premier et dernier point par les positions exactes
+        path_mm[0] = Position(start.x, start.y)
+        path_mm[-1] = Position(goal.x, goal.y)
+
+        if DEBUG:
+            print(f"[Planner] Chemin final: {len(path_mm)} waypoints")
+            for i, wp in enumerate(path_mm):
                 print(f"  [{i}] {wp}")
 
-        return path
+        return path_mm
 
-    # ── Détection d'obstacle sur un segment ───────────────────────────────
+    def plan_full_route(self, start: Position, targets: List[Position],
+                        obstacles: List[ObjectInfo]) -> List[Position]:
+        """Planifie un chemin complet passant par tous les targets dans l'ordre.
 
-    def _find_blocking_obstacle(self, seg_start: Position,
-                                seg_end: Position,
-                                obstacles: List[ObjectInfo]
-                                ) -> ObjectInfo | None:
-        """Trouve le premier obstacle qui bloque le segment."""
-        for obs in obstacles:
-            dist = self._point_to_segment_distance(
-                obs.position, seg_start, seg_end
-            )
-            if dist < OBSTACLE_SAFETY_MARGIN_MM:
-                return obs
-        return None
-
-    @staticmethod
-    def _point_to_segment_distance(point: Position,
-                                   seg_a: Position,
-                                   seg_b: Position) -> float:
-        """Distance d'un point à un segment [A, B]."""
-        dx = seg_b.x - seg_a.x
-        dy = seg_b.y - seg_a.y
-        seg_len_sq = dx * dx + dy * dy
-
-        if seg_len_sq < 1e-6:
-            return point.distance_to(seg_a)
-
-        # Projection du point sur le segment (t ∈ [0, 1])
-        t = ((point.x - seg_a.x) * dx + (point.y - seg_a.y) * dy) / seg_len_sq
-        t = max(0.0, min(1.0, t))
-
-        proj = Position(seg_a.x + t * dx, seg_a.y + t * dy)
-        return point.distance_to(proj)
-
-    def _compute_detour(self, seg_start: Position, seg_end: Position,
-                        obstacle_pos: Position) -> Position:
-        """Calcule un waypoint de contournement autour d'un obstacle.
-
-        Stratégie : décalage perpendiculaire au segment, du côté le plus
-        éloigné du bord de la table.
+        Concatène les chemins A* entre chaque paire de waypoints consécutifs.
+        Utilisé pendant la phase init pour pré-calculer toute la route.
         """
-        # Vecteur du segment
-        dx = seg_end.x - seg_start.x
-        dy = seg_end.y - seg_start.y
-        seg_len = math.hypot(dx, dy)
+        if not targets:
+            return [start]
 
-        if seg_len < 1e-6:
-            return Position(obstacle_pos.x + OBSTACLE_SAFETY_MARGIN_MM,
-                            obstacle_pos.y)
+        full_path = []
+        current = start
 
-        # Vecteur perpendiculaire normalisé (2 options : gauche ou droite)
-        nx = -dy / seg_len
-        ny = dx / seg_len
+        for i, target in enumerate(targets):
+            if DEBUG:
+                print(f"[Planner] Segment {i + 1}/{len(targets)}: "
+                      f"{current} → {target}")
 
-        offset = OBSTACLE_SAFETY_MARGIN_MM * 1.5
+            segment = self.plan_path(current, target, obstacles)
 
-        # Option A : décalage positif
-        detour_a = Position(obstacle_pos.x + nx * offset,
-                            obstacle_pos.y + ny * offset)
-        # Option B : décalage négatif
-        detour_b = Position(obstacle_pos.x - nx * offset,
-                            obstacle_pos.y - ny * offset)
+            # Éviter les doublons au point de jonction
+            if full_path and segment:
+                segment = segment[1:]
 
-        # Choisir le détour qui reste le plus dans la table
-        score_a = self._in_table_score(detour_a)
-        score_b = self._in_table_score(detour_b)
+            full_path.extend(segment)
+            current = target
 
-        chosen = detour_a if score_a >= score_b else detour_b
+        if DEBUG:
+            print(f"[Planner] Route complète: {len(full_path)} waypoints "
+                  f"pour {len(targets)} cibles")
 
-        # Clamp dans la table
-        chosen.x = max(50, min(TABLE_W_MM - 50, chosen.x))
-        chosen.y = max(50, min(TABLE_H_MM - 50, chosen.y))
-
-        return chosen
-
-    @staticmethod
-    def _in_table_score(pos: Position) -> float:
-        """Score : plus le point est loin des bords, plus le score est haut."""
-        return min(pos.x, TABLE_W_MM - pos.x, pos.y, TABLE_H_MM - pos.y)
+        return full_path
 
     # ── Conversion path → actions ─────────────────────────────────────────
 
