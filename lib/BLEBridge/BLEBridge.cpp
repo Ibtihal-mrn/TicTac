@@ -208,6 +208,14 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         cmd.type = RobotCommandType::RESET;
     } else if (strcmp(upper, "PING") == 0) {
         cmd.type = RobotCommandType::PING;
+    } else if (strcmp(upper, "CLEAR_QUEUE") == 0) {
+        // Vider la queue de commandes immediatement
+        xQueueReset(cmdQueue_);
+        Serial.println("[BLE] CLEAR_QUEUE: queue videe");
+        bleBridge.sendLog("[ESP32] CLEAR_QUEUE: queue videe");
+        // Enqueue un STOP pour arreter le mouvement en cours
+        cmd.type = RobotCommandType::STOP;
+        cmd.value = 0;
     } else {
         // Commande inconnue — on l'envoie quand même avec NONE
         cmd.type = RobotCommandType::NONE;

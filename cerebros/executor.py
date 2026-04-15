@@ -1,11 +1,12 @@
-"""
-cerebros/executor.py — Exécuteur d'actions.
+﻿"""
+cerebros/executor.py -- Executeur d'actions.
 
-Consomme la file d'actions et appelle send_action() pour chaque commande.
-NE CONTIENT PAS de BLE — utilise une fonction callback pour l'envoi.
+Envoie la queue complete d'actions au robot via BLE d'un coup.
+Le robot stocke et execute les commandes localement (robuste
+en cas de perte de connexion).
 
-L'executor gère le timing entre les commandes et attend la confirmation
-(ou un timeout) avant de passer à la commande suivante.
+Pendant le match, l'executor ne fait que surveiller l'etat.
+En cas de replan, il envoie CLEAR_QUEUE + nouvelle queue.
 """
 
 from __future__ import annotations
@@ -19,19 +20,19 @@ from cerebros.models import Action, ActionType, RobotStatus
 from cerebros.robot_state import RobotState
 
 
-# Type pour la callback d'envoi — fournie par l'appelant (UI, BLE, mock…)
+# Type pour la callback d'envoi
 SendActionFn = Callable[[str], None]
+
+# Delai entre chaque commande BLE pour ne pas saturer le buffer
+BLE_SEND_DELAY_S = 0.05   # 50ms entre chaque commande
 
 
 class Executor:
-    """Exécute les actions de la file en appelant send_action().
+    """Envoie la queue complete au robot et surveille l'execution.
 
-    Usage:
-        def my_send(cmd: str):
-            print(f"Envoi BLE: {cmd}")
-
-        executor = Executor(action_queue, robot_state, send_fn=my_send)
-        executor.tick()  # dans la boucle principale
+    Le robot ESP32 stocke les commandes dans sa cmdQueue FreeRTOS (64 slots)
+    et les execute sequentiellement. Le PC n'a plus besoin de piloter
+    commande par commande.
     """
 
     def __init__(self, action_queue: ActionQueue,
@@ -40,134 +41,93 @@ class Executor:
         self._queue = action_queue
         self._robot = robot_state
         self._send_fn = send_fn or self._default_send
-        self._current_action: Optional[Action] = None
-        self._action_sent_at: float = 0.0
-        self._action_timeout_s: float = 5.0    # timeout par défaut
-        self._min_delay_between_s: float = 0.3  # délai minimum entre 2 commandes
-        self._last_send_time: float = 0.0
+        self._queue_sent = False
 
         if DEBUG:
-            print("[Executor] Initialisé — prêt à exécuter des actions")
+            print("[Executor] Initialise")
 
     def set_send_function(self, fn: SendActionFn) -> None:
-        """Change la fonction d'envoi (pour brancher le BLE plus tard)."""
         self._send_fn = fn
         if DEBUG:
-            print("[Executor] Fonction d'envoi mise à jour")
+            print("[Executor] Fonction d'envoi mise a jour")
 
-    # ── Tick principal ────────────────────────────────────────────────────
+    # -- Envoi de la queue complete ------------------------------------
 
-    def tick(self) -> bool:
-        """Appelé à chaque itération de la boucle principale.
+    def send_full_queue(self) -> int:
+        """Envoie toute la queue d'actions au robot d'un coup.
+
+        Chaque action est envoyee comme commande BLE individuelle,
+        avec un petit delai pour ne pas saturer le buffer.
+        Le robot les stocke dans sa cmdQueue FreeRTOS.
 
         Returns:
-            True si une action a été envoyée ou est en cours,
-            False si la file est vide et rien n'est en cours.
+            Nombre d'actions envoyees.
         """
-        now = time.time()
+        count = 0
+        total = self._queue.size
 
-        # ── Action en cours ? Vérifier timeout ────────────────────────
-        if self._current_action is not None:
-            elapsed = now - self._action_sent_at
+        while not self._queue.is_empty():
+            action = self._queue.dequeue()
+            if action is None:
+                break
 
-            # Le robot est-il revenu IDLE ? → action terminée
-            if self._robot.is_idle() and elapsed > self._min_delay_between_s:
-                if DEBUG:
-                    print(f"[Executor] Action terminée: {self._current_action} "
-                          f"({elapsed:.2f}s)")
-                self._current_action = None
-                return True
+            cmd = action.to_command()
+            if DEBUG:
+                print(f"[Executor] >>> ENVOI [{count + 1}/{total}]: '{cmd}'")
 
-            # Timeout ?
-            if elapsed > self._action_timeout_s:
-                if DEBUG:
-                    print(f"[Executor] TIMEOUT sur {self._current_action} "
-                          f"({elapsed:.1f}s)")
-                self._current_action = None
-                # On continue avec la prochaine action
+            self._send_fn(cmd)
+            count += 1
 
-            return True  # action en cours
+            # Petit delai pour ne pas saturer le BLE
+            time.sleep(BLE_SEND_DELAY_S)
 
-        # ── Prochaine action ──────────────────────────────────────────
-        if self._queue.is_empty():
+        self._queue_sent = True
+        self._robot.set_status(RobotStatus.MOVING)
+
+        print(f"[Executor] Queue complete envoyee: {count} actions au robot")
+        return count
+
+    # -- Tick (monitoring only) ----------------------------------------
+
+    def tick(self) -> bool:
+        """Tick de monitoring. Retourne True si le robot est occupe."""
+        if not self._queue_sent:
             return False
+        return self._robot.status not in (RobotStatus.IDLE, RobotStatus.STOPPED)
 
-        # Respect du délai minimum
-        if (now - self._last_send_time) < self._min_delay_between_s:
-            return True
-
-        action = self._queue.dequeue()
-        if action is None:
-            return False
-
-        # Envoyer la commande
-        cmd = action.to_command()
-        self._current_action = action
-        self._action_sent_at = now
-        self._last_send_time = now
-
-        # Adapter le timeout selon le type d'action
-        self._action_timeout_s = self._estimate_timeout(action)
-
-        # Mettre à jour le statut du robot
-        self._update_robot_status(action)
-
-        if DEBUG:
-            print(f"[Executor] >>> ENVOI: '{cmd}' "
-                  f"(timeout={self._action_timeout_s:.1f}s)")
-
-        self._send_fn(cmd)
-        return True
-
-    # ── Helpers ───────────────────────────────────────────────────────────
-
-    def _estimate_timeout(self, action: Action) -> float:
-        """Estime un timeout raisonnable pour une action."""
-        if action.action_type in (ActionType.FORWARD, ActionType.BACKWARD):
-            # ~200mm/s → timeout proportionnel à la distance
-            dist = action.value or 200
-            return max(2.0, dist / 150.0)
-        if action.action_type in (ActionType.LEFT, ActionType.RIGHT):
-            return 3.0
-        if action.action_type in (ActionType.DEPLOY, ActionType.RETRACT):
-            return 4.0
-        return 2.0
-
-    def _update_robot_status(self, action: Action) -> None:
-        """Met à jour le statut du robot en fonction de l'action envoyée."""
-        if action.action_type in (ActionType.FORWARD, ActionType.BACKWARD):
-            self._robot.set_status(RobotStatus.MOVING)
-        elif action.action_type in (ActionType.LEFT, ActionType.RIGHT):
-            self._robot.set_status(RobotStatus.TURNING)
-        elif action.action_type in (ActionType.DEPLOY, ActionType.RETRACT):
-            self._robot.set_status(RobotStatus.DEPLOYING)
-        elif action.action_type == ActionType.STOP:
-            self._robot.set_status(RobotStatus.STOPPED)
-
-    @staticmethod
-    def _default_send(cmd: str) -> None:
-        """Fonction d'envoi par défaut (print uniquement)."""
-        print(f"[Executor] DEFAULT SEND (pas de BLE) → '{cmd}'")
-
-    # ── Contrôle ──────────────────────────────────────────────────────────
+    # -- Controle ------------------------------------------------------
 
     def abort(self) -> None:
-        """Arrête l'action en cours et vide la file."""
+        """Envoie CLEAR_QUEUE au robot (vide sa queue + STOP)
+        et vide la queue locale."""
         if DEBUG:
-            print("[Executor] ABORT — arrêt de toutes les actions")
-        self._current_action = None
+            print("[Executor] ABORT -- CLEAR_QUEUE")
+
         self._queue.clear()
-        # Envoyer STOP immédiatement
-        self._send_fn("STOP")
+        self._queue_sent = False
+        self._send_fn("CLEAR_QUEUE")
         self._robot.set_status(RobotStatus.STOPPED)
+
+    def send_command(self, cmd: str) -> None:
+        """Envoie une commande unique au robot (bypass queue)."""
+        if DEBUG:
+            print(f"[Executor] Commande directe: '{cmd}'")
+        self._send_fn(cmd)
 
     @property
     def is_busy(self) -> bool:
-        return self._current_action is not None or not self._queue.is_empty()
+        return self._queue_sent and not self._queue.is_empty()
+
+    @property
+    def queue_sent(self) -> bool:
+        return self._queue_sent
 
     def force_idle(self) -> None:
-        """Force le robot à l'état IDLE (confirmation externe)."""
+        """Force le robot a l'etat IDLE (confirmation externe)."""
         self._robot.set_status(RobotStatus.IDLE)
-        self._current_action = None
         if DEBUG:
-            print("[Executor] Force IDLE — prêt pour la prochaine action")
+            print("[Executor] Force IDLE")
+
+    @staticmethod
+    def _default_send(cmd: str) -> None:
+        print(f"[Executor] DEFAULT SEND (pas de BLE) -> '{cmd}'")

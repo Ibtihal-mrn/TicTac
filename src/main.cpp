@@ -20,6 +20,7 @@
 #include "config.h"          // Pins, adresses, config
 #include "globals.h"         // Mutex I2C
 #include "TeamSwitch.h"      // Team switch hardware
+#include "StartSwitch.h"     // Tirette (launch trigger)
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  DÉFINITION DES GLOBALES (déclarées "extern" dans globals.h)
@@ -34,6 +35,10 @@ volatile bool emergencyStop = false;  // Flag d'arrêt d'urgence (utilisé par r
 // Équipe lue depuis le team switch au boot
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 const char* currentTeam = "BLUE";  // par défaut, mis à jour dans setup()
+
+// ── Tirette (start switch) ───────────────────────────────────────────────────
+StartSwitch startSwitch((gpio_num_t)LAUNCH_TRIGGER_PIN);
+volatile bool matchStarted = false;  // passe à true quand la tirette est retirée
 
 // ── Contexte FSM (utilisé uniquement par Core 1) ────────────────────────────
 static FsmContext fsmCtx;
@@ -60,12 +65,22 @@ void bleTask(void* pvParameters) {
         // Flush les logs en attente vers le PC via BLE notify
         bleBridge.update();
 
+        // ── Détection tirette : insertion → retrait = MATCH START ──────────
+        if (!matchStarted && !startSwitch.isInserted()) {
+            // La tirette vient d'être retirée
+            matchStarted = true;
+            bleSerial.println("[EVENT] MATCH_START");
+            Serial.println("[BLE_TASK] Tirette retiree -> MATCH_START");
+        }
+
         // Heartbeat toutes les 5 secondes
         if (millis() - lastHeartbeat >= 5000) {
-            char hb[96];
-            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus | FSM=%s | team=%s",
+            char hb[128];
+            snprintf(hb, sizeof(hb),
+                     "[BLE] Heartbeat | connected=%d | uptime=%lus | FSM=%s | team=%s | tirette=%s",
                      bleBridge.isConnected(), millis() / 1000,
-                     fsmAlive ? "OK" : "DEAD", currentTeam);
+                     fsmAlive ? "OK" : "DEAD", currentTeam,
+                     startSwitch.isInserted() ? "IN" : "OUT");
             bleSerial.println(hb);
             fsmAlive = false;  // Reset — doit être remis à true par fsmTask
             lastHeartbeat = millis();
@@ -122,6 +137,11 @@ void setup() {
     teamSwitch.begin();
     currentTeam = (teamSwitch.readTeam() == TeamSwitchTeam::A) ? "BLUE" : "YELLOW";
     Serial.printf("[SETUP] Team switch: %s\n", currentTeam);
+
+    // ── Start Switch (tirette) ───────────────────────────────────────────
+    startSwitch.begin();
+    Serial.printf("[SETUP] Start switch: %s\n",
+                  startSwitch.isInserted() ? "INSERTED" : "NOT INSERTED");
     // ── Timers pour ESP32Servo (DOIT être fait avant bras_init) ──────────────
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);

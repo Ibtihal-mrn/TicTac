@@ -42,15 +42,16 @@ class RobotStatus(Enum):
 
 class ActionType(Enum):
     """Commandes connues par le robot ESP32."""
-    FORWARD  = "FORWARD"
-    BACKWARD = "BACKWARD"
-    LEFT     = "LEFT"
-    RIGHT    = "RIGHT"
-    DEPLOY   = "DEPLOY"
-    RETRACT  = "RETRACT"
-    STOP     = "STOP"
-    STATUS   = "STATUS"
-    RESET    = "RESET"
+    FORWARD     = "FORWARD"
+    BACKWARD    = "BACKWARD"
+    LEFT        = "LEFT"
+    RIGHT       = "RIGHT"
+    DEPLOY      = "DEPLOY"
+    RETRACT     = "RETRACT"
+    STOP        = "STOP"
+    STATUS      = "STATUS"
+    RESET       = "RESET"
+    CLEAR_QUEUE = "CLEAR_QUEUE"
 
 
 # ── Position ──────────────────────────────────────────────────────────────────

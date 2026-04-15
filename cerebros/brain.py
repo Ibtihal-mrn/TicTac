@@ -208,6 +208,9 @@ class Brain:
         print(f"[Brain] Actions en queue: {self.action_queue.size}")
         print("=" * 60 + "\n")
 
+        # Envoyer la queue complète au robot
+        self.executor.send_full_queue()
+
     def tick(self) -> None:
         """Un cycle de la boucle principale. Appeler à ~10 Hz."""
         self._tick_count += 1
@@ -326,11 +329,11 @@ class Brain:
         # Reconstruire la route dans le mission manager
         self.mission_mgr.rebuild_route_from(remaining)
 
-        # Envoyer la nouvelle queue
+        # Envoyer la nouvelle queue au robot
         self.action_queue.enqueue_many(actions)
-        self.robot.set_status(RobotStatus.IDLE)
+        self.executor.send_full_queue()
 
-        print(f"[Brain] Nouvelle queue: {len(actions)} actions")
+        print(f"[Brain] Nouvelle queue envoyée: {len(actions)} actions")
         print("-" * 40 + "\n")
 
     # ── Boucle principale ─────────────────────────────────────────────

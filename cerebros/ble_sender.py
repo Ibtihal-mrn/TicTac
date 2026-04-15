@@ -29,6 +29,8 @@ class BLEBridge:
         self._rx_char = None
         self._connected = False
         self._detected_team: Optional[str] = None  # "BLUE" ou "YELLOW", lu depuis le heartbeat
+        self._tirette_inserted: Optional[bool] = None  # True=IN, False=OUT
+        self._match_started: bool = False  # passe a True sur [EVENT] MATCH_START
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -84,19 +86,37 @@ class BLEBridge:
         text = data.decode("utf-8", errors="replace").strip()
         if text:
             print(f"[BLE <-] {text}")
-            # Parse team from heartbeat: "[BLE] Heartbeat | ... | team=BLUE"
-            if "team=" in text and self._detected_team is None:
+
+            # Detect [EVENT] MATCH_START (tirette retiree)
+            if "MATCH_START" in text:
+                self._match_started = True
+                print("[BLEBridge] >>> MATCH_START recu! <<<")
+
+            # Parse heartbeat: "[BLE] Heartbeat | ... | team=BLUE | tirette=IN"
+            if "Heartbeat" in text:
                 for part in text.split("|"):
                     part = part.strip()
-                    if part.startswith("team="):
+                    if part.startswith("team=") and self._detected_team is None:
                         self._detected_team = part.split("=", 1)[1].strip()
-                        print(f"[BLEBridge] Team détectée depuis ESP32: {self._detected_team}")
-                        break
+                        print(f"[BLEBridge] Team detectee depuis ESP32: {self._detected_team}")
+                    elif part.startswith("tirette="):
+                        val = part.split("=", 1)[1].strip()
+                        self._tirette_inserted = (val == "IN")
 
     @property
     def detected_team(self) -> Optional[str]:
-        """Retourne l'équipe lue depuis le heartbeat ESP32, ou None si pas encore reçu."""
+        """Retourne l'equipe lue depuis le heartbeat ESP32, ou None si pas encore recu."""
         return self._detected_team
+
+    @property
+    def tirette_inserted(self) -> Optional[bool]:
+        """True si la tirette est inseree, False si retiree, None si inconnu."""
+        return self._tirette_inserted
+
+    @property
+    def match_started(self) -> bool:
+        """True des que l'event MATCH_START a ete recu."""
+        return self._match_started
 
     # -- Envoi (sync, utilisable comme callback Executor) --------------
 
