@@ -11,6 +11,8 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "globals.h"
+
 // ── Singletons ───────────────────────────────────────────────────────────────
 BLEBridge bleBridge;
 BleSerial bleSerial;
@@ -181,29 +183,46 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         param = atof(space + 1);
     }
 
+    // FORWARD
     if (strcmp(upper, "FORWARD") == 0 || strcmp(upper, "MOVE_FORWARD") == 0) {
         cmd.type = CommandType::MoveForward;
         cmd.value = param;
         cmd.speed = DEFAULT_MOVE_SPEED;
+    // BACKWARD
     } else if (strcmp(upper, "BACKWARD") == 0 || strcmp(upper, "MOVE_BACKWARD") == 0) {
         cmd.type = CommandType::MoveBackward;
         cmd.value = param;
         cmd.speed = DEFAULT_MOVE_SPEED;
+    // ROTATE
     } else if (strcmp(upper, "ROTATE") == 0) {
         cmd.type = CommandType::Rotate;
         cmd.value = param;
         cmd.speed = DEFAULT_ROTATE_SPEED;
+    // WAIT
     } else if (strcmp(upper, "WAIT") == 0) {
         cmd.type = CommandType::Wait;
         cmd.waitMs = (unsigned long)param;
+    // DEPLOY
     } else if (strcmp(upper, "DEPLOY") == 0) {
         cmd.type = CommandType::DeployServo;
+    // RETRACT
     } else if (strcmp(upper, "RETRACT") == 0) {
         cmd.type = CommandType::RetractServo;
+    // PING
     } else if (strcmp(upper, "PING") == 0) {
         cmd.type = CommandType::Ping;
+    
+    // CLEAR QUEUE
     } else if (strcmp(upper, "CLEAR") == 0 || strcmp(upper, "CLEARQUEUE") == 0) {
         cmd.type = CommandType::ClearQueue;
+    
+    // STOP EMERGENCY
+    } else if (strcmp(upper, "STOP") == 0) {
+        bleStopRequested = true;
+        bleBridge.sendLog("[ESP32] BLE STOP received");
+        return;
+
+    // UNKNOWN COMMAND / ERROR
     } else {
         Serial.printf("[BLE] Commande inconnue: '%s'\n", localRaw);
         char fb[BLE_MAX_MSG_LEN];

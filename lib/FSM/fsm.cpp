@@ -161,8 +161,6 @@ const char* commandTypeToString(CommandType type)
         default:                          return "Unknown";
     }
 }
-
-
 void printCommand(const RobotCommand &cmd){
     Serial.print("[CMD] ");
     Serial.print(commandTypeToString(cmd.type));
@@ -173,25 +171,40 @@ void printCommand(const RobotCommand &cmd){
     Serial.print(" waitMs=");
     Serial.println(cmd.waitMs);
 }
-
+static void clearCommandQueue(QueueHandle_t q) {
+    if (!q) return;
+    RobotCommand dropped;
+    while (xQueueReceive(q, &dropped, 0) == pdTRUE) {
+        // drop everything
+    }
+}
 
 
 // ========== FSM ============
 void robot_step(Context &ctx)
 {
-    if (emergencyStop) {
+    if (emergencyStopUS) {
         // motion.abort();
-        // emergencyStop = false;
+        // emergencyStopUS = false;
         // ctx.currentAction = Robot::EMERGENCY_STOP;
         static unsigned long Lpwm = 0;
         if (millis() - Lpwm >= 2000){
-            bleSerial.println("EmergencyStop");
+            bleSerial.println("emergencyStopUS");
             Lpwm = millis();
         }
     }
 
     // BLE Stop & Updates
+    if (bleStopRequested) {
+        motion.abort();
+        clearCommandQueue(ctx.commandQueue);
+        ctx.currentAction = Robot::EMERGENCY_STOP;
+        bleStopRequested = false;
 
+        Serial.println("[FSM] BLE STOP");
+        bleSerial.println("[FSM] BLE STOP");
+        return;
+    }
 
     // DBG
     #if DBG_FSM
@@ -200,7 +213,7 @@ void robot_step(Context &ctx)
             Serial.print("[FSM] state=");
             Serial.print(stateList[(int)ctx.currentAction]);
             Serial.print(" stop=");
-            Serial.print(emergencyStop);
+            Serial.print(emergencyStopUS);
             Serial.print(" busy=");
             Serial.println(motion.isBusy());
             lastStatePrintMs = millis();
@@ -271,7 +284,15 @@ void robot_step(Context &ctx)
                     ctx.currentAction = Robot::EXEC_WAIT;
                     break;
 
-                // case STEPPER_UP:
+                case CommandType::DeployServo:
+                    break;
+                case CommandType::RetractServo:
+                    break;
+
+                case CommandType::ClearQueue:
+                    clearCommandQueue(ctx.commandQueue);
+                    break;
+
 
                 default: ctx.currentAction = Robot::DISPATCH_CMD; break;
             }
@@ -307,7 +328,7 @@ void robot_step(Context &ctx)
         case Robot::EMERGENCY_STOP:
             motion.abort();
             if (digitalRead(STOP_PIN) == LOW) {
-                emergencyStop = false;
+                emergencyStopUS = false;
                 ctx.currentAction = Robot::IDLE;
             }
             break;

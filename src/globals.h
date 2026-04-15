@@ -11,4 +11,5 @@
 //  Le mutex garantit qu'un seul périphérique accède au bus à la fois.
 extern SemaphoreHandle_t i2cMutex;
 
-extern volatile bool emergencyStop;
+extern volatile bool emergencyStopUS;
+extern volatile bool bleStopRequested;

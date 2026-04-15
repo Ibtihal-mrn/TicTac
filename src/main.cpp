@@ -44,10 +44,12 @@ TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 Context fsmCtx{};
 
-// OBSTACLE : Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
-volatile bool emergencyStop = false;  //extern in globals.h
-void IRAM_ATTR stopISR() { emergencyStop = digitalRead(STOP_PIN); }
+// OBSTACLE flag : Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
+volatile bool emergencyStopUS = false;  //extern in globals.h
+void IRAM_ATTR stopISR() { emergencyStopUS = digitalRead(STOP_PIN); }
 
+// BLE flag
+volatile bool bleStopRequested = false;
 
 // TODO: remove/obfuscate this :
 // const int RELAY_PIN = 41;
