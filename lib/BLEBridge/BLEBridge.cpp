@@ -11,7 +11,7 @@
 #include <cstring>
 #include <cstdlib>
 
-#include "globals.h"
+#include "../../src/globals.h"
 
 // ── Singletons ───────────────────────────────────────────────────────────────
 BLEBridge bleBridge;
