@@ -1,8 +1,11 @@
 """
-cerebros/brain.py — Boucle principale temps réel du cerveau robot.
+cerebros/brain.py — Boucle principale du cerveau robot.
 
-Orchestre tous les modules :
-  Vision → WorldState → MissionManager → Planner → ActionQueue → Executor
+Deux phases :
+  1. INIT  — Avant la tirette : la vision détecte la table, on calcule
+             les chemins A* et on envoie la queue complète au robot.
+  2. RUN   — Après la tirette : monitoring simple — on vérifie que le
+             robot exécute correctement, et on replanifie si nécessaire.
 
 Usage:
     from cerebros.brain import Brain
@@ -14,13 +17,18 @@ Usage:
     # Depuis la vision (appelé régulièrement) :
     brain.feed_vision([("BR1", 5, 10), ("BLUE55", 20, 8), ...])
 
-    # Boucle principale :
-    brain.run()   # ou brain.tick() dans votre propre boucle
+    # Phase 1 — Init (avant tirette) :
+    brain.init_plan()          # calcule A* et prépare la queue
+
+    # Phase 2 — Tirette tirée :
+    brain.start_match()
+    brain.run()                # boucle de monitoring
 """
 
 from __future__ import annotations
 
 import time
+from enum import Enum, auto
 from typing import Callable, List, Optional, Tuple
 
 from cerebros import config
@@ -28,13 +36,18 @@ from cerebros.actions import ActionQueue
 from cerebros.config import DEBUG
 from cerebros.executor import Executor, SendActionFn
 from cerebros.mission_manager import MissionManager
-from cerebros.models import (
-    Action, ActionType, Mission, MissionStatus,
-    ObjectType, Position, RobotStatus, Team,
-)
+from cerebros.models import Position, RobotStatus, Team
 from cerebros.planner import Planner
 from cerebros.robot_state import RobotState
 from cerebros.world_state import WorldState
+
+
+class BrainPhase(Enum):
+    """Phase du cerveau."""
+    INIT = auto()       # Avant tirette : détection + planification A*
+    READY = auto()      # Plan calculé, en attente de la tirette
+    RUNNING = auto()    # Match en cours : monitoring
+    FINISHED = auto()   # Match terminé
 
 
 class Brain:
@@ -63,11 +76,16 @@ class Brain:
         self.executor = Executor(self.action_queue, self.robot)
 
         # ── État interne ──────────────────────────────────────────────
-        self._running = False
+        self.phase = BrainPhase.INIT
         self._match_start: Optional[float] = None
         self._tick_count = 0
-        self._current_mission: Optional[Mission] = None
-        self._needs_replan = False
+
+        # ── Monitoring ────────────────────────────────────────────────
+        self._monitoring_deviation_threshold_mm = config.REPLAN_DISTANCE_MM
+        self._monitoring_stuck_ticks = 0
+        self._monitoring_stuck_threshold = 30   # ~3s à 10Hz
+        self._last_robot_pos = Position(self.robot.position.x,
+                                        self.robot.position.y)
 
         print(f"[Brain] Prêt. Robot à {self.robot.position}, "
               f"heading={self.robot.heading_deg}°")
@@ -91,164 +109,243 @@ class Brain:
         """
         self.world.update_from_vision(detections)
 
-        # Mettre à jour le heading du robot si la vision le fournit
         if robot_heading is not None and self.robot is not None:
             self.robot.heading_deg = robot_heading
             if config.DEBUG:
                 print(f"[Brain] Heading vision: {robot_heading:.1f}°")
 
-        # Vérifier si le monde a changé significativement → replanifier
-        if self._current_mission and not self.executor.is_busy:
-            self._needs_replan = True
+    # ══════════════════════════════════════════════════════════════════
+    # PHASE 1 — INIT : Planification A* avant la tirette
+    # ══════════════════════════════════════════════════════════════════
 
-    # ── Tick unique ───────────────────────────────────────────────────
+    def init_plan(self, target_positions: Optional[List[Position]] = None,
+                  target_labels: Optional[List[str]] = None) -> bool:
+        """Calcule les chemins A* et prépare la queue d'actions complète.
+
+        Args:
+            target_positions: liste ordonnée de positions objectifs (mm).
+                              Si None, utilise les goals détectés par la vision.
+            target_labels: labels optionnels pour chaque objectif.
+
+        Returns:
+            True si le plan a été calculé avec succès.
+        """
+        print("\n" + "=" * 60)
+        print("[Brain] === PHASE INIT — Planification A* ===")
+        print("=" * 60)
+
+        # Déterminer les cibles
+        if target_positions is None:
+            goals = self.world.get_goals()
+            if not goals:
+                print("[Brain] Aucun goal détecté — impossible de planifier")
+                return False
+            # Trier par distance depuis le robot (plus proche d'abord)
+            goals.sort(key=lambda g: self.robot.position.distance_to(g.position))
+            target_positions = [g.position for g in goals]
+            target_labels = [g.label for g in goals]
+            print(f"[Brain] {len(goals)} goals détectés par la vision")
+        else:
+            print(f"[Brain] {len(target_positions)} objectifs fournis manuellement")
+
+        # Récupérer les obstacles
+        obstacles = self.world.get_obstacles()
+        print(f"[Brain] {len(obstacles)} obstacles détectés")
+
+        # Afficher le plan
+        print("[Brain] Objectifs dans l'ordre:")
+        for i, pos in enumerate(target_positions):
+            label = target_labels[i] if target_labels and i < len(target_labels) else ""
+            print(f"  [{i + 1}] {pos} {label}")
+
+        # Définir la route dans le mission manager
+        self.mission_mgr.set_route(target_positions, target_labels)
+
+        # Calculer le chemin A* complet
+        full_path = self.planner.plan_full_route(
+            self.robot.position, target_positions, obstacles
+        )
+
+        if len(full_path) < 2:
+            print("[Brain] Chemin trop court — échec de planification")
+            return False
+
+        # Convertir en actions
+        actions = self.planner.path_to_actions(
+            full_path,
+            self.robot.heading_deg,
+            deploy_at_end=False,
+        )
+
+        # Remplir la file d'actions
+        self.action_queue.clear()
+        self.action_queue.enqueue_many(actions)
+
+        self.phase = BrainPhase.READY
+        print(f"\n[Brain] Plan prêt: {len(actions)} actions en queue")
+        print(f"[Brain] Route: {self.mission_mgr.progress}")
+        print("[Brain] En attente de la tirette (start_match)...")
+        print("=" * 60 + "\n")
+
+        return True
+
+    # ══════════════════════════════════════════════════════════════════
+    # PHASE 2 — RUN : Match en cours + monitoring
+    # ══════════════════════════════════════════════════════════════════
+
+    def start_match(self) -> None:
+        """Appelé quand la tirette est tirée — démarre le match."""
+        if self.phase not in (BrainPhase.READY, BrainPhase.INIT):
+            print(f"[Brain] WARN: start_match appelé en phase {self.phase.name}")
+
+        self.phase = BrainPhase.RUNNING
+        self._match_start = time.time()
+        self._tick_count = 0
+
+        print("\n" + "=" * 60)
+        print("[Brain] MATCH DÉMARRÉ!")
+        print(f"[Brain] Durée: {config.MATCH_DURATION_MS / 1000:.0f}s")
+        print(f"[Brain] Actions en queue: {self.action_queue.size}")
+        print("=" * 60 + "\n")
 
     def tick(self) -> None:
-        """Un cycle de décision. Appeler à ~10 Hz."""
+        """Un cycle de la boucle principale. Appeler à ~10 Hz."""
         self._tick_count += 1
+
+        if self.phase != BrainPhase.RUNNING:
+            return
 
         # ── Vérifier temps de match ───────────────────────────────────
         if self._match_start is not None:
             elapsed_ms = (time.time() - self._match_start) * 1000
             if elapsed_ms >= config.MATCH_DURATION_MS:
-                print("[Brain] ⏰ FIN DU MATCH — STOP")
+                print("[Brain] FIN DU MATCH — STOP")
                 self.executor.abort()
-                self._running = False
+                self.phase = BrainPhase.FINISHED
                 return
 
-        # ── L'executor a-t-il fini ? ──────────────────────────────────
-        executor_busy = self.executor.tick()
+        # ── Faire avancer l'executor ──────────────────────────────────
+        self.executor.tick()
 
-        # ── Mission active : vérifier complétion ──────────────────────
-        if self._current_mission:
-            if self.mission_mgr.is_goal_reached(
-                    self.robot.position, self._current_mission):
-                # Goal atteint !
-                self._on_mission_reached()
-                return
+        # ── Vérifier si on a atteint un objectif ─────────────────────
+        self.mission_mgr.check_and_advance(self.robot.position)
 
-            if not executor_busy and self.action_queue.is_empty():
-                # Toutes les actions envoyées mais goal pas atteint
-                # → la mission est probablement complétée (ou il faut replanifier)
-                if DEBUG:
-                    print("[Brain] Actions terminées, vérification du goal...")
-                dist = self.robot.position.distance_to(
-                    self._current_mission.target.position)
-                if dist < config.GOAL_REACHED_THRESHOLD_MM * 2:
-                    self._on_mission_reached()
-                else:
-                    # Replanifier
-                    self._needs_replan = True
-
-        # ── Besoin de replanifier ? ───────────────────────────────────
-        if self._needs_replan and self._current_mission:
-            self._needs_replan = False
-            self._plan_current_mission()
+        # ── Route terminée ? ──────────────────────────────────────────
+        if self.mission_mgr.is_route_complete and self.action_queue.is_empty():
+            print(f"[Brain] Route terminée! "
+                  f"{self.mission_mgr.progress} objectifs atteints")
+            self.phase = BrainPhase.FINISHED
             return
 
-        # ── Pas de mission active → en chercher une ──────────────────
-        if self._current_mission is None and not executor_busy:
-            self._select_next_mission()
+        # ── Monitoring ────────────────────────────────────────────────
+        self._monitor()
 
         # ── Debug périodique ──────────────────────────────────────────
         if DEBUG and self._tick_count % 50 == 0:
             self._debug_status()
 
-    # ── Logique de mission ────────────────────────────────────────────
+    def _monitor(self) -> None:
+        """Monitoring simple pendant l'exécution.
 
-    def _select_next_mission(self) -> None:
-        """Sélectionne et planifie la prochaine mission."""
-        # Générer des missions à partir des goals visibles
-        goals = self.world.get_goals()
-        if goals:
-            self.mission_mgr.generate_missions_from_goals(
-                goals, self.robot.position
+        Vérifie :
+          1. Le robot progresse (pas bloqué / ultrasons)
+          2. Le robot est sur la bonne trajectoire
+
+        Si problème détecté → clear queue + replan depuis la position actuelle.
+        """
+        # ── Détection de blocage (ultrasons / immobilité) ─────────────
+        dist_moved = self.robot.position.distance_to(self._last_robot_pos)
+
+        if dist_moved < 5:  # < 5mm de mouvement
+            self._monitoring_stuck_ticks += 1
+        else:
+            self._monitoring_stuck_ticks = 0
+            self._last_robot_pos = Position(
+                self.robot.position.x, self.robot.position.y
             )
 
-        # Choisir la meilleure mission
-        mission = self.mission_mgr.get_next_mission(self.robot.position)
-        if mission is None:
-            if DEBUG and self._tick_count % 30 == 0:
-                print("[Brain] Aucune mission disponible — en attente")
+        if self._monitoring_stuck_ticks >= self._monitoring_stuck_threshold:
+            if not self.action_queue.is_empty():
+                print(f"[Brain] MONITORING: Robot bloqué depuis "
+                      f"{self._monitoring_stuck_ticks} ticks — replan!")
+                self._replan_from_current()
+                self._monitoring_stuck_ticks = 0
+                return
+
+        # ── Vérification de la trajectoire ────────────────────────────
+        target = self.mission_mgr.current_target_position
+        if target is not None:
+            # Si le robot est très loin de sa cible actuelle par rapport
+            # à la distance attendue, il s'est peut-être écarté
+            expected_dist = self.robot.position.distance_to(target)
+            if expected_dist > self._monitoring_deviation_threshold_mm * 3:
+                # On ne replan que si la queue n'est pas en train de corriger
+                if self._tick_count % 100 == 0 and DEBUG:
+                    print(f"[Brain] MONITORING: dist au target={expected_dist:.0f}mm")
+
+    def _replan_from_current(self) -> None:
+        """Replanifie depuis la position actuelle vers les objectifs restants.
+
+        1. Clear la queue du robot
+        2. Recalcule A* pour les objectifs non atteints
+        3. Envoie la nouvelle queue
+        """
+        print("\n" + "-" * 40)
+        print("[Brain] REPLAN depuis position actuelle")
+        print("-" * 40)
+
+        # Envoyer STOP + clear queue
+        self.executor.abort()
+
+        # Objectifs restants
+        remaining = self.mission_mgr.get_remaining_targets()
+        if not remaining:
+            print("[Brain] Aucun objectif restant — rien à replanifier")
             return
 
-        self._current_mission = mission
-        print(f"[Brain] === NOUVELLE MISSION === {mission}")
-        self._plan_current_mission()
-
-    def _plan_current_mission(self) -> None:
-        """Planifie le chemin vers la mission active."""
-        if self._current_mission is None:
-            return
-
-        target_pos = self._current_mission.target.position
         obstacles = self.world.get_obstacles()
 
-        print(f"[Brain] Planification vers {target_pos} "
-              f"({len(obstacles)} obstacles)")
+        print(f"[Brain] {len(remaining)} objectifs restants, "
+              f"{len(obstacles)} obstacles")
 
-        # Vider l'ancienne file
-        self.action_queue.clear()
-
-        # Planifier le chemin
-        path = self.planner.plan_path(
-            self.robot.position, target_pos, obstacles
+        # Recalculer le chemin A*
+        full_path = self.planner.plan_full_route(
+            self.robot.position, remaining, obstacles
         )
+
+        if len(full_path) < 2:
+            print("[Brain] Échec du replan — chemin trop court")
+            return
 
         # Convertir en actions
         actions = self.planner.path_to_actions(
-            path,
+            full_path,
             self.robot.heading_deg,
-            deploy_at_end=self._current_mission.requires_deploy,
         )
 
-        # Remplir la file
+        # Reconstruire la route dans le mission manager
+        self.mission_mgr.rebuild_route_from(remaining)
+
+        # Envoyer la nouvelle queue
         self.action_queue.enqueue_many(actions)
-
-        print(f"[Brain] {len(actions)} actions en file d'attente")
-
-    def _on_mission_reached(self) -> None:
-        """Appelé quand le robot atteint le goal de la mission."""
-        if self._current_mission is None:
-            return
-
-        print(f"[Brain] 🎯 MISSION ACCOMPLIE : {self._current_mission}")
-        self.mission_mgr.complete_mission(self._current_mission)
-
-        # Retirer l'objet du monde (ramassé)
-        self.world.remove_object(self._current_mission.target.marker_id)
-        self._current_mission = None
-
-        # Rétracter le bras après déploiement
-        self.action_queue.enqueue(Action(ActionType.RETRACT))
-
         self.robot.set_status(RobotStatus.IDLE)
+
+        print(f"[Brain] Nouvelle queue: {len(actions)} actions")
+        print("-" * 40 + "\n")
 
     # ── Boucle principale ─────────────────────────────────────────────
 
     def run(self) -> None:
-        """Boucle principale temps réel. Bloquante.
+        """Boucle principale temps réel (phase RUN). Bloquante."""
+        if self.phase == BrainPhase.READY:
+            self.start_match()
 
-        Appeller dans un thread ou comme programme principal.
-        Ctrl+C pour arrêter.
-        """
-        self._running = True
-        self._match_start = time.time()
-
-        print("\n" + "=" * 60)
-        print("[Brain] 🚀 DÉMARRAGE DE LA BOUCLE PRINCIPALE")
-        print(f"[Brain] Fréquence: {config.BRAIN_LOOP_HZ} Hz "
-              f"(dt={config.BRAIN_LOOP_DT_S*1000:.0f}ms)")
-        print(f"[Brain] Durée match: {config.MATCH_DURATION_MS/1000:.0f}s")
-        print("=" * 60 + "\n")
+        print(f"[Brain] Boucle de monitoring à {config.BRAIN_LOOP_HZ} Hz")
 
         try:
-            while self._running:
+            while self.phase == BrainPhase.RUNNING:
                 t_start = time.time()
-
                 self.tick()
-
-                # Respect du timing de la boucle
                 elapsed = time.time() - t_start
                 sleep_time = config.BRAIN_LOOP_DT_S - elapsed
                 if sleep_time > 0:
@@ -258,14 +355,16 @@ class Brain:
             print("\n[Brain] Interruption clavier — arrêt")
             self.stop()
 
+        print(f"[Brain] Fin du match. Progression: {self.mission_mgr.progress}")
+
     def stop(self) -> None:
         """Arrête proprement le cerveau."""
         print("[Brain] Arrêt en cours...")
-        self._running = False
+        self.phase = BrainPhase.FINISHED
         self.executor.abort()
         print("[Brain] Arrêté.")
 
-    # ── Commandes manuelles (pour debug / UI) ─────────────────────────
+    # ── Commandes manuelles ───────────────────────────────────────────
 
     def send_manual_command(self, cmd: str) -> None:
         """Envoie une commande manuelle au robot (bypass la file)."""
@@ -274,14 +373,17 @@ class Brain:
 
     def force_stop(self) -> None:
         """Arrêt d'urgence."""
-        print("[Brain] ⚠ ARRÊT D'URGENCE")
+        print("[Brain] ARRÊT D'URGENCE")
         self.executor.abort()
-        self._current_mission = None
+        self.phase = BrainPhase.FINISHED
+
+    def force_replan(self) -> None:
+        """Force un replan depuis la position actuelle (appelable depuis l'UI)."""
+        self._replan_from_current()
 
     # ── Debug ─────────────────────────────────────────────────────────
 
     def _debug_status(self) -> None:
-        """Affiche un résumé de l'état (appelé périodiquement)."""
         elapsed = ""
         if self._match_start:
             e = time.time() - self._match_start
@@ -290,8 +392,7 @@ class Brain:
         print(f"[Brain] tick#{self._tick_count} | "
               f"robot={self.robot.position} heading={self.robot.heading_deg:.0f}° "
               f"status={self.robot.status.name} | "
-              f"missions: {self.mission_mgr.completed_count} done, "
-              f"{self.mission_mgr.pending_count} pending | "
+              f"route: {self.mission_mgr.progress} | "
               f"queue: {self.action_queue.size} actions"
               f"{elapsed}")
 
@@ -300,9 +401,9 @@ class Brain:
         print("\n" + "#" * 60)
         print("# BRAIN DUMP")
         print("#" * 60)
+        print(f"Phase: {self.phase.name}")
         self.world.dump()
         self.mission_mgr.dump()
         self.action_queue.dump()
         print(f"Robot: {self.robot}")
-        print(f"Mission active: {self._current_mission}")
         print("#" * 60 + "\n")

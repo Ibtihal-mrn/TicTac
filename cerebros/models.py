@@ -90,32 +90,6 @@ class ObjectInfo:
                 f"type={self.obj_type.name}, pos={self.position})")
 
 
-# ── Mission ───────────────────────────────────────────────────────────────────
-
-class MissionStatus(Enum):
-    PENDING    = auto()
-    ACTIVE     = auto()
-    COMPLETED  = auto()
-    FAILED     = auto()
-    SKIPPED    = auto()
-
-
-@dataclass
-class Mission:
-    """Une mission = un objectif à atteindre ou une action à réaliser."""
-    mission_id: int
-    target: ObjectInfo
-    priority: int = 0                # plus haut = plus prioritaire
-    status: MissionStatus = MissionStatus.PENDING
-    requires_deploy: bool = False    # doit-on déployer le bras ?
-    created_at: float = field(default_factory=time.time)
-    completed_at: Optional[float] = None
-
-    def __repr__(self) -> str:
-        return (f"Mission(#{self.mission_id}, target={self.target.label}, "
-                f"prio={self.priority}, status={self.status.name})")
-
-
 # ── Action ────────────────────────────────────────────────────────────────────
 
 @dataclass

@@ -1,188 +1,183 @@
 """
-cerebros/mission_manager.py — Gestionnaire de missions.
+cerebros/mission_manager.py — Gestionnaire de missions par coordonnées.
 
 Responsable de :
-  - Générer des missions à partir des goals détectés
-  - Choisir la prochaine mission (priorité + distance)
-  - Tenir une mémoire des missions déjà accomplies
-  - Éviter de refaire les mêmes missions
+  - Stocker une liste ordonnée de coordonnées objectifs (la route)
+  - Suivre la progression : aller vers A → A ok → aller vers B → B ok → ...
+  - Fournir le prochain objectif à atteindre
+  - Permettre de recalculer la route depuis la position actuelle
+    (en ne gardant que les objectifs non encore atteints)
 """
 
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 from cerebros.config import DEBUG, GOAL_REACHED_THRESHOLD_MM
-from cerebros.models import (
-    Mission, MissionStatus, ObjectInfo, ObjectType, Position,
-)
+from cerebros.models import Position
+
+
+@dataclass
+class Waypoint:
+    """Un objectif de coordonnées dans la route planifiée."""
+    position: Position
+    label: str = ""                # description optionnelle (ex: "BLUE36")
+    completed: bool = False
+    completed_at: Optional[float] = None
+
+    def __repr__(self) -> str:
+        status = "DONE" if self.completed else "TODO"
+        return f"WP({self.label or self.position}, {status})"
 
 
 class MissionManager:
-    """Gère la file de missions et la mémoire."""
+    """Gère la route (suite de coordonnées objectifs) et la mémoire."""
 
     def __init__(self):
-        self._missions: Dict[int, Mission] = {}       # mission_id → Mission
-        self._completed_ids: Set[int] = set()          # marker_ids déjà traités
-        self._failed_ids: Set[int] = set()             # marker_ids échoués
-        self._next_mission_id = 1
-        self._active_mission: Optional[Mission] = None
+        self._route: List[Waypoint] = []
+        self._current_index: int = 0       # index du prochain objectif à atteindre
+        self._completed_positions: List[Position] = []  # mémoire des positions atteintes
 
         if DEBUG:
-            print("[MissionManager] Initialisé — aucune mission en cours")
+            print("[MissionManager] Initialisé — aucune route définie")
 
-    # ── Génération de missions ────────────────────────────────────────────
+    # ── Définition de la route ────────────────────────────────────────────
 
-    def generate_missions_from_goals(self, goals: List[ObjectInfo],
-                                     robot_pos: Position) -> None:
-        """Crée des missions pour chaque goal non encore traité."""
-        for goal in goals:
-            mid = goal.marker_id
+    def set_route(self, targets: List[Position],
+                  labels: Optional[List[str]] = None) -> None:
+        """Définit la route complète (liste de positions objectifs dans l'ordre).
 
-            # Déjà complétée ou échouée ? → skip
-            if mid in self._completed_ids:
-                continue
-            if mid in self._failed_ids:
-                continue
+        Appelé pendant la phase init avec les coordonnées calculées par A*.
+        """
+        self._route = []
+        self._current_index = 0
 
-            # Mission déjà existante pour ce marker ?
-            if any(m.target.marker_id == mid and m.status == MissionStatus.PENDING
-                   for m in self._missions.values()):
-                continue
+        for i, pos in enumerate(targets):
+            label = labels[i] if labels and i < len(labels) else f"T{i + 1}"
+            self._route.append(Waypoint(position=pos, label=label))
 
-            # Créer la mission
-            priority = self._compute_priority(goal, robot_pos)
-            mission = Mission(
-                mission_id=self._next_mission_id,
-                target=goal,
-                priority=priority,
-                requires_deploy=(goal.obj_type == ObjectType.GOAL),
+        if DEBUG:
+            print(f"[MissionManager] Route définie: {len(self._route)} objectifs")
+            for i, wp in enumerate(self._route):
+                print(f"  [{i}] {wp}")
+
+    # ── Progression ───────────────────────────────────────────────────────
+
+    @property
+    def current_target(self) -> Optional[Waypoint]:
+        """Retourne le prochain objectif à atteindre, ou None si route finie."""
+        if self._current_index < len(self._route):
+            return self._route[self._current_index]
+        return None
+
+    @property
+    def current_target_position(self) -> Optional[Position]:
+        wp = self.current_target
+        return wp.position if wp else None
+
+    def check_and_advance(self, robot_pos: Position) -> bool:
+        """Vérifie si le robot a atteint l'objectif courant.
+
+        Si oui, marque comme complété et avance au suivant.
+        Returns: True si un objectif a été complété.
+        """
+        wp = self.current_target
+        if wp is None:
+            return False
+
+        dist = robot_pos.distance_to(wp.position)
+        if dist < GOAL_REACHED_THRESHOLD_MM:
+            wp.completed = True
+            wp.completed_at = time.time()
+            self._completed_positions.append(
+                Position(wp.position.x, wp.position.y)
             )
-            self._missions[mission.mission_id] = mission
-            self._next_mission_id += 1
 
             if DEBUG:
-                print(f"[MissionManager] Nouvelle mission créée : {mission}")
+                print(f"[MissionManager] Objectif atteint: {wp} "
+                      f"(dist={dist:.0f}mm)")
 
-    def _compute_priority(self, goal: ObjectInfo,
-                          robot_pos: Position) -> int:
-        """Priorité = inverse de la distance (plus proche → plus prioritaire).
+            self._current_index += 1
 
-        Retourne un score entier. Les goals très proches ont un score élevé.
-        """
-        dist = robot_pos.distance_to(goal.position)
-        # Score basé sur 3000 (diagonale table ~ 3606mm)
-        return max(1, int(3600 - dist))
+            if self._current_index < len(self._route):
+                next_wp = self._route[self._current_index]
+                if DEBUG:
+                    print(f"[MissionManager] Prochain objectif: {next_wp}")
+            else:
+                if DEBUG:
+                    print("[MissionManager] Route terminée!")
 
-    # ── Sélection de la prochaine mission ─────────────────────────────────
+            return True
 
-    def get_next_mission(self, robot_pos: Position) -> Optional[Mission]:
-        """Retourne la mission PENDING la plus prioritaire, ou None."""
-        pending = [
-            m for m in self._missions.values()
-            if m.status == MissionStatus.PENDING
+        return False
+
+    # ── Recalcul de route ─────────────────────────────────────────────────
+
+    def get_remaining_targets(self) -> List[Position]:
+        """Retourne les positions des objectifs non encore atteints."""
+        return [
+            wp.position for wp in self._route[self._current_index:]
+            if not wp.completed
         ]
 
-        if not pending:
-            if DEBUG:
-                print("[MissionManager] Aucune mission PENDING")
-            return None
+    def rebuild_route_from(self, new_targets: List[Position],
+                           labels: Optional[List[str]] = None) -> None:
+        """Reconstruit la route avec de nouveaux objectifs,
+        en conservant la mémoire des objectifs déjà atteints.
 
-        # Trier par priorité décroissante, puis distance croissante
-        pending.sort(
-            key=lambda m: (-m.priority, robot_pos.distance_to(m.target.position))
-        )
+        Utilisé après un replan (monitoring a détecté un problème).
+        """
+        # Conserver la mémoire des waypoints complétés
+        completed_part = [wp for wp in self._route if wp.completed]
 
-        chosen = pending[0]
-        chosen.status = MissionStatus.ACTIVE
-        self._active_mission = chosen
+        new_route = list(completed_part)
+        for i, pos in enumerate(new_targets):
+            label = labels[i] if labels and i < len(labels) else f"T{len(completed_part) + i + 1}"
+            new_route.append(Waypoint(position=pos, label=label))
 
-        if DEBUG:
-            dist = robot_pos.distance_to(chosen.target.position)
-            print(f"[MissionManager] Mission sélectionnée : {chosen} "
-                  f"(dist={dist:.0f}mm)")
-
-        return chosen
-
-    # ── Complétion / Échec ────────────────────────────────────────────────
-
-    def complete_mission(self, mission: Mission) -> None:
-        """Marque une mission comme complétée."""
-        mission.status = MissionStatus.COMPLETED
-        mission.completed_at = time.time()
-        self._completed_ids.add(mission.target.marker_id)
-
-        if self._active_mission and self._active_mission.mission_id == mission.mission_id:
-            self._active_mission = None
+        self._route = new_route
+        self._current_index = len(completed_part)
 
         if DEBUG:
-            print(f"[MissionManager] ✓ Mission complétée : {mission}")
-            print(f"[MissionManager] Mémoire: {len(self._completed_ids)} goals faits, "
-                  f"{len(self._failed_ids)} échoués")
-
-    def fail_mission(self, mission: Mission) -> None:
-        """Marque une mission comme échouée."""
-        mission.status = MissionStatus.FAILED
-        self._failed_ids.add(mission.target.marker_id)
-
-        if self._active_mission and self._active_mission.mission_id == mission.mission_id:
-            self._active_mission = None
-
-        if DEBUG:
-            print(f"[MissionManager] ✗ Mission échouée : {mission}")
-
-    def skip_mission(self, mission: Mission) -> None:
-        """Skip une mission (cible disparue, inaccessible, etc.)."""
-        mission.status = MissionStatus.SKIPPED
-
-        if self._active_mission and self._active_mission.mission_id == mission.mission_id:
-            self._active_mission = None
-
-        if DEBUG:
-            print(f"[MissionManager] ⊘ Mission skip : {mission}")
-
-    # ── Vérification goal atteint ─────────────────────────────────────────
-
-    def is_goal_reached(self, robot_pos: Position, mission: Mission) -> bool:
-        """Vérifie si le robot est assez proche du goal."""
-        dist = robot_pos.distance_to(mission.target.position)
-        reached = dist < GOAL_REACHED_THRESHOLD_MM
-
-        if DEBUG and reached:
-            print(f"[MissionManager] Goal atteint! dist={dist:.0f}mm < "
-                  f"seuil={GOAL_REACHED_THRESHOLD_MM}mm")
-
-        return reached
+            print(f"[MissionManager] Route recalculée: "
+                  f"{len(completed_part)} faits, "
+                  f"{len(new_targets)} restants")
 
     # ── Accesseurs ────────────────────────────────────────────────────────
 
     @property
-    def active_mission(self) -> Optional[Mission]:
-        return self._active_mission
+    def is_route_complete(self) -> bool:
+        return self._current_index >= len(self._route)
 
     @property
     def completed_count(self) -> int:
-        return len(self._completed_ids)
+        return sum(1 for wp in self._route if wp.completed)
 
     @property
     def pending_count(self) -> int:
-        return sum(1 for m in self._missions.values()
-                   if m.status == MissionStatus.PENDING)
+        return sum(1 for wp in self._route if not wp.completed)
 
-    def is_marker_done(self, marker_id: int) -> bool:
-        return marker_id in self._completed_ids
+    @property
+    def total_count(self) -> int:
+        return len(self._route)
 
-    def get_all_missions(self) -> List[Mission]:
-        return list(self._missions.values())
+    @property
+    def progress(self) -> str:
+        """Retourne une chaîne de progression : '2/5'."""
+        return f"{self.completed_count}/{self.total_count}"
+
+    @property
+    def completed_positions(self) -> List[Position]:
+        return list(self._completed_positions)
 
     def dump(self) -> None:
         """Affiche l'état des missions (debug)."""
         print("-" * 50)
-        print(f"[MissionManager] Total: {len(self._missions)} missions")
-        print(f"  Complétées: {len(self._completed_ids)}")
-        print(f"  Échouées:   {len(self._failed_ids)}")
-        print(f"  Active:     {self._active_mission}")
-        for m in self._missions.values():
-            print(f"    {m}")
+        print(f"[MissionManager] Route: {self.progress} "
+              f"(index courant: {self._current_index})")
+        for i, wp in enumerate(self._route):
+            marker = ">>>" if i == self._current_index else "   "
+            print(f"  {marker} [{i}] {wp}")
         print("-" * 50)

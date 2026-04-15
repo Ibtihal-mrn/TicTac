@@ -65,6 +65,10 @@ OBSTACLE_SAFETY_MARGIN_MM = 200        # marge autour des obstacles
 GOAL_REACHED_THRESHOLD_MM = 50         # distance pour considérer un goal atteint
 REPLAN_DISTANCE_MM        = 150        # distance mini avant re-planification
 
+# ── Paramètres de monitoring ─────────────────────────────────────────────────
+MONITORING_STUCK_THRESHOLD = 30        # ticks sans mouvement avant replan (~3s à 10Hz)
+MONITORING_STUCK_MIN_MOVE_MM = 5       # mouvement minimum pour ne pas être "stuck"
+
 # ── Paramètres de mouvement ──────────────────────────────────────────────────
 DEFAULT_MOVE_STEP_MM      = 200        # pas de FORWARD/BACKWARD par défaut
 DEFAULT_TURN_STEP_DEG     = 90         # pas de LEFT/RIGHT par défaut

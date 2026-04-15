@@ -2,7 +2,9 @@
 """
 cerebros/__main__.py — Point d'entrée pour tester le cerveau robot.
 
-Lance le Brain avec des données simulées pour validation rapide.
+Démontre le flux en 2 phases :
+  1. INIT : vision → A* → queue complète
+  2. RUN  : tirette → monitoring + replan si bloqué
 
 Usage:
     cd TicTac
@@ -19,12 +21,12 @@ from cerebros.models import Position, Team
 
 def fake_send(cmd: str) -> None:
     """Simule l'envoi BLE — juste un print."""
-    print(f"  📡 [BLE MOCK] → '{cmd}'")
+    print(f"  [BLE MOCK] -> '{cmd}'")
 
 
 def main() -> None:
     print("=" * 60)
-    print("  CEREBROS — Test standalone")
+    print("  CEREBROS — Test A* standalone")
     print("=" * 60)
 
     # ── Créer le cerveau ──────────────────────────────────────────────
@@ -37,49 +39,59 @@ def main() -> None:
     brain.set_send_function(fake_send)
 
     # ── Simuler des détections vision ─────────────────────────────────
-    # Format : (label, grid_x, grid_y) — comme produit par markers.py
     fake_detections = [
-        # Notre robot (bleu)
-        ("BR1", 1, 10),
-        # Quelques goals (objets bleus)
-        ("BLUE55", 20, 8),
-        ("BLUE60", 25, 15),
-        ("BLUE52", 10, 5),
-        # Un obstacle (zone)
-        ("AREA15", 12, 9),
-        # Un robot ennemi (jaune)
-        ("YR1", 18, 10),
+        ("BR1", 1, 10),          # Notre robot
+        ("BLUE36", 20, 8),       # Goal bleu
+        ("BLUE36", 25, 15),      # Goal bleu (autre instance)
+        ("AREA15", 12, 9),       # Obstacle
+        ("BLACK51", 15, 10),     # Obstacle noir
+        ("YR1", 18, 10),         # Robot ennemi
     ]
 
-    print("\n[Test] Injection de détections simulées...")
+    print("\n[Test] Injection des détections vision...")
     brain.feed_vision(fake_detections)
+
+    # ══════════════════════════════════════════════════════════════════
+    # PHASE 1 — INIT : Planification A*
+    # ══════════════════════════════════════════════════════════════════
+    print("\n[Test] === PHASE INIT ===")
+
+    # Option A : laisser le brain utiliser les goals détectés
+    # brain.init_plan()
+
+    # Option B : fournir manuellement les coordonnées objectifs
+    targets = [
+        Position(2050, 850),     # Premier objectif
+        Position(2550, 1550),    # Deuxième objectif
+    ]
+    labels = ["BLUE36_A", "BLUE36_B"]
+
+    success = brain.init_plan(target_positions=targets, target_labels=labels)
+    if not success:
+        print("[Test] Échec de la planification — abandon")
+        return
+
     brain.dump()
 
-    # ── Lancer quelques ticks ─────────────────────────────────────────
-    print("\n[Test] Lancement de 20 ticks...")
-    for i in range(20):
-        brain.tick()
-        time.sleep(0.1)
+    # ══════════════════════════════════════════════════════════════════
+    # PHASE 2 — RUN : Tirette tirée, monitoring
+    # ══════════════════════════════════════════════════════════════════
+    print("\n[Test] === PHASE RUN (simulation) ===")
+    print("[Test] Simulation de 30 ticks (tirette tirée)...")
 
-        # Simuler que le robot devient IDLE après chaque commande
+    brain.start_match()
+
+    for i in range(30):
+        brain.tick()
+        time.sleep(0.05)
+
+        # Simuler que le robot avance et devient IDLE
         if brain.robot.status != brain.robot.status.IDLE:
             brain.executor.force_idle()
 
     brain.dump()
-
-    # ── Test boucle complète (courte) ─────────────────────────────────
-    print("\n[Test] Voulez-vous lancer la boucle complète ? (Ctrl+C pour arrêter)")
-    print("[Test] Appuyez sur Entrée pour continuer, ou Ctrl+C pour quitter")
-
-    try:
-        input()
-        brain.run()
-    except KeyboardInterrupt:
-        print("\n[Test] Arrêt demandé")
-        brain.stop()
-
-    print("\n[Test] Test terminé.")
-    brain.dump()
+    print(f"\n[Test] Progression finale: {brain.mission_mgr.progress}")
+    print("[Test] Test terminé.")
 
 
 if __name__ == "__main__":
