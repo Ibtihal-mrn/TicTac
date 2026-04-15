@@ -2,7 +2,7 @@
 #include <Arduino.h>
 
 // Hardware
-#include "us.h" 
+#include "../lib/UltrasonicFunction/us.h" 
 #include "i2c_comm.h"
 
 
@@ -243,7 +243,7 @@ void setup() {
     Serial.begin(115200); // debug
 
     // I2C
-    Wire.begin(HUB_ADDR, SDA_PIN_HUB, SCL_PIN_HUB, 100000);
+    Wire.begin(HUB_ADDR, SDA_PIN_HUB, SCL_PIN_HUB, 50000);
     Wire.onReceive(onReceive);  // master writes commands
     Wire.onRequest(onRequest);  // master read
 

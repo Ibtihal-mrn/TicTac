@@ -1,6 +1,46 @@
 # Eurobot competition : Tictac
 
 
+
+## Upload Code 
+- robot_master :
+```bash
+     ACM0
+         >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+         >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM0
+     ACM1
+         >> Upload & Monitor : pio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+         >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM1
+     ACM2
+         >> Upload & Monitor : ppio run -t upload -t monitor -e robot_master --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+         >> Monitor Only     : pio run -t monitor -e robot_master --monitor-port /dev/ttyACM2
+```
+- Sensor_hub : 
+```bash
+     ACM0
+         >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM0 --monitor-port /dev/ttyACM0
+         >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM0
+     ACM1
+         >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM1 --monitor-port /dev/ttyACM1
+         >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM1
+     ACM2
+         >> Upload & Monitor : pio run -t upload -t monitor -e sensor_hub --upload-port /dev/ttyACM2 --monitor-port /dev/ttyACM2
+         >> Monitor Only     : pio run -t monitor -e sensor_hub --monitor-port /dev/ttyACM2
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Technical Specifications :
 
 #### Microcontroller = esp32-s3-devkitc-1

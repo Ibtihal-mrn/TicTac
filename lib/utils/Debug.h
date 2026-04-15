@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include "BLEBridge.h"
+// #include "BLEBridge.h"
 
 // Feature bits (one byte)
 #define DBG_FSM            (1u << 0)
@@ -42,20 +42,21 @@ inline void debugPrintf(uint32_t feature, const char *fmt, ...) {
   va_start(args, fmt);
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
-  bleSerial.println(buf);
+  Serial.println(buf);
 }
 
 // Simple F() friendly print (no formatting)
 inline void debugPrintF(uint8_t feature, const __FlashStringHelper* msg) {
   if (!(debugMask & feature)) return;
-  bleSerial.println(msg);
+  Serial.println(msg);
 }
 
 
 inline void printMillis(uint8_t feature, const char* text, unsigned long t, unsigned long& lastPrint, unsigned long interval = 2000) {
     if (!(debugMask & feature)) return;
     if (t - lastPrint >= interval) {
-        bleSerial.print(text);
+        Serial.print(text);
         lastPrint = t;
     }
 }
+

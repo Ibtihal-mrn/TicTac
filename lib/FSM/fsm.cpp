@@ -14,6 +14,7 @@
 //
 #include "utils.h"
 #include "Debug.h"
+#include "BLEBridge.h"
 
 // I2C sensors
 #include "i2c_comm.h"
@@ -73,7 +74,9 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
     // ctx.matchStartMs = 0;
     // debugPrintf(DBG_FSM, "FSM -> INIT");
     
+    Serial.println("[FSM] Context initialized");
     bleSerial.println("[FSM] Context initialized");
+
 }
 
 
