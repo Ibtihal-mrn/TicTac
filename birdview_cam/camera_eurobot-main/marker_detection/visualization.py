@@ -45,11 +45,22 @@ def draw_table_outline(frame: np.ndarray, table_pts: np.ndarray | None, aruco_pt
     if aruco_pts is None:
         return
 
-    cv2.polylines(frame, [aruco_pts.astype(np.int32).reshape(-1, 1, 2)], True, (255, 255, 0), 2)
+    visible_mask = np.isfinite(aruco_pts).all(axis=1)
+    visible_pts = aruco_pts[visible_mask]
+    if len(visible_pts) >= 2:
+        cv2.polylines(
+            frame,
+            [visible_pts.astype(np.int32).reshape(-1, 1, 2)],
+            len(visible_pts) >= 3,
+            (255, 255, 0),
+            2,
+        )
 
     labels = ["TL(23)", "TR(22)", "BR(20)", "BL(21)"]
     colors = [(255, 0, 255), (255, 128, 0), (0, 255, 255), (128, 255, 0)]
-    for pt, label, color in zip(aruco_pts, labels, colors):
+    for pt, label, color, is_visible in zip(aruco_pts, labels, colors, visible_mask):
+        if not is_visible:
+            continue
         p = tuple(pt.astype(int))
         cv2.circle(frame, p, 8, color, -1)
         cv2.putText(frame, label, (p[0] + 10, p[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)

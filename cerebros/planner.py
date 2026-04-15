@@ -125,7 +125,7 @@ class Planner:
 
         Pour chaque segment :
           1. Calculer l'angle vers le prochain waypoint
-          2. Tourner (LEFT/RIGHT) pour s'aligner
+          2. Tourner (ROTATE angle) pour s'aligner
           3. Avancer (FORWARD) de la distance du segment
 
         Args:
@@ -162,14 +162,9 @@ class Planner:
 
             # ── Rotation si nécessaire ────────────────────────────────
             if abs(delta) > 5:  # tolérance 5°
-                if delta > 0:
-                    actions.append(Action(ActionType.LEFT, abs(delta)))
-                    if DEBUG:
-                        print(f"    → LEFT {abs(delta):.0f}°")
-                else:
-                    actions.append(Action(ActionType.RIGHT, abs(delta)))
-                    if DEBUG:
-                        print(f"    → RIGHT {abs(delta):.0f}°")
+                actions.append(Action(ActionType.ROTATE, delta))
+                if DEBUG:
+                    print(f"    → ROTATE {delta:.0f}°")
 
                 heading = desired_angle
 
