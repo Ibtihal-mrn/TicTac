@@ -77,21 +77,23 @@ def main() -> None:
     else:
         print("[INIT] Timeout — équipe par défaut: BLUE")
 
+    initial_pos = Position(150, 1000)
     brain = Brain(
         team=team,
         robot_id=robot_id,
-        initial_pos=Position(150, 1000),
+        initial_pos=initial_pos,
         initial_heading=0.0,
     )
     brain.set_send_function(ble.send)
 
     # ── PHASE INIT : mission hardcodee ────────────────────────────────
-    #  Mission : milieu de la table, puis milieu tout a droite
+    #  Mission : centre table → centre-droit → retour base
     targets = [
         Position(1500, 1000),   # Centre de la table
         Position(2850, 1000),   # Centre-droit
+        Position(initial_pos.x, initial_pos.y),  # Retour à la position initiale
     ]
-    labels = ["CENTRE_TABLE", "CENTRE_DROIT"]
+    labels = ["CENTRE_TABLE", "CENTRE_DROIT", "RETOUR_BASE"]
     print(f"[INIT] Mission : {labels}")
 
     create_windows()  # Ouverture des fenetres camera / aerienne.
@@ -185,10 +187,10 @@ def main() -> None:
                         init_vision_frames = 0  # retry
 
                 # ── TIRETTE : demarrer le match quand elle est retiree ─
+                # TEST: bypass tirette — demarre des que le plan est pret
                 if init_plan_done and brain.phase == BrainPhase.READY:
-                    if ble.match_started:
-                        print("[MATCH] Tirette retiree — MATCH START!")
-                        brain.start_match()
+                    print("[MATCH] TEST MODE — demarrage immediat!")
+                    brain.start_match()
 
                 # ── RUN : tick de monitoring ───────────────────────────
                 if brain.phase == BrainPhase.RUNNING:

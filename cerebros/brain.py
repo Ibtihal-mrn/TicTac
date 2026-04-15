@@ -31,12 +31,14 @@ import time
 from enum import Enum, auto
 from typing import List, Optional, Tuple
 
+import math
+
 from cerebros import config
 from cerebros.actions import ActionQueue
 from cerebros.config import DEBUG
 from cerebros.executor import Executor, SendActionFn
 from cerebros.mission_manager import MissionManager
-from cerebros.models import Position, Team
+from cerebros.models import Action, ActionType, Position, Team
 from cerebros.planner import Planner
 from cerebros.robot_state import RobotState
 from cerebros.world_state import WorldState
@@ -161,9 +163,19 @@ class Brain:
         # Définir la route dans le mission manager
         self.mission_mgr.set_route(target_positions, target_labels)
 
-        # Calculer le chemin A* complet
+        # ── FORWARD initial pour sortir de la zone de départ ─────────
+        exit_mm = config.EXIT_ZONE_MM
+        heading_rad = math.radians(self.robot.heading_deg)
+        start_after_exit = Position(
+            self.robot.position.x + exit_mm * math.cos(heading_rad),
+            self.robot.position.y + exit_mm * math.sin(heading_rad),
+        )
+        print(f"[Brain] FORWARD {exit_mm}mm pour sortir de zone → "
+              f"position estimée: {start_after_exit}")
+
+        # Calculer le chemin A* depuis la position post-sortie
         full_path = self.planner.plan_full_route(
-            self.robot.position, target_positions, obstacles
+            start_after_exit, target_positions, obstacles
         )
 
         if len(full_path) < 2:
@@ -176,6 +188,11 @@ class Brain:
             self.robot.heading_deg,
             deploy_at_end=False,
         )
+
+        # Prépendre le FORWARD de sortie de zone
+        exit_action = Action(ActionType.FORWARD, exit_mm)
+        actions.insert(0, exit_action)
+        print(f"[Brain] Action de sortie ajoutée: {exit_action}")
 
         # Remplir la file d'actions
         self.action_queue.clear()
