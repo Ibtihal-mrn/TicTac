@@ -40,6 +40,13 @@ void PIDController::resetState() {
 }
 
 
+static float applyMinPwm(float value, float minPwm) {
+    if (fabsf(value) > 0.01f && fabsf(value) < minPwm) {
+        return copysignf(minPwm, value);
+    }
+    return value;
+}
+
 
 // ===== Start Movement =========
 void PIDController::startLinear(float distanceMm, int maxPwm) {
@@ -106,7 +113,9 @@ float PIDController::updatePID_(PID& pid, float error, float dt) {
 bool PIDController::update() {
     if (mode_ == Mode::Idle) return true;
 
-    const float dt = nextDt_();
+
+    // 1. Read Encoders, Gyro and convert ticks to distance
+    const float dt = nextDt_(); // time since last update
 
     long leftTicks = 0;
     long rightTicks = 0;
@@ -119,54 +128,83 @@ bool PIDController::update() {
     const float gyroRateDps = imu_readGyroZ_dps();
     headingDeg_ += gyroRateDps * dt;
 
+
+    // ====================== LINEAR =========================
     if (mode_ == Mode::Linear) {
         // distance signed: forward positive, backward negative
+
+        // 2. Total Travelled distance
         const float deltaDistanceMm = 0.5f * (deltaLeft + deltaRight) * mm_per_tick();
         traveledDistanceMm_ += deltaDistanceMm;
 
+        // 3. Total Error (distance left to go)
         const float distanceError = targetDistanceMm_ - traveledDistanceMm_;
-        const float headingError = -headingDeg_; // target heading = 0
+        const float headingError = -headingDeg_; // how much we drifted : target heading = 0
 
-        float linearCmd = updatePID_(distancePid_, distanceError, dt);
-        float angularCmd = updatePID_(anglePid_, headingError, dt);
+        // 4. PID compute (keep robot straight)
+        float linearCmd  = updatePID_(distancePid_, distanceError, dt);  // PID output for forward/backward motion.
+        float angularCmd = updatePID_(anglePid_  , headingError , dt);  // PID output for heading correction.
 
-        linearCmd = constrain(linearCmd, -maxPwm_, maxPwm_);
+        // 5. Clamp max output
+        linearCmd = constrain(linearCmd, -maxPwm_, maxPwm_);   // max_pwm forward, -max backward
         angularCmd = constrain(angularCmd, -maxPwm_, maxPwm_);
 
-        if (fabs(distanceError) > DONE_DISTANCE_MM) {
-            if (fabs(linearCmd) > 0.01f && fabs(linearCmd) < PWM_MIN) {
-                linearCmd = copysign(PWM_MIN, linearCmd);
-            }
+
+        // 6. Clamp max output
+        float leftCmd = constrain(linearCmd - angularCmd, -maxPwm_, maxPwm_); // mix linear and angular corrections
+        float rightCmd = constrain(linearCmd + angularCmd, -maxPwm_, maxPwm_);
+
+        // 7. Minimum PWM floor if robot near end
+        const bool needMotion =
+            fabsf(distanceError) > DONE_DISTANCE_MM ||
+            fabsf(headingError) > 2.0f;
+
+        const float floorPwm = min((float)PWM_MIN_LINEAR, (float)maxPwm_);
+
+        if (needMotion) {
+            leftCmd  = applyMinPwm(leftCmd,  floorPwm);
+            rightCmd = applyMinPwm(rightCmd, floorPwm);
+        } else {
+            leftCmd = 0.0f;
+            rightCmd = 0.0f;
         }
+        // if (fabs(distanceError) > DONE_DISTANCE_MM) {
+        //     if (fabs(linearCmd) > 0.01f && fabs(linearCmd) < PWM_MIN) {
+        //         linearCmd = copysign(PWM_MIN, linearCmd);
+        //     }
+        // }
 
-        const float leftCmd = linearCmd - angularCmd;
-        const float rightCmd = linearCmd + angularCmd;
-
+        // 8. Debug prints
         #if DBG_PID
         static unsigned long lastPidPrintMs = 0;
         if (millis() - lastPidPrintMs >= 500) {
-            printLinearDebug(
-                dt,
-                leftTicks,
-                rightTicks,
-                deltaLeft,
-                deltaRight,
-                targetDistanceMm_,
-                traveledDistanceMm_,
-                distanceError,
-                headingDeg_,
-                headingError,
-                linearCmd,
-                angularCmd,
-                leftCmd,
-                rightCmd,
-                maxPwm_
-            );
+            Serial.print("[PID LIN] ");
+            Serial.print("dt="); Serial.print(dt, 3);
+            Serial.print(" lt="); Serial.print(leftTicks);
+            Serial.print(" rt="); Serial.print(rightTicks);
+            Serial.print(" dL="); Serial.print(deltaLeft);
+            Serial.print(" dR="); Serial.print(deltaRight);
+            Serial.print(" targetD="); Serial.print(targetDistanceMm_);
+            Serial.print(" travelledD="); Serial.print(traveledDistanceMm_);
+            Serial.print(" distError="); Serial.print(distanceError);
+
+            Serial.print(" head="); Serial.print(headingDeg_, 2);
+            Serial.print(" headingError="); Serial.print(headingError, 2);
+            Serial.print(" gyro="); Serial.print(gyroRateDps, 2);
+            Serial.print(" linearCmd="); Serial.println(linearCmd, 2);
+            Serial.print(" angularCmd="); Serial.println(angularCmd, 2);
+            Serial.print(" needMotion="); Serial.print(needMotion);
+            Serial.print(" floorPwm="); Serial.print(floorPwm);
+            Serial.print(" Lcmd="); Serial.print(leftCmd);
+            Serial.print(" Rcmd="); Serial.print(rightCmd);
             lastPidPrintMs = millis();
         }
         #endif
+
+        // 9. Apply motors output
         motors_.applyMotorOutputs(leftCmd, rightCmd);
 
+        // 10. Finish Condition
         if (fabs(distanceError) <= DONE_DISTANCE_MM && fabs(headingError) <= 2.0f) {
             if (stableSinceMs_ == 0) stableSinceMs_ = millis();
             if (millis() - stableSinceMs_ >= STABLE_MS) {
@@ -181,17 +219,38 @@ bool PIDController::update() {
         return false;
     }
 
+
+
+    // ====================== ROTATE =========================
     if (mode_ == Mode::Rotate) {
+    // 2. 
     const float angleError = targetAngleDeg_ - headingDeg_;
 
     float turnCmd = updatePID_(anglePid_, angleError, dt);
     turnCmd = constrain(turnCmd, -maxPwm_, maxPwm_);
 
-    if (fabs(angleError) > DONE_ANGLE_DEG) {
-        if (fabs(turnCmd) > 0.01f && fabs(turnCmd) < PWM_MIN) {
-            turnCmd = copysign(PWM_MIN, turnCmd);
-        }
+    float leftCmd  = constrain(-turnCmd, -maxPwm_, maxPwm_);
+    float rightCmd = constrain( turnCmd, -maxPwm_, maxPwm_);
+
+    const bool needMotion =
+        fabsf(angleError) > DONE_ANGLE_DEG ||
+        fabsf(gyroRateDps) > DONE_RATE_DPS;
+
+    const float floorPwm = min((float)PWM_MIN_ROTATE, (float)maxPwm_);
+
+    if (needMotion) {
+        leftCmd  = applyMinPwm(leftCmd,  floorPwm);
+        rightCmd = applyMinPwm(rightCmd, floorPwm);
+    } else {
+        leftCmd = 0.0f;
+        rightCmd = 0.0f;
     }
+
+    // if (fabs(angleError) > DONE_ANGLE_DEG) {
+    //     if (fabs(turnCmd) > 0.01f && fabs(turnCmd) < PWM_MIN_ROTATE) {
+    //         turnCmd = copysign(PWM_MIN, turnCmd);
+    //     }
+    // }
 
     #if DBG_PID
         static unsigned long lastPidPrintMs = 0;
@@ -206,11 +265,15 @@ bool PIDController::update() {
             Serial.print(" angErr="); Serial.print(angleError, 2);
             Serial.print(" gyro="); Serial.print(gyroRateDps, 2);
             Serial.print(" turnCmd="); Serial.println(turnCmd, 2);
+            Serial.print(" needMotion="); Serial.print(needMotion);
+            Serial.print(" floorPwm="); Serial.print(floorPwm);
+            Serial.print(" Lcmd="); Serial.print(leftCmd);
+            Serial.print(" Rcmd="); Serial.print(rightCmd);
             lastPidPrintMs = millis();
         }
     #endif
 
-    motors_.applyMotorOutputs(-turnCmd, turnCmd);
+    motors_.applyMotorOutputs(leftCmd, rightCmd);
 
     if (fabs(angleError) <= DONE_ANGLE_DEG && fabs(gyroRateDps) <= DONE_RATE_DPS) {
         if (stableSinceMs_ == 0) stableSinceMs_ = millis();

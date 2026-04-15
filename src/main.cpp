@@ -105,7 +105,7 @@ void setup() {
     debugInit(115200,
           DBG_FSM |
           DBG_I2C_HUB |
-        //   DBG_PID |
+          DBG_PID |
           // DBG_MOTORS |
           // DBG_SENSORS |
           // DEBUG_TEAM_SWITCH |

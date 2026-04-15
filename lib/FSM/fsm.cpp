@@ -117,18 +117,24 @@ void testRotation(Context &ctx){
     // Serial.println(ctx.commandQueue.size());
 }
 void testLinearMotion(Context &ctx){
-    // ctx.commandQueue = std::queue<RobotCommand>();
-    // Serial.println("[TEST] linear sequence start");
+    if (!ctx.commandQueue) return;
 
-    // debugEnable(DBG_ENCODER);
+    RobotCommand move1{CommandType::MoveForward, 1000.0f, 80, 0};
+    xQueueSendToBack(ctx.commandQueue, &move1, 0);
 
-    // ctx.commandQueue.push(RobotCommand{CommandType::MoveForward, 2000.0f, 100, 0});
-    // // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 2000});
-    // // ctx.commandQueue.push(RobotCommand{CommandType::MoveBackward, 1000.0f, 100, 0});
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 5000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
 
-    // Serial.print("[TEST] queued=");
-    // Serial.println(ctx.commandQueue.size());
+    RobotCommand move2{CommandType::MoveForward, 900.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move2, 0);
+    
+//     RobotCommand rotate1{CommandType::Rotate, 90.0f, 200, 0};
+//     xQueueSendToBack(ctx.commandQueue, &rotate1, 0);
+
+//     RobotCommand rotate2{CommandType::Rotate, -90.0f, 200, 0};
+//     xQueueSendToBack(ctx.commandQueue, &rotate2, 0);
 }
+
 void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
     RobotCommand cmd;
     cmd.type = CommandType::Rotate;
@@ -198,7 +204,7 @@ void robot_step(Context &ctx)
     if (bleStopRequested) {
         motion.abort();
         clearCommandQueue(ctx.commandQueue);
-        ctx.currentAction = Robot::EMERGENCY_STOP;
+        ctx.currentAction = Robot::DISPATCH_CMD;
         bleStopRequested = false;
 
         Serial.println("[FSM] BLE STOP");
@@ -232,7 +238,7 @@ void robot_step(Context &ctx)
 
             // MOVE COMMANDS
             // testRotation(ctx);
-            // testLinearMotion(ctx);
+            testLinearMotion(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;
