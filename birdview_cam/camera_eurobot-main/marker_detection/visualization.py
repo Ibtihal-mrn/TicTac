@@ -218,3 +218,155 @@ def draw_aerial_detection(
     cv2.polylines(aerial, [pts_int], True, color, 2)
     center = pts_aerial.mean(axis=0)[0].astype(int)
     cv2.putText(aerial, label, (center[0] + 5, center[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 1)
+
+
+# ── Cerebros overlay : targets + A* path ─────────────────────────────────────
+
+def _mm_to_pixel(x_mm: float, y_mm: float, h_mm_to_img: np.ndarray) -> tuple[int, int] | None:
+    """Convertit une position mm de la table en pixel image via homographie."""
+    # Symétrie gauche-droite : l'axe X de cerebros est inversé par rapport à la caméra
+    x_mm = config.TABLE_W_MM - x_mm
+    pt = np.float32([[[x_mm, y_mm]]])
+    projected = cv2.perspectiveTransform(pt, h_mm_to_img)
+    px, py = projected[0, 0]
+    return (int(px), int(py))
+
+
+def _mm_to_aerial(x_mm: float, y_mm: float) -> tuple[int, int]:
+    """Convertit une position mm de la table en pixel dans la vue aérienne."""
+    # Symétrie gauche-droite : l'axe X de cerebros est inversé par rapport à la caméra
+    px = int((config.TABLE_W_MM - x_mm) / config.TABLE_W_MM * config.AERIAL_W)
+    py = int(y_mm / config.TABLE_H_MM * config.AERIAL_H)
+    return (px, py)
+
+
+def draw_brain_overlay(
+    frame: np.ndarray,
+    aerial: np.ndarray | None,
+    planned_path: list,
+    planned_targets: list,
+    planned_target_labels: list[str],
+    robot_pos,
+    robot_heading_deg: float,
+    h_grid_to_img: np.ndarray | None,
+) -> None:
+    """Dessine les targets, le path A* et la position robot sur la caméra et la vue aérienne.
+
+    Args:
+        frame: image caméra (modifiée in-place)
+        aerial: vue aérienne (modifiée in-place), ou None
+        planned_path: liste de Position (mm) — waypoints A*
+        planned_targets: liste de Position (mm) — objectifs
+        planned_target_labels: labels des objectifs
+        robot_pos: Position actuelle du robot (mm)
+        robot_heading_deg: heading du robot en degrés (0° = axe X+, sens trigo)
+        h_grid_to_img: homographie grille→image (pour la vue caméra)
+    """
+    if not planned_path and not planned_targets:
+        return
+
+    # Construire h_mm_to_img depuis h_grid_to_img
+    h_mm_to_img = None
+    if h_grid_to_img is not None:
+        h_mm_to_grid = np.array(
+            [[config.GRID_COLS / config.TABLE_W_MM, 0.0, 0.0],
+             [0.0, config.GRID_ROWS / config.TABLE_H_MM, 0.0],
+             [0.0, 0.0, 1.0]], dtype=np.float64)
+        h_mm_to_img = h_grid_to_img @ h_mm_to_grid
+
+    # ── Dessiner le path A* (ligne cyan) ──────────────────────────────
+    if len(planned_path) >= 2:
+        # Vue caméra
+        if h_mm_to_img is not None:
+            cam_pts = []
+            for wp in planned_path:
+                p = _mm_to_pixel(wp.x, wp.y, h_mm_to_img)
+                if p is not None:
+                    cam_pts.append(p)
+            if len(cam_pts) >= 2:
+                for i in range(len(cam_pts) - 1):
+                    cv2.line(frame, cam_pts[i], cam_pts[i + 1], (255, 255, 0), 2)
+                # Petits cercles aux waypoints
+                for p in cam_pts:
+                    cv2.circle(frame, p, 4, (255, 255, 0), -1)
+
+        # Vue aérienne
+        if aerial is not None:
+            aer_pts = [_mm_to_aerial(wp.x, wp.y) for wp in planned_path]
+            for i in range(len(aer_pts) - 1):
+                cv2.line(aerial, aer_pts[i], aer_pts[i + 1], (255, 255, 0), 2)
+            for p in aer_pts:
+                cv2.circle(aerial, p, 3, (255, 255, 0), -1)
+
+    # ── Dessiner les targets (losanges magenta) ──────────────────────
+    for i, target in enumerate(planned_targets):
+        label = planned_target_labels[i] if i < len(planned_target_labels) else f"T{i+1}"
+
+        # Vue caméra
+        if h_mm_to_img is not None:
+            p = _mm_to_pixel(target.x, target.y, h_mm_to_img)
+            if p is not None:
+                _draw_target_marker(frame, p, label, (255, 0, 255), size=14)
+
+        # Vue aérienne
+        if aerial is not None:
+            p = _mm_to_aerial(target.x, target.y)
+            _draw_target_marker(aerial, p, label, (255, 0, 255), size=10)
+
+    # ── Dessiner la position robot + flèche heading ──────────────────
+    if robot_pos is not None:
+        import math
+        heading_rad = math.radians(robot_heading_deg)
+        # Longueur de la flèche en mm (sur la table)
+        arrow_len_mm = 150
+        tip_x_mm = robot_pos.x + arrow_len_mm * math.cos(heading_rad)
+        tip_y_mm = robot_pos.y + arrow_len_mm * math.sin(heading_rad)
+
+        if h_mm_to_img is not None:
+            p = _mm_to_pixel(robot_pos.x, robot_pos.y, h_mm_to_img)
+            tip = _mm_to_pixel(tip_x_mm, tip_y_mm, h_mm_to_img)
+            if p is not None:
+                # Centre du robot (point rouge plein)
+                cv2.circle(frame, p, 5, (0, 0, 255), -1)
+                # Cercle extérieur vert
+                cv2.circle(frame, p, 14, (0, 255, 0), 2)
+                # Flèche de heading
+                if tip is not None:
+                    cv2.arrowedLine(frame, p, tip, (0, 255, 0), 3, tipLength=0.3)
+                cv2.putText(frame, f"ROBOT {robot_heading_deg:.0f}deg",
+                            (p[0] + 18, p[1] + 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        if aerial is not None:
+            p = _mm_to_aerial(robot_pos.x, robot_pos.y)
+            tip = _mm_to_aerial(tip_x_mm, tip_y_mm)
+            # Centre du robot (point rouge plein)
+            cv2.circle(aerial, p, 4, (0, 0, 255), -1)
+            # Cercle extérieur vert
+            cv2.circle(aerial, p, 10, (0, 255, 0), 2)
+            # Flèche de heading
+            cv2.arrowedLine(aerial, p, tip, (0, 255, 0), 2, tipLength=0.3)
+            cv2.putText(aerial, f"ROBOT {robot_heading_deg:.0f}deg",
+                        (p[0] + 12, p[1] + 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
+
+
+def _draw_target_marker(
+    img: np.ndarray,
+    center: tuple[int, int],
+    label: str,
+    color: tuple[int, int, int],
+    size: int = 12,
+) -> None:
+    """Dessine un losange (diamond) avec label pour marquer un objectif."""
+    cx, cy = center
+    pts = np.array([
+        [cx, cy - size],
+        [cx + size, cy],
+        [cx, cy + size],
+        [cx - size, cy],
+    ], dtype=np.int32)
+    cv2.polylines(img, [pts], True, color, 2)
+    cv2.circle(img, center, 3, color, -1)
+    cv2.putText(img, label, (cx + size + 4, cy + 4),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)

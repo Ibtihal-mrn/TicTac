@@ -82,6 +82,11 @@ class Brain:
         self._match_start: Optional[float] = None
         self._tick_count = 0
 
+        # ── Données de planification (pour visualisation) ─────────────
+        self.planned_path: List[Position] = []       # waypoints A* (mm)
+        self.planned_targets: List[Position] = []    # objectifs (mm)
+        self.planned_target_labels: List[str] = []
+
         # ── Monitoring ────────────────────────────────────────────────
         self._monitoring_deviation_threshold_mm = config.REPLAN_DISTANCE_MM
         self._monitoring_stuck_ticks = 0
@@ -183,6 +188,11 @@ class Brain:
         if len(full_path) < 2:
             print("[Brain] Chemin trop court — échec de planification")
             return False
+
+        # Stocker pour la visualisation (inclure le segment de sortie de base)
+        self.planned_path = [Position(self.robot.position.x, self.robot.position.y)] + list(full_path)
+        self.planned_targets = list(target_positions)
+        self.planned_target_labels = list(target_labels) if target_labels else []
 
         # Convertir en actions
         actions = self.planner.path_to_actions(
@@ -349,6 +359,10 @@ class Brain:
         if len(full_path) < 2:
             print("[Brain] Échec du replan — chemin trop court")
             return
+
+        # Stocker pour la visualisation
+        self.planned_path = list(full_path)
+        self.planned_targets = list(remaining)
 
         # Convertir en actions
         actions = self.planner.path_to_actions(

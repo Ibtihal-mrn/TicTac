@@ -18,6 +18,7 @@ from marker_detection.runtime import (
 from marker_detection.tracking import Tracker
 from marker_detection.visualization import (
     compute_aerial,
+    draw_brain_overlay,
     draw_corner_markers,
     draw_grid,
     draw_object_markers,
@@ -197,6 +198,17 @@ def main() -> None:
                     brain.tick()
 
         draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
+
+        # ── Overlay Cerebros : targets + path A* + position robot ─────
+        draw_brain_overlay(
+            frame, aerial,
+            brain.planned_path,
+            brain.planned_targets,
+            brain.planned_target_labels,
+            brain.robot.position,
+            brain.robot.heading_deg,
+            h_grid_to_img,
+        )
 
         cv2.imshow(config.WINDOW_CAMERA, frame)
 
