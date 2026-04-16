@@ -118,7 +118,7 @@ class DevicePanel:
         qf = tk.Frame(self.frame, bg=BG)
         qf.pack(fill=tk.X, pady=(4, 2))
 
-        for txt, clr in [("FORWARD 200", GREEN), ("BACKWARD 200", YELLOW),
+        for txt, clr in [("FORWARD 255", GREEN), ("BACKWARD 255", YELLOW),
                          ("ROTATE 90", ACCENT), ("ROTATE -90", ACCENT),
                          ("DEPLOY", GREEN), ("RETRACT", YELLOW),
                          ("STOP", RED), ("STATUS", GREEN), ("RESET", YELLOW)]:
