@@ -73,15 +73,29 @@ bool updateSensorAndStop(int i) {
     s.distance = d;
 
     // 2. Hysteresis + debounce
-    if (!s.obstacle && d > 0 && d < US_OBSTACLE_THRESHOLD_CM) {
-        if (now - s.lastChange > STOP_HOLD_MS) {
-            s.obstacle = true;
-            s.lastChange = now;
-        }
-    } else if (s.obstacle && (d < 0 || d > US_OBSTACLE_CLEAR_CM)) {
-        if (now - s.lastChange > STOP_HOLD_MS) {
-            s.obstacle = false;
-            s.lastChange = now;
+    const bool validObstacle = (d > 0 && d < US_OBSTACLE_THRESHOLD_CM);
+    const bool validClear = (d > 0 && d > US_OBSTACLE_CLEAR_CM);
+    const bool invalid = (d < 0);
+
+    if (!s.obstacle) {
+        if (validObstacle) {
+            if (s.obstacleSince == 0) { s.obstacleSince = now; }
+            if (now - s.obstacleSince >= STOP_HOLD_MS) {
+                s.obstacle = true;
+                s.obstacleSince = 0;
+                s.clearSince = 0;
+            }
+        } else { s.obstacleSince = 0; }
+    } else {
+        if (validClear) {
+            if (s.clearSince == 0) { s.clearSince = now; }
+            if (now - s.clearSince >= STOP_HOLD_MS) {
+                s.obstacle = false;
+                s.clearSince = 0;
+                s.obstacleSince = 0;
+            }
+        } else if (invalid) { s.clearSince = 0;
+        } else { s.clearSince = 0;
         }
     }
 

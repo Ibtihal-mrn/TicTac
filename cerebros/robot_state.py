@@ -16,8 +16,8 @@ class RobotState:
     """État complet d'un robot (notre robot ou un allié)."""
 
     def __init__(self, robot_id: str, team: Team,
-                 initial_pos: Position | None = None,
-                 initial_heading: float = 0.0):
+                initial_pos: Position | None = None,
+                initial_heading: float = 0.0):
         self.robot_id = robot_id
         self.team = team
         self.position = initial_pos or Position(0.0, 0.0)

@@ -14,7 +14,7 @@ enum class Robot {
 	EXEC,	          // Exec Commands
 	EXEC_WAIT,		  // Wait ms
     EXEC_SERVO,
-	EMERGENCY_STOP,   // Obstacle Detected (Hardware US)
+	EMERGENCY_STOP_US,   // Obstacle Detected (Hardware US)
 	
 	// EXEC_MOVE,
 	// EXEC_ROTATE,
@@ -31,7 +31,7 @@ static const char* const stateList[] = {
     "DISPATCH_CMD",
     "EXEC",
     "EXEC_WAIT",
-    "EMERGENCY_STOP",
+    "EMERGENCY_STOP_US",
     "TIMER_END"
 };
 

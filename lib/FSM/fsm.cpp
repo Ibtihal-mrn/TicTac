@@ -3,6 +3,7 @@
 #include "../../src/globals.h"
 
 #include "motors.h"
+#include "bras.h"
 #include "encoders.h"
 #include "us.h"
 #include "imu.h"
@@ -25,18 +26,34 @@
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 static PIDController motion(motors);
 
+// ------- INITS ---------
+void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
+    
+    // Init freeRtos Queue
+    ctx.commandQueue = cmdQueue;
+    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
 
+    // Context
+    ctx.currentAction = Robot::INIT;
+    ctx.currentTeam = Team::TEAM_YELLOW;
+    // TOD: add match timer init
+    // Init Match Timer
+    // ctx.matchActive = false;
+    // ctx.matchDurationMs = MATCH_DURATION_MS;
+    // ctx.matchStartMs = 0;
+    // debugPrintf(DBG_FSM, "FSM -> INIT");
+    
+    Serial.println("[FSM] Context initialized");
+    bleSerial.println("[FSM] Context initialized");
 
-
+}
 
 void hardware_init(Context &ctx)
 {
     // To be called in setup() in main.cpp
-
+    bras_init();
     // motors_init();
     encoders_init();
-    // ultrasonic_init(13, 10);  // trig, echo
-    // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
     // IMU
     if (!imu_init())
@@ -59,26 +76,6 @@ void hardware_init(Context &ctx)
     // ctx.currentTeam = Team::TEAM_YELLOW;
 }
 
-void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
-    
-    // Init freeRtos Queue
-    ctx.commandQueue = cmdQueue;
-    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
-
-    // Context
-    ctx.currentAction = Robot::INIT;
-    ctx.currentTeam = Team::TEAM_YELLOW;
-    // TOD: add match timer init
-    // Init Match Timer
-    // ctx.matchActive = false;
-    // ctx.matchDurationMs = MATCH_DURATION_MS;
-    // ctx.matchStartMs = 0;
-    // debugPrintf(DBG_FSM, "FSM -> INIT");
-    
-    Serial.println("[FSM] Context initialized");
-    bleSerial.println("[FSM] Context initialized");
-
-}
 
 
 // ---- US obstacle movement -------
@@ -99,23 +96,7 @@ void rotate(float angle, int speed) {
 
 // ------- ROUTINES ----------
 void testRotation(Context &ctx){
-    // debugEnable(DBG_IMU);
-    // clear queue
-    // ctx.commandQueue = std::queue<RobotCommand>(); 
-    // Serial.println("[TEST] rotation sequence start");
-
-
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
-
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
-
-
-    Serial.print("[TEST] queued=");
-    // Serial.println(ctx.commandQueue.size());
+    
 }
 void testLinearMotion(Context &ctx){
     if (!ctx.commandQueue) return;
@@ -136,21 +117,18 @@ void testLinearMotion(Context &ctx){
 //     xQueueSendToBack(ctx.commandQueue, &rotate2, 0);
 }
 
-void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
-    RobotCommand cmd;
-    cmd.type = CommandType::Rotate;
-    cmd.value = 180.0f;
-    cmd.speed = 80;
-    cmd.waitMs = 0;
-    xQueueSendToBack(q, &cmd, 0);
+void testServos(Context &ctx){
+    if (!ctx.commandQueue) return;
 
-    cmd.type = CommandType::Wait;
-    cmd.value = 0;
-    cmd.speed = 0;
-    cmd.waitMs = 3000;
-    xQueueSendToBack(q, &cmd, 0);
+    RobotCommand deploy1{CommandType::DeployServo};
+    xQueueSendToBack(ctx.commandQueue, &deploy1, 0);
+
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand retract1{CommandType::RetractServo};
+    xQueueSendToBack(ctx.commandQueue, &retract1, 0);
 }
-
 
 
 // -------- helpers ----------
@@ -187,33 +165,7 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
-// ========== FSM ============
-void robot_step(Context &ctx)
-{
-    if (emergencyStopUS) {
-        // motion.abort();
-        // emergencyStopUS = false;
-        // ctx.currentAction = Robot::EMERGENCY_STOP;
-        static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){
-            bleSerial.println("emergencyStopUS");
-            Lpwm = millis();
-        }
-    }
-
-    // BLE Stop & Updates
-    if (bleStopRequested) {
-        motion.abort();
-        clearCommandQueue(ctx.commandQueue);
-        ctx.currentAction = Robot::DISPATCH_CMD;
-        bleStopRequested = false;
-
-        Serial.println("[FSM] BLE STOP");
-        bleSerial.println("[FSM] BLE STOP");
-        return;
-    }
-
-    // DBG
+void debugPrints(Context &ctx){
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
@@ -230,6 +182,49 @@ void robot_step(Context &ctx)
     // printIMUAngleTest();
     // printEncodersVal();
     
+}
+
+// Stop Conditions
+void US_STOP(Context &ctx){
+    if (emergencyStopUS) {
+        motion.abort();
+        emergencyStopUS = false;
+        ctx.currentAction = Robot::EMERGENCY_STOP_US;
+        static unsigned long Lpwm = 0;
+        if (millis() - Lpwm >= 2000){ bleSerial.println("emergencyStopUS"); Lpwm = millis(); }
+
+        // Turn On builtin led
+        #ifdef LED_BUILTIN
+            digitalWrite(LED_BUILTIN, HIGH);
+        #endif
+    }
+}
+void BLE_STOP(Context &ctx){
+    if (bleStopRequested) {
+        motion.abort();
+        clearCommandQueue(ctx.commandQueue);
+        ctx.currentAction = Robot::DISPATCH_CMD;
+        bleStopRequested = false;
+
+        Serial.println("[FSM] BLE STOP");
+        bleSerial.println("[FSM] BLE STOP");
+        // return true;
+    // } else { return false;}
+    }
+}
+
+
+// ========== FSM ============
+void robot_step(Context &ctx)
+{
+
+    // Stop Conditions
+    US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
+    BLE_STOP(ctx);
+
+    // DBG
+    debugPrints(ctx);
+    
 
 
     // ===================================================
@@ -239,7 +234,8 @@ void robot_step(Context &ctx)
 
             // MOVE COMMANDS
             // testRotation(ctx);
-            testLinearMotion(ctx);
+            // testLinearMotion(ctx);
+            testServos(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;
@@ -303,8 +299,10 @@ void robot_step(Context &ctx)
                     break;
 
                 case CommandType::DeployServo:
+                    bras_deployer();
                     break;
                 case CommandType::RetractServo:
+                    bras_retracter();
                     break;
 
                 case CommandType::ClearQueue:
@@ -343,11 +341,16 @@ void robot_step(Context &ctx)
                     : Robot::IDLE;            }
             break;
 
-        case Robot::EMERGENCY_STOP:
+        case Robot::EMERGENCY_STOP_US:
             motion.abort();
             if (digitalRead(STOP_PIN) == LOW) {
                 emergencyStopUS = false;
-                ctx.currentAction = Robot::IDLE;
+                ctx.currentAction = Robot::DISPATCH_CMD;
+
+                // Turn off builtin led
+                #ifdef LED_BUILTIN
+                    digitalWrite(LED_BUILTIN, LOW);
+                #endif
             }
             break;
 
