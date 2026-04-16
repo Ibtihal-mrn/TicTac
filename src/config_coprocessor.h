@@ -63,8 +63,8 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 // ==================
 //       FRONT
 // ==================
-#define US_F0_TRIG 39     // Left
-#define US_F0_ECHO 40
+#define US_F0_TRIG 15     // Left
+#define US_F0_ECHO 16
 
 #define US_F1_TRIG 10     // Middle
 #define US_F1_ECHO 11
@@ -84,14 +84,14 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 // ==========
 //   BACK
 // ==========
-#define US_B5_TRIG  15   // Left
-#define US_B5_ECHO  16
+//#define US_B5_TRIG  15   // Left
+//#define US_B5_ECHO  16
 
-#define US_B6_TRIG  8   // Middle
-#define US_B6_ECHO  9
+//#define US_B6_TRIG  8   // Middle
+//#define US_B6_ECHO  9
 
-#define US_B7_TRIG  21 // Rigth
-#define US_B7_ECHO  38
+//#define US_B7_TRIG  21 // Rigth
+//#define US_B7_ECHO  38
 
 
 // ==================
@@ -100,8 +100,8 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define US_L8_TRIG  41     // Left
 #define US_L8_ECHO  42
 
-#define US_L9_TRIG  2  // Right
-#define US_L9_ECHO  1
+#define US_L9_TRIG  8  // Right
+#define US_L9_ECHO  9
 
 
 

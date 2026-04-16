@@ -166,9 +166,9 @@ void setupUS(){
     us_add(ZONE_RIGHT, US_R4_TRIG, US_R4_ECHO);
 
     // BACK
-    us_add(ZONE_BACK, US_B5_TRIG, US_B5_ECHO);
-    us_add(ZONE_BACK, US_B6_TRIG, US_B6_ECHO);
-    us_add(ZONE_BACK, US_B7_TRIG, US_B7_ECHO);
+    // us_add(ZONE_BACK, US_B5_TRIG, US_B5_ECHO);
+    // us_add(ZONE_BACK, US_B6_TRIG, US_B6_ECHO);
+    // us_add(ZONE_BACK, US_B7_TRIG, US_B7_ECHO);
 
     // LEFT
     us_add(ZONE_LEFT, US_L8_TRIG, US_L8_ECHO);
