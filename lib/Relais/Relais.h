@@ -1,18 +1,14 @@
-#ifndef RELAIS_H
-#define RELAIS_H
-
+#pragma once
 #include <Arduino.h>
 
-// Initialisation du relais
+// Initialisation du relais (broche, logique active bas)
 void relais_init(int pin, bool activeLow = true);
 
 // Allumer le relais
 void relais_on();
 
-// Éteindre le relais
+// Eteindre le relais
 void relais_off();
 
-// Vérifier si le relais est activé
+// Retourne true si le relais est actif
 bool relais_isOn();
-
-#endif

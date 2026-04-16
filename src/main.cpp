@@ -8,14 +8,12 @@
  * Communication inter-cœurs :
  *   cmdQueue (FreeRTOS queue) : commandes BLE → FSM
  *   logQueue (dans BLEBridge) : logs FSM → BLE notify → PC
- * 
  */
 
-// main.cpp
 #include <Arduino.h>
 #include <Wire.h>
 
-// ── BLE Bridge (réception logs sur PC via BLE) ──────────────────────────────
+// BLE Bridge
 #include "BLEBridge.h"
 
 // Hardware
@@ -44,21 +42,15 @@ TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 Context fsmCtx{};
 
-// OBSTACLE flag : Hardware Interrupt (Ultrasonic sensors Hub Obstacle detected).
-volatile bool emergencyStopUS = false;  //extern in globals.h
+// OBSTACLE flag : Hardware Interrupt
+volatile bool emergencyStopUS = false;  // extern in globals.h
 void IRAM_ATTR stopISR() { emergencyStopUS = digitalRead(STOP_PIN); }
 
 // BLE flag
 volatile bool bleStopRequested = false;
 
-// TODO: remove/obfuscate this :
-// const int RELAY_PIN = 41;
-// const bool RELAY_ACTIVE_LOW = true;
-// bool lastSwitchState = HIGH;   // INPUT_PULLUP
-// bool sequenceDone = false;     // Pour éviter répétition
 
-
-
+// ========= TACHE BLE — Core 0 =========
 void bleTask(void* pvParameters) {
     bleSerial.println("[BLE_TASK] Started on Core 0");
 
@@ -72,84 +64,104 @@ void bleTask(void* pvParameters) {
         if (millis() - lastHeartbeat >= 5000) {
             char hb[64];
             snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus",
-                      bleBridge.isConnected(), millis() / 1000);
+                     bleBridge.isConnected(), millis() / 1000);
             bleSerial.println(hb);
             lastHeartbeat = millis();
         }
 
-        // Laisser du temps aux autres tâches (NimBLE tourne aussi sur Core 0)
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
+
+// ========= TACHE FSM — Core 1 =========
 void fsmTask(void* pvParameters) {
     bleSerial.println("[FSM_TASK] Started on Core 1");
 
-    // Initialiser la FSM avec la queue de commandes du BLEBridge
-    fsm_init(fsmCtx, bleBridge.getCommandQueue()); //TODO: getCommandQueue?
-    // hardware_init(ctx);
+    fsm_init(fsmCtx, bleBridge.getCommandQueue());
 
     for (;;) {
-        // Un pas de la FSM
         robot_step(fsmCtx);
-
-        // Petit yield pour ne pas affamer le watchdog
-        // Note: fsm_step() contient déjà des vTaskDelay dans certains états
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 
-// ------------------
+// ========= SETUP =========
 void setup() {
     debugInit(115200,
-          DBG_FSM |
-          DBG_I2C_HUB |
-          DBG_PID |
-          // DBG_MOTORS |
-          // DBG_SENSORS |
-          // DEBUG_TEAM_SWITCH |
-          // DBG_SERVO |
-          // DBG_ENCODER |
-          // DBG_MAGNET
-          // DBG_COMMS |  
-        //   DBG_IMU |
-          DBG_ENCODER 
-          // DBG_LAUNCH_TGR       
-          // comment to deactivate its related prints
-  );
-  
-  // ======== HARDWARE INIT ==========
-  pinMode(STOP_PIN, INPUT); //
-  attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, CHANGE);
+              DBG_FSM |
+              DBG_I2C_HUB |
+              DBG_PID |
+              // DBG_MOTORS |
+              // DBG_SENSORS |
+              // DEBUG_TEAM_SWITCH |
+              // DBG_SERVO |
+              // DBG_ENCODER |
+              // DBG_MAGNET |
+              // DBG_COMMS |
+              // DBG_IMU |
+              DBG_ENCODER
+              // DBG_LAUNCH_TGR
+    );
 
-  // I2C Setup.
-  Wire.begin(SDA_PIN, SCL_PIN, 100000);
-  // initUSConfig();    //TODO: change init config of hub
+    // Hardware Interrupt
+    pinMode(STOP_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, CHANGE);
 
-  // Utils.h
-  i2c_scanner();
-  // printEsp32Info();
+    // I2C
+    Wire.begin(SDA_PIN, SCL_PIN, 100000);
 
+    // Utils
+    i2c_scanner();
 
-  // Init Hardware et Robot
-  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
-  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
-  // bras_init();                // must run FIRST
-  // robot_init();
+    // Init Hardware
+    ESP32PWM::allocateTimer(0);
+    ESP32PWM::allocateTimer(1);
+    hardware_init(fsmCtx);
 
-  hardware_init(fsmCtx);
+    // Init relais
+    relais_init(21, true);
 
-  // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
-  bleBridge.begin(BLE_DEVICE_NAME); bleSerial.println("[SETUP] BLE Bridge ready");
+    // ========= SEQUENCE ELECTROAIMANT =========
+    // Avancer 10 cm
+    RobotCommand move1{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(fsmCtx.commandQueue, &move1, 0);
 
-  xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
-  xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);                 
+    // Arrêt 2 secondes + relais on pendant ce temps
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(fsmCtx.commandQueue, &wait1, 0);
+
+    RobotCommand relOn{CommandType::RelaisOn, 0.0f, 0, 0};
+    xQueueSendToBack(fsmCtx.commandQueue, &relOn, 0);
+
+    // Avancer 10 cm relais actif
+    RobotCommand move2{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(fsmCtx.commandQueue, &move2, 0);
+
+    // Relais off
+    RobotCommand relOff{CommandType::RelaisOff, 0.0f, 0, 0};
+    xQueueSendToBack(fsmCtx.commandQueue, &relOff, 0);
+
+    // Continuer 10 cm
+    RobotCommand move3{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(fsmCtx.commandQueue, &move3, 0);
+    // ==========================================
+
+    // BLE Bridge
+    bleBridge.begin(BLE_DEVICE_NAME);
+    bleSerial.println("[SETUP] BLE Bridge ready");
+
+    // Lancer les taches FreeRTOS
+    xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
+    xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);
+
+    Serial.println("Setup Done.");
 }
 
+
+// ========= LOOP =========
 void loop() {
+    // FreeRTOS gère les tâches, loop() ne fait rien
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
-
-
-

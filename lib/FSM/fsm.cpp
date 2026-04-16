@@ -7,6 +7,7 @@
 #include "us.h"
 #include "imu.h"
 #include "pid.h"
+#include "Relais.h"
 
 // #include "control.h"
 // #include "kinematics.h"
@@ -288,6 +289,17 @@ void robot_step(Context &ctx)
                     motion.abort();
                     ctx.waitEndMs = millis() + ctx.currentCommand.waitMs;
                     ctx.currentAction = Robot::EXEC_WAIT;
+                    break;
+
+                // Controle electroaimant
+                case CommandType::RelaisOn:
+                    relais_on();
+                    ctx.currentAction = Robot::DISPATCH_CMD;
+                    break;
+
+                case CommandType::RelaisOff:
+                    relais_off();
+                    ctx.currentAction = Robot::DISPATCH_CMD;
                     break;
 
                 case CommandType::DeployServo:

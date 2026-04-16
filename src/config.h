@@ -96,8 +96,8 @@
 
 
 // ==================== Electro Aimant ====================
-#define RELAY_PIN 40
-#define SWITCH_PIN 41
+//#define RELAY_PIN 41
+//#define SWITCH_PIN 41
 
 
 

@@ -45,6 +45,8 @@ enum class CommandType {
     Wait,
     DeployServo,
     RetractServo,
+    RelaisOn,
+    RelaisOff,
 
     //
     Ping,
