@@ -24,9 +24,27 @@
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 static PIDController motion(motors);
 
+// ------- INITS ---------
+void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
+    
+    // Init freeRtos Queue
+    ctx.commandQueue = cmdQueue;
+    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
 
+    // Context
+    ctx.currentAction = Robot::INIT;
+    ctx.currentTeam = Team::TEAM_YELLOW;
+    // TOD: add match timer init
+    // Init Match Timer
+    // ctx.matchActive = false;
+    // ctx.matchDurationMs = MATCH_DURATION_MS;
+    // ctx.matchStartMs = 0;
+    // debugPrintf(DBG_FSM, "FSM -> INIT");
+    
+    Serial.println("[FSM] Context initialized");
+    bleSerial.println("[FSM] Context initialized");
 
-
+}
 
 void hardware_init(Context &ctx)
 {
@@ -58,26 +76,6 @@ void hardware_init(Context &ctx)
     // ctx.currentTeam = Team::TEAM_YELLOW;
 }
 
-void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
-    
-    // Init freeRtos Queue
-    ctx.commandQueue = cmdQueue;
-    memset(&ctx.currentCommand, 0, sizeof(RobotCommand));
-
-    // Context
-    ctx.currentAction = Robot::INIT;
-    ctx.currentTeam = Team::TEAM_YELLOW;
-    // TOD: add match timer init
-    // Init Match Timer
-    // ctx.matchActive = false;
-    // ctx.matchDurationMs = MATCH_DURATION_MS;
-    // ctx.matchStartMs = 0;
-    // debugPrintf(DBG_FSM, "FSM -> INIT");
-    
-    Serial.println("[FSM] Context initialized");
-    bleSerial.println("[FSM] Context initialized");
-
-}
 
 
 // ---- US obstacle movement -------
@@ -186,30 +184,7 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
-// ========== FSM ============
-void robot_step(Context &ctx)
-{
-    if (emergencyStopUS) {
-        motion.abort();
-        emergencyStopUS = false;
-        ctx.currentAction = Robot::EMERGENCY_STOP_US;
-        static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){ bleSerial.println("emergencyStopUS"); Lpwm = millis(); }
-    }
-
-    // BLE Stop & Updates
-    if (bleStopRequested) {
-        motion.abort();
-        clearCommandQueue(ctx.commandQueue);
-        ctx.currentAction = Robot::DISPATCH_CMD;
-        bleStopRequested = false;
-
-        Serial.println("[FSM] BLE STOP");
-        bleSerial.println("[FSM] BLE STOP");
-        return;
-    }
-
-    // DBG
+void debugPrints(Context &ctx){
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
@@ -225,6 +200,49 @@ void robot_step(Context &ctx)
     // printIMUVal();
     // printIMUAngleTest();
     // printEncodersVal();
+    
+}
+
+// Stop Conditions
+void US_STOP(Context &ctx){
+    if (emergencyStopUS) {
+        motion.abort();
+        emergencyStopUS = false;
+        ctx.currentAction = Robot::EMERGENCY_STOP_US;
+        static unsigned long Lpwm = 0;
+        if (millis() - Lpwm >= 2000){ bleSerial.println("emergencyStopUS"); Lpwm = millis(); }
+
+        // Turn On builtin led
+        #ifdef LED_BUILTIN
+            digitalWrite(LED_BUILTIN, HIGH);
+        #endif
+    }
+}
+void BLE_STOP(Context &ctx){
+    if (bleStopRequested) {
+        motion.abort();
+        clearCommandQueue(ctx.commandQueue);
+        ctx.currentAction = Robot::DISPATCH_CMD;
+        bleStopRequested = false;
+
+        Serial.println("[FSM] BLE STOP");
+        bleSerial.println("[FSM] BLE STOP");
+        // return true;
+    // } else { return false;}
+    }
+}
+
+
+// ========== FSM ============
+void robot_step(Context &ctx)
+{
+
+    // Stop Conditions
+    US_STOP(ctx);
+    BLE_STOP(ctx);
+
+    // DBG
+    debugPrints(ctx);
     
 
 
@@ -332,7 +350,12 @@ void robot_step(Context &ctx)
             motion.abort();
             if (digitalRead(STOP_PIN) == LOW) {
                 emergencyStopUS = false;
-                ctx.currentAction = Robot::IDLE;
+                ctx.currentAction = Robot::DISPATCH_CMD;
+
+                // Turn off builtin led
+                #ifdef LED_BUILTIN
+                    digitalWrite(LED_BUILTIN, LOW);
+                #endif
             }
             break;
 

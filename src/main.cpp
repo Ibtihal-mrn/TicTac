@@ -103,48 +103,54 @@ void fsmTask(void* pvParameters) {
 // ------------------
 void setup() {
     debugInit(115200,
-          DBG_FSM |
-          DBG_I2C_HUB |
-          DBG_PID |
-          // DBG_MOTORS |
-          // DBG_SENSORS |
-          // DEBUG_TEAM_SWITCH |
-          // DBG_SERVO |
-          // DBG_ENCODER |
-          // DBG_MAGNET
-          // DBG_COMMS |  
-        //   DBG_IMU |
-          DBG_ENCODER 
-          // DBG_LAUNCH_TGR       
-          // comment to deactivate its related prints
-  );
-  
-  // ======== HARDWARE INIT ==========
-  pinMode(STOP_PIN, INPUT); //
-  attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, CHANGE);
-
-  // I2C Setup.
-  Wire.begin(SDA_PIN, SCL_PIN, 100000);
-  // initUSConfig();    //TODO: change init config of hub
-
-  // Utils.h
-  i2c_scanner();
-  // printEsp32Info();
+            DBG_FSM |
+            DBG_I2C_HUB |
+            DBG_PID |
+            // DBG_MOTORS |
+            // DBG_SENSORS |
+            // DEBUG_TEAM_SWITCH |
+            // DBG_SERVO |
+            // DBG_ENCODER |
+            // DBG_MAGNET
+            // DBG_COMMS |  
+            //   DBG_IMU |
+            DBG_ENCODER 
+            // DBG_LAUNCH_TGR       
+            // comment to deactivate its related prints
+    );
+        
+    // ======== HARDWARE INIT ==========
+    // Hub GPIO Interrupt Pin
+    pinMode(STOP_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(STOP_PIN), stopISR, CHANGE);
+    #ifdef LED_BUILTIN
+        pinMode(LED_BUILTIN, OUTPUT);
+        digitalWrite(LED_BUILTIN, LOW);
+    #endif
 
 
-  // Init Hardware et Robot
-  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
-  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
-  // bras_init();                // must run FIRST
-  // robot_init();
+    // I2C Setup.
+    Wire.begin(SDA_PIN, SCL_PIN, 100000);
+    // initUSConfig();    //TODO: change init config of hub
 
-  hardware_init(fsmCtx);
+    // Utils.h
+    i2c_scanner();
+    // printEsp32Info();
 
-  // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
-  bleBridge.begin(BLE_DEVICE_NAME); bleSerial.println("[SETUP] BLE Bridge ready");
 
-  xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
-  xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);                 
+    // Init Hardware et Robot
+    ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
+    ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
+    // bras_init();                // must run FIRST
+    // robot_init();
+
+    hardware_init(fsmCtx);
+
+    // ── Initialiser le BLE Bridge (crée les queues) ──────────────────────────
+    bleBridge.begin(BLE_DEVICE_NAME); bleSerial.println("[SETUP] BLE Bridge ready");
+
+    xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
+    xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);                 
 }
 
 void loop() {
