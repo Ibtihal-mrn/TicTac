@@ -210,14 +210,11 @@ class Brain:
         self.action_queue.clear()
         self.action_queue.enqueue_many(actions)
 
-        # self.phase = BrainPhase.READY
+        self.phase = BrainPhase.READY
         print(f"\n[Brain] Plan prêt: {len(actions)} actions en queue")
         print(f"[Brain] Route: {self.mission_mgr.progress}")
-        # print("[Brain] En attente de la tirette (start_match)...")
+        print("[Brain] En attente de la tirette (start_match)...")
         print("=" * 60 + "\n")
-
-        # Tirette commentée — lancement immédiat
-        self.start_match()
 
         return True
 
@@ -385,7 +382,8 @@ class Brain:
     def run(self) -> None:
         """Boucle principale temps réel (phase RUN). Bloquante."""
         if self.phase == BrainPhase.READY:
-            self.start_match()
+            print("[Brain] En attente de start_match() avant la boucle RUN")
+            return
 
         print(f"[Brain] Boucle de monitoring à {config.BRAIN_LOOP_HZ} Hz")
 

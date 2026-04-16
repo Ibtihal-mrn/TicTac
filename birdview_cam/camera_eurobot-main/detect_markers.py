@@ -113,6 +113,7 @@ def main() -> None:
     frame_count = 0
     init_plan_done = False       # A* calcule une seule fois
     init_vision_frames = 0       # Compteur de frames avec vision valide
+    tirette_seen_inserted = False
 
     while True:
 
@@ -187,11 +188,16 @@ def main() -> None:
                         print("[INIT] Echec planification — nouvel essai dans quelques frames")
                         init_vision_frames = 0  # retry
 
-                # ── TIRETTE : demarrer le match quand elle est retiree ─
-                # TEST: bypass tirette — demarre des que le plan est pret
+                # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
                 if init_plan_done and brain.phase == BrainPhase.READY:
-                    print("[MATCH] TEST MODE — demarrage immediat!")
-                    brain.start_match()
+                    if ble.tirette_inserted is True:
+                        if not tirette_seen_inserted:
+                            print("[MATCH] Tirette détectée IN — attente du retrait")
+                        tirette_seen_inserted = True
+                    elif ble.tirette_inserted is False and tirette_seen_inserted:
+                        print("[MATCH] Front tirette IN -> OUT détecté — démarrage!")
+                        brain.start_match()
+                        tirette_seen_inserted = False
 
                 # ── RUN : tick de monitoring ───────────────────────────
                 if brain.phase == BrainPhase.RUNNING:
