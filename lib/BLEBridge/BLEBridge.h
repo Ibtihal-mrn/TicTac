@@ -28,7 +28,7 @@
 #define BLE_DEVICE_NAME   "Eurobot"
 #define BLE_MAX_MSG_LEN   240
 #define BLE_QUEUE_DEPTH   32
-#define BLE_CMD_QUEUE_DEPTH 64
+#define BLE_CMD_QUEUE_DEPTH 256
 #define BLE_MTU           247
 
 // ── Types de commandes robot ─────────────────────────────────────────────────

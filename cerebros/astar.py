@@ -225,6 +225,48 @@ def simplify_path(path: List[Cell]) -> List[Cell]:
     return simplified
 
 
+def _line_of_sight(grid: AStarGrid, a: Cell, b: Cell) -> bool:
+    """Vérifie que toutes les cellules sur la ligne droite a→b sont libres."""
+    dx = b[0] - a[0]
+    dy = b[1] - a[1]
+    steps = max(abs(dx), abs(dy))
+    if steps == 0:
+        return True
+    for i in range(steps + 1):
+        t = i / steps
+        x = round(a[0] + dx * t)
+        y = round(a[1] + dy * t)
+        if not grid.is_free(x, y):
+            return False
+    return True
+
+
+def smooth_path(grid: AStarGrid, path: List[Cell]) -> List[Cell]:
+    """Lisse le chemin A* par vérification de ligne de vue.
+
+    Supprime les waypoints intermédiaires inutiles en vérifiant si une
+    ligne droite entre deux points non-adjacents est libre d'obstacles.
+    Produit des diagonales franches au lieu de zig-zags grille.
+    """
+    if len(path) <= 2:
+        return path
+
+    result = [path[0]]
+    current = 0
+
+    while current < len(path) - 1:
+        # Chercher le point le plus loin atteignable en ligne droite
+        farthest = current + 1
+        for j in range(len(path) - 1, current + 1, -1):
+            if _line_of_sight(grid, path[current], path[j]):
+                farthest = j
+                break
+        result.append(path[farthest])
+        current = farthest
+
+    return result
+
+
 def path_cells_to_mm(cells: List[Cell]) -> List[Position]:
     """Convertit un chemin de cellules en positions mm (centres des cellules)."""
     return [grid_to_mm_center(c, r) for c, r in cells]

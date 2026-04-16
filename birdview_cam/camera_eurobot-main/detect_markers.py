@@ -37,6 +37,11 @@ from cerebros.models import Position, Team
 from cerebros import config as cerebros_config
 
 
+# Bypass de la tirette pour les tests PC/vision.
+# Remettre a False pour revenir au demarrage sur front IN -> OUT.
+BYPASS_TIRETTE = True
+
+
 def main() -> None:
     """Boucle principale du pipeline."""
 
@@ -78,11 +83,11 @@ def main() -> None:
     else:
         print("[INIT] Timeout — équipe par défaut: BLUE")
 
-    initial_pos = Position(150, 1000)
+    home_pos = Position(150, 1000)  # Position de base pour retour (pas la pos reelle)
     brain = Brain(
         team=team,
         robot_id=robot_id,
-        initial_pos=initial_pos,
+        initial_pos=None,        # Pas de position par defaut — attente de la vision
         initial_heading=0.0,
     )
     brain.set_send_function(ble.send)
@@ -90,9 +95,9 @@ def main() -> None:
     # ── PHASE INIT : mission hardcodee ────────────────────────────────
     #  Mission : centre table → centre-droit → retour base
     targets = [
-        Position(1500, 1000),   # Centre de la table
-        Position(2850, 1000),   # Centre-droit
-        Position(initial_pos.x, initial_pos.y),  # Retour à la position initiale
+        Position(1500, 0),   # Centre de la table
+        Position(0, 1000), # Centre-droit
+        Position(200,1700),  # Retour a la position de base
     ]
     labels = ["CENTRE_TABLE", "CENTRE_DROIT", "RETOUR_BASE"]
     print(f"[INIT] Mission : {labels}")
@@ -177,19 +182,25 @@ def main() -> None:
                 init_vision_frames += 1
 
                 # ── INIT : lancer A* apres quelques frames stables ────
-                if not init_plan_done and init_vision_frames >= 10:
-                    print("[INIT] Vision stable — lancement planification A*")
+                if (not init_plan_done and init_vision_frames >= 5
+                        and brain.robot_position_known):
+                    print("[INIT] Vision stable + robot detecte — lancement planification A*")
                     ok = brain.init_plan(
                         target_positions=targets, target_labels=labels)
                     if ok:
                         init_plan_done = True
-                        print("[INIT] Plan OK. Insere la tirette puis retire-la pour lancer le match.")
+                        if BYPASS_TIRETTE:
+                            print("[INIT] Plan OK. Bypass tirette actif — demarrage immediat du match.")
+                            brain.start_match()
+                        else:
+                            print("[INIT] Plan OK. Insere la tirette puis retire-la pour lancer le match.")
                     else:
                         print("[INIT] Echec planification — nouvel essai dans quelques frames")
                         init_vision_frames = 0  # retry
 
                 # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
-                if init_plan_done and brain.phase == BrainPhase.READY:
+                if (not BYPASS_TIRETTE and init_plan_done
+                        and brain.phase == BrainPhase.READY):
                     if ble.tirette_inserted is True:
                         if not tirette_seen_inserted:
                             print("[MATCH] Tirette détectée IN — attente du retrait")

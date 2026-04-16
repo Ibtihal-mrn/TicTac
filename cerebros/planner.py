@@ -15,6 +15,7 @@ from cerebros.astar import (
     mm_to_grid,
     path_cells_to_mm,
     simplify_path,
+    smooth_path,
 )
 from cerebros.config import DEBUG
 from cerebros.models import Action, ActionType, ObjectInfo, Position
@@ -62,12 +63,12 @@ class Planner:
                       "Fallback: ligne droite")
             return [Position(start.x, start.y), Position(goal.x, goal.y)]
 
-        # Simplifier (supprimer les points colinéaires)
-        simplified = simplify_path(cell_path)
+        # Lisser le chemin par ligne de vue (élimine les zig-zags grille)
+        simplified = smooth_path(self._grid, cell_path)
 
         if DEBUG:
             print(f"[Planner] A* brut: {len(cell_path)} cellules → "
-                  f"simplifié: {len(simplified)} waypoints")
+                  f"lissé: {len(simplified)} waypoints")
 
         # Convertir en mm
         path_mm = path_cells_to_mm(simplified)

@@ -355,8 +355,14 @@ def build_transforms(
     return _compose_transforms(h_img_to_mm, table_pts, _select_anchor_points(corners_by_id))
 
 
-def to_cell(px: float, py: float, h_img_to_grid: np.ndarray | None) -> tuple[float, float] | None:
-    """Projette un point image dans le repere grille (colonne, ligne)."""
+def to_cell(px: float, py: float, h_img_to_grid: np.ndarray | None,
+            strict: bool = True) -> tuple[float, float] | None:
+    """Projette un point image dans le repere grille (colonne, ligne).
+
+    Args:
+        strict: si True, rejette les points hors table. Si False, autorise
+                les coordonnees hors limites (utile pour les robots au bord).
+    """
     if h_img_to_grid is None:
         return None
 
@@ -364,7 +370,7 @@ def to_cell(px: float, py: float, h_img_to_grid: np.ndarray | None) -> tuple[flo
     gx, gy = float(out[0, 0, 0]), float(out[0, 0, 1])
     gx = config.GRID_COLS - gx  # Inverser l'axe horizontal pour top-right = (0,0)
 
-    if gx < -0.5 or gx > config.GRID_COLS + 0.5 or gy < -0.5 or gy > config.GRID_ROWS + 0.5:
+    if strict and (gx < -0.5 or gx > config.GRID_COLS + 0.5 or gy < -0.5 or gy > config.GRID_ROWS + 0.5):
         return None
 
     return gx, gy

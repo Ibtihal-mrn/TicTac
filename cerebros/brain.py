@@ -67,10 +67,11 @@ class Brain:
         self.world = WorldState(team)
         self.robot = RobotState(
             robot_id, team,
-            initial_pos=initial_pos or Position(150, 1000),
+            initial_pos=initial_pos,
             initial_heading=initial_heading,
         )
         self.world.set_our_robot(self.robot)
+        self._robot_position_known = initial_pos is not None
 
         self.mission_mgr = MissionManager()
         self.planner = Planner()
@@ -94,12 +95,18 @@ class Brain:
         self._last_robot_pos = Position(self.robot.position.x,
                                         self.robot.position.y)
         self._last_replan_tick = 0
-        self._replan_cooldown_ticks = 50   # ~5s à 10Hz entre deux replans
+        self._replan_cooldown_ticks = 5    # ~0.5s à 10Hz entre deux replans
 
-        print(f"[Brain] Prêt. Robot à {self.robot.position}, "
+        pos_info = str(self.robot.position) if self._robot_position_known else "inconnue (attente vision)"
+        print(f"[Brain] Prêt. Robot à {pos_info}, "
               f"heading={self.robot.heading_deg}°")
 
     # ── Configuration ─────────────────────────────────────────────────
+
+    @property
+    def robot_position_known(self) -> bool:
+        """True si la position du robot a ete vue par la vision."""
+        return self._robot_position_known
 
     def set_send_function(self, fn: SendActionFn) -> None:
         """Branche la fonction d'envoi BLE."""
@@ -117,6 +124,15 @@ class Brain:
             robot_heading: heading du robot en degrés (depuis ArUco corners)
         """
         self.world.update_from_vision(detections)
+
+        # Detecter la premiere apparition du robot par la vision
+        if not self._robot_position_known:
+            for label, gx, gy in detections:
+                if label == self.robot.robot_id:
+                    self._robot_position_known = True
+                    print(f"[Brain] Robot detecte par la vision a "
+                          f"{self.robot.position}")
+                    break
 
         if robot_heading is not None and self.robot is not None:
             self.robot.heading_deg = robot_heading
@@ -142,6 +158,10 @@ class Brain:
         print("\n" + "=" * 60)
         print("[Brain] === PHASE INIT — Planification A* ===")
         print("=" * 60)
+
+        if not self._robot_position_known:
+            print("[Brain] Position du robot inconnue — impossible de planifier")
+            return False
 
         # Déterminer les cibles
         if target_positions is None:
