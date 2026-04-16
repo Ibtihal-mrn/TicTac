@@ -118,7 +118,7 @@ static void printHubStatus(bool stopState) {
     Serial.print(F("STOP: "));
     Serial.println(stopState ? F("TRIGGERED") : F("CLEAR"));
 
-    const uint8_t zones[] = {ZONE_FRONT, ZONE_LEFT, ZONE_RIGHT, ZONE_BACK};
+    const uint8_t zones[] = {ZONE_FRONT, ZONE_RIGHT, ZONE_BACK, ZONE_LEFT};
 
     for (uint8_t z = 0; z < 4; z++) {
         uint8_t zone = zones[z];
@@ -157,22 +157,22 @@ static void printHubStatus(bool stopState) {
 // ------- Helpers
 void setupUS(){
     // FRONT
+    us_add(ZONE_FRONT, US_F0_TRIG, US_F0_ECHO);
     us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
     us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
 
     // RIGHT
-    us_add(ZONE_RIGHT, US_R1_TRIG, US_R1_ECHO);
-    us_add(ZONE_RIGHT, US_R2_TRIG, US_R2_ECHO);
-
-    // LEFT
-    us_add(ZONE_LEFT, US_L1_TRIG, US_L1_ECHO);
-    us_add(ZONE_LEFT, US_L2_TRIG, US_L2_ECHO);
+    us_add(ZONE_RIGHT, US_R3_TRIG, US_R3_ECHO);
+    us_add(ZONE_RIGHT, US_R4_TRIG, US_R4_ECHO);
 
     // BACK
-    // us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
+    us_add(ZONE_BACK, US_B5_TRIG, US_B5_ECHO);
+    us_add(ZONE_BACK, US_B6_TRIG, US_B6_ECHO);
+    us_add(ZONE_BACK, US_B7_TRIG, US_B7_ECHO);
+
+    // LEFT
+    us_add(ZONE_LEFT, US_L8_TRIG, US_L8_ECHO);
+    us_add(ZONE_LEFT, US_L9_TRIG, US_L9_ECHO);
 
 }
 

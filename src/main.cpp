@@ -109,7 +109,7 @@ void setup() {
             // DBG_MOTORS |
             // DBG_SENSORS |
             // DEBUG_TEAM_SWITCH |
-            // DBG_SERVO |
+            DBG_SERVO |
             // DBG_ENCODER |
             // DBG_MAGNET
             // DBG_COMMS |  
@@ -131,7 +131,7 @@ void setup() {
 
     // I2C Setup.
     Wire.begin(SDA_PIN, SCL_PIN, 100000);
-    // initUSConfig();    //TODO: change init config of hub
+    // initUSConfig(); // (optionnal) change init config of hub
 
     // Utils.h
     i2c_scanner();
@@ -141,8 +141,6 @@ void setup() {
     // Init Hardware et Robot
     ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
     ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
-    // bras_init();                // must run FIRST
-    // robot_init();
 
     hardware_init(fsmCtx);
 

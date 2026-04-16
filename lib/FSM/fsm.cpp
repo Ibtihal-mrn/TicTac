@@ -3,6 +3,7 @@
 #include "../../src/globals.h"
 
 #include "motors.h"
+#include "bras.h"
 #include "encoders.h"
 #include "us.h"
 #include "imu.h"
@@ -49,11 +50,9 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
 void hardware_init(Context &ctx)
 {
     // To be called in setup() in main.cpp
-
+    bras_init();
     // motors_init();
     encoders_init();
-    // ultrasonic_init(13, 10);  // trig, echo
-    // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
 
     // IMU
     if (!imu_init())
@@ -96,23 +95,7 @@ void rotate(float angle, int speed) {
 
 // ------- ROUTINES ----------
 void testRotation(Context &ctx){
-    // debugEnable(DBG_IMU);
-    // clear queue
-    // ctx.commandQueue = std::queue<RobotCommand>(); 
-    // Serial.println("[TEST] rotation sequence start");
-
-
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
-
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
-
-
-    Serial.print("[TEST] queued=");
-    // Serial.println(ctx.commandQueue.size());
+    
 }
 void testLinearMotion(Context &ctx){
     if (!ctx.commandQueue) return;
@@ -133,21 +116,18 @@ void testLinearMotion(Context &ctx){
 //     xQueueSendToBack(ctx.commandQueue, &rotate2, 0);
 }
 
-void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
-    RobotCommand cmd;
-    cmd.type = CommandType::Rotate;
-    cmd.value = 180.0f;
-    cmd.speed = 80;
-    cmd.waitMs = 0;
-    xQueueSendToBack(q, &cmd, 0);
+void testServos(Context &ctx){
+    if (!ctx.commandQueue) return;
 
-    cmd.type = CommandType::Wait;
-    cmd.value = 0;
-    cmd.speed = 0;
-    cmd.waitMs = 3000;
-    xQueueSendToBack(q, &cmd, 0);
+    RobotCommand deploy1{CommandType::DeployServo};
+    xQueueSendToBack(ctx.commandQueue, &deploy1, 0);
+
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand retract1{CommandType::RetractServo};
+    xQueueSendToBack(ctx.commandQueue, &retract1, 0);
 }
-
 
 
 // -------- helpers ----------
@@ -238,7 +218,7 @@ void robot_step(Context &ctx)
 {
 
     // Stop Conditions
-    US_STOP(ctx);
+    US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
     BLE_STOP(ctx);
 
     // DBG
@@ -254,6 +234,7 @@ void robot_step(Context &ctx)
             // MOVE COMMANDS
             // testRotation(ctx);
             // testLinearMotion(ctx);
+            testServos(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;
@@ -306,8 +287,10 @@ void robot_step(Context &ctx)
                     break;
 
                 case CommandType::DeployServo:
+                    bras_deployer();
                     break;
                 case CommandType::RetractServo:
+                    bras_retracter();
                     break;
 
                 case CommandType::ClearQueue:
