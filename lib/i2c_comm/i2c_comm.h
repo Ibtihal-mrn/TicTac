@@ -28,7 +28,7 @@ enum Zone {
 #define CMD_SET_CLEAR_THRESHOLD       0x06
 #define CMD_PING                      0x07
 #define CMD_RESET                     0x08
-#define CMD_GET_CONFIG                0x09
+// #define CMD_GET_CONFIG                0x09
 
 // ================== STRUCT ==================
 struct __attribute__((packed)) SensorPacket {

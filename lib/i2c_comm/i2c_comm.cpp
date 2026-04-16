@@ -24,6 +24,7 @@ void initUSConfig(){
 
 // ===== SLAVE =====
 void onReceive(int len) {
+    // Note : SINGLE PARAM COMMANDS ONLY
     if (len < 1) return;
 
     lastCmd = Wire.read();
@@ -103,7 +104,7 @@ bool setThresholds(uint8_t obst_thr, uint8_t clear_thr) {
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_SET_CLEAR_THRESHOLD);
     Wire.write(clear_thr);
-    uint8_t err = Wire.endTransmission();
+    err = Wire.endTransmission();
     if (err != 0) {
         Serial.print("I2C error (setThresholds): ");
         Serial.println(err);
