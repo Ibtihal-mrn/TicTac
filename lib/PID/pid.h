@@ -65,14 +65,19 @@ private:
     int maxPwm_;
     unsigned long lastUpdateUs_;
     unsigned long stableSinceMs_;
+    // Timeout
+    unsigned long motionStartMs_; 
+    static constexpr unsigned long MOTION_TIMEOUT_MS = 5000; 
 
     // PID min/max values
     static constexpr int PWM_MIN_LINEAR = 40;
     static constexpr int PWM_MIN_ROTATE = 80;
     static constexpr int PWM_MAX = 255;
+    
+    static constexpr int LINEAR_TRIM_PWM = 8;            // static bias to compensate for drivetrain asymmetry.
+    static constexpr int LINEAR_STEER_HEADROOM_PWM = 30;  // reserves PWM space for steering correction.(if linearCmd uses the full maxPwm_, there is no room left to correct drift)
 
-
-    static constexpr float DONE_DISTANCE_MM = 10.0f;    // linear precision
+    static constexpr float DONE_DISTANCE_MM = 30.0f;    // linear precision
     static constexpr float DONE_ANGLE_DEG = 5.0f;       // angle  precision
     static constexpr float DONE_RATE_DPS = 8.0f;
     static constexpr float INTEGRAL_CLAMP = 300.0f;

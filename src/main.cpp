@@ -37,7 +37,7 @@
 
 // External Objects
 extern Motors motors;
-StartSwitch startSwitch(GPIO_NUM_38);
+
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 Context fsmCtx{};
@@ -124,6 +124,8 @@ void setup() {
     relais_init(RELAY_PIN, true);
 
     
+
+    
     // ==========================================
 
     // BLE Bridge
@@ -133,6 +135,8 @@ void setup() {
     // Lancer les taches FreeRTOS
     xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
     xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);
+
+
 
     Serial.println("Setup Done.");
 }

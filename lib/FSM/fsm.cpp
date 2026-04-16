@@ -12,7 +12,7 @@
 
 // #include "control.h"
 // #include "kinematics.h"
-
+#include "StartSwitch.h"
 //
 #include "utils.h"
 #include "Debug.h"
@@ -25,6 +25,7 @@
 
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 static PIDController motion(motors);
+StartSwitch startSwitch(GPIO_NUM_38);
 
 // ------- INITS ---------
 void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
@@ -96,18 +97,27 @@ void rotate(float angle, int speed) {
 
 // ------- ROUTINES ----------
 void testRotation(Context &ctx){
-    
+    RobotCommand rot1{CommandType::Rotate, 90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot1, 0);
+    RobotCommand wait1{CommandType::Wait}; xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand rot2{CommandType::Rotate, -90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand rot3{CommandType::Rotate, 360.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot3, 0);
+
+
+
 }
 void testLinearMotion(Context &ctx){
     if (!ctx.commandQueue) return;
 
-    RobotCommand move1{CommandType::MoveForward, 1000.0f, 80, 0};
+    RobotCommand move1{CommandType::MoveForward, 1000.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move1, 0);
 
     RobotCommand wait1{CommandType::Wait, 0.0f, 0, 5000};
     xQueueSendToBack(ctx.commandQueue, &wait1, 0);
 
-    RobotCommand move2{CommandType::MoveForward, 900.0f, 200, 0};
+    RobotCommand move2{CommandType::MoveBackward, 900.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move2, 0);
     
 //     RobotCommand rotate1{CommandType::Rotate, 90.0f, 200, 0};
@@ -157,7 +167,52 @@ void testElectroAimant(Context &ctx){
     xQueueSendToBack(ctx.commandQueue, &move3, 0);
 }
 
+void competitionRoutine(Context &ctx){
+    if (!ctx.commandQueue) return;
 
+    // SERVO
+    RobotCommand servo1{CommandType::DeployServo}; xQueueSendToBack(ctx.commandQueue, &servo1, 0);
+    RobotCommand wait1{CommandType::Wait}; xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+    RobotCommand servo2{CommandType::RetractServo}; xQueueSendToBack(ctx.commandQueue, &servo2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+
+    // MOVE FORWARD 130cm-à
+    RobotCommand move1{CommandType::MoveForward, 1690.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move1, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // ROTATE -90°s
+    RobotCommand rot1{CommandType::Rotate, 90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot1, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MOVE FORWARD 30cm
+    RobotCommand move2{CommandType::MoveForward, 500.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // ROTATE -90°
+    RobotCommand rot2{CommandType::Rotate, 80.0f, 90, 0}; xQueueSendToBack(ctx.commandQueue, &rot2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MOVE FORWARD 150cm
+    RobotCommand move3{CommandType::MoveForward, 1700.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move3, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MANGER :  SERVO FINISHER: 20 deploy/retract cycles
+    for (int i = 0; i < 20; i++) {
+        RobotCommand deploy{CommandType::DeployServo};
+        xQueueSendToBack(ctx.commandQueue, &deploy, 0);
+
+        RobotCommand waitDeploy{CommandType::Wait, 0.0f, 0, 300};
+        xQueueSendToBack(ctx.commandQueue, &waitDeploy, 0);
+
+        RobotCommand retract{CommandType::RetractServo};
+        xQueueSendToBack(ctx.commandQueue, &retract, 0);
+
+        RobotCommand waitRetract{CommandType::Wait, 0.0f, 0, 300};
+        xQueueSendToBack(ctx.commandQueue, &waitRetract, 0);
+    }
+
+}
 
 // -------- helpers ----------
 const char* commandTypeToString(CommandType type)
@@ -208,7 +263,7 @@ void debugPrints(Context &ctx){
     #endif
     // printIMUVal();
     // printIMUAngleTest();
-    // printEncodersVal();
+    printEncodersVal();
     
 }
 
@@ -264,11 +319,13 @@ void robot_step(Context &ctx)
         case Robot::INIT:
 
             // MOVE COMMANDS
-            // testRotation(ctx);
+            testRotation(ctx);
             // testLinearMotion(ctx);
             // testServos(ctx);
             // testElectroAimant(ctx);
-
+            // startSwitch.begin();
+            // startSwitch.waitForStart();
+            // competitionRoutine(ctx);
 
             ctx.currentAction = Robot::WAIT_START;
             break;
@@ -277,6 +334,7 @@ void robot_step(Context &ctx)
             // ADD LaunchTrigger HERE
             // start 100sec timer
             // startMatchTimer(ctx);
+            
             // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
             ctx.currentAction = Robot::DISPATCH_CMD;
             break;
