@@ -3,8 +3,8 @@
 cerebros/__main__.py — Point d'entrée pour tester le cerveau robot.
 
 Démontre le flux en 2 phases :
-  1. INIT : vision → A* → queue complète
-  2. RUN  : tirette → monitoring + replan si bloqué
+    1. INIT : vision → A* → queue complète
+    2. RUN  : tirette → monitoring + replan si bloqué
 
 Usage:
     cd TicTac

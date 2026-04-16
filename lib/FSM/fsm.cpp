@@ -190,14 +190,11 @@ static void clearCommandQueue(QueueHandle_t q) {
 void robot_step(Context &ctx)
 {
     if (emergencyStopUS) {
-        // motion.abort();
-        // emergencyStopUS = false;
-        // ctx.currentAction = Robot::EMERGENCY_STOP;
+        motion.abort();
+        emergencyStopUS = false;
+        ctx.currentAction = Robot::EMERGENCY_STOP_US;
         static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){
-            bleSerial.println("emergencyStopUS");
-            Lpwm = millis();
-        }
+        if (millis() - Lpwm >= 2000){ bleSerial.println("emergencyStopUS"); Lpwm = millis(); }
     }
 
     // BLE Stop & Updates
@@ -331,7 +328,7 @@ void robot_step(Context &ctx)
                     : Robot::IDLE;            }
             break;
 
-        case Robot::EMERGENCY_STOP:
+        case Robot::EMERGENCY_STOP_US:
             motion.abort();
             if (digitalRead(STOP_PIN) == LOW) {
                 emergencyStopUS = false;
