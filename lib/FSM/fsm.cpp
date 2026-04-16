@@ -247,8 +247,11 @@ void robot_step(Context &ctx)
 {
 
     // Stop Conditions
-    US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
     BLE_STOP(ctx);
+    if(ctx.currentAction == Robot::EXEC) US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
+    
+    // LED
+    if (emergencyStopUS) { digitalWrite(LED_BUILTIN, HIGH);} else{digitalWrite(LED_BUILTIN, LOW);}
 
     // DBG
     debugPrints(ctx);
@@ -264,7 +267,7 @@ void robot_step(Context &ctx)
             // testRotation(ctx);
             // testLinearMotion(ctx);
             // testServos(ctx);
-            testElectroAimant(ctx);
+            // testElectroAimant(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;

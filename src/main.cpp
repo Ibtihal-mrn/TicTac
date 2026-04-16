@@ -121,7 +121,7 @@ void setup() {
     hardware_init(fsmCtx);
 
     // Init relais
-    relais_init(21, true);
+    relais_init(RELAY_PIN, true);
 
     
     // ==========================================

@@ -121,7 +121,10 @@ class DevicePanel:
         for txt, clr in [("FORWARD 255", GREEN), ("BACKWARD 255", YELLOW),
                          ("ROTATE 90", ACCENT), ("ROTATE -90", ACCENT),
                          ("DEPLOY", GREEN), ("RETRACT", YELLOW),
-                         ("STOP", RED), ("STATUS", GREEN), ("RESET", YELLOW)]:
+                         ("STOP", RED), ("STATUS", GREEN), ("RESET", YELLOW),
+                         ("RELAISON", RED), 
+                         ("RELAISOFF", RED),
+                         ]:
             tk.Button(qf, text=txt, bg=BTN_BG, fg=clr,
                       font=("Consolas", 8), relief=tk.FLAT,
                       padx=6, pady=1, cursor="hand2",
