@@ -131,6 +131,34 @@ void testServos(Context &ctx){
 }
 
 
+void testElectroAimant(Context &ctx){
+    // ========= SEQUENCE ELECTROAIMANT =========
+    // Avancer 10 cm
+    RobotCommand move1{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move1, 0);
+
+    // Arrêt 2 secondes + relais on pendant ce temps
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand relOn{CommandType::RelaisOn, 0.0f, 0, 0};
+    xQueueSendToBack(ctx.commandQueue, &relOn, 0);
+
+    // Avancer 10 cm relais actif
+    RobotCommand move2{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move2, 0);
+
+    // Relais off
+    RobotCommand relOff{CommandType::RelaisOff, 0.0f, 0, 0};
+    xQueueSendToBack(ctx.commandQueue, &relOff, 0);
+
+    // Continuer 10 cm
+    RobotCommand move3{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move3, 0);
+}
+
+
+
 // -------- helpers ----------
 const char* commandTypeToString(CommandType type)
 {
@@ -235,7 +263,8 @@ void robot_step(Context &ctx)
             // MOVE COMMANDS
             // testRotation(ctx);
             // testLinearMotion(ctx);
-            testServos(ctx);
+            // testServos(ctx);
+            testElectroAimant(ctx);
 
 
             ctx.currentAction = Robot::WAIT_START;

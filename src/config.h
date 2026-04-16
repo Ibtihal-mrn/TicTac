@@ -67,9 +67,9 @@
 // =================== ACTUATORS PINS ====================
 #define LAUNCH_TRIGGER_PIN 38     // TODO: not used here, impl in main.cpp startSwitch !
 #define TEAM_SWITCH_PIN    39
-// #define EBTN_PIN           48    //TODO: remove, changed to Hardware Switch
-#define EBTN_PIN           STOP_PIN  // Emergency button now shares STOP_PIN (hardware switch)
-
+// ==================== Electro Aimant ====================
+#define RELAY_PIN 40
+//#define SWITCH_PIN 41
 
 // ==================== STEPPER ====================
 #define SERVO_LEFT  1 // need PMW pin choose : (4, 5, 6, 7, 15, 16, 17 or 18)
@@ -92,12 +92,6 @@
 
 #define ENC_L_A 17 // Motor 2
 #define ENC_L_B 18
-
-
-
-// ==================== Electro Aimant ====================
-//#define RELAY_PIN 41
-//#define SWITCH_PIN 41
 
 
 

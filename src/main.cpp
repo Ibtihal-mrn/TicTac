@@ -123,29 +123,7 @@ void setup() {
     // Init relais
     relais_init(21, true);
 
-    // ========= SEQUENCE ELECTROAIMANT =========
-    // Avancer 10 cm
-    RobotCommand move1{CommandType::MoveForward, 100.0f, 200, 0};
-    xQueueSendToBack(fsmCtx.commandQueue, &move1, 0);
-
-    // Arrêt 2 secondes + relais on pendant ce temps
-    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
-    xQueueSendToBack(fsmCtx.commandQueue, &wait1, 0);
-
-    RobotCommand relOn{CommandType::RelaisOn, 0.0f, 0, 0};
-    xQueueSendToBack(fsmCtx.commandQueue, &relOn, 0);
-
-    // Avancer 10 cm relais actif
-    RobotCommand move2{CommandType::MoveForward, 100.0f, 200, 0};
-    xQueueSendToBack(fsmCtx.commandQueue, &move2, 0);
-
-    // Relais off
-    RobotCommand relOff{CommandType::RelaisOff, 0.0f, 0, 0};
-    xQueueSendToBack(fsmCtx.commandQueue, &relOff, 0);
-
-    // Continuer 10 cm
-    RobotCommand move3{CommandType::MoveForward, 100.0f, 200, 0};
-    xQueueSendToBack(fsmCtx.commandQueue, &move3, 0);
+    
     // ==========================================
 
     // BLE Bridge
