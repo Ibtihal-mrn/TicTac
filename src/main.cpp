@@ -39,7 +39,7 @@
 
 // External Objects
 extern Motors motors;
-StartSwitch startSwitch(GPIO_NUM_38);
+StartSwitch startSwitch((gpio_num_t)LAUNCH_TRIGGER_PIN);
 TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 Context fsmCtx{};
@@ -50,6 +50,14 @@ void IRAM_ATTR stopISR() { emergencyStopUS = digitalRead(STOP_PIN); }
 
 // BLE flag
 volatile bool bleStopRequested = false;
+
+static const char* heartbeatTeamName() {
+    return teamSwitch.readTeam() == TeamSwitchTeam::A ? "BLUE" : "YELLOW";
+}
+
+static const char* heartbeatTiretteState() {
+    return startSwitch.isInserted() ? "IN" : "OUT";
+}
 
 // TODO: remove/obfuscate this :
 // const int RELAY_PIN = 41;
@@ -70,9 +78,16 @@ void bleTask(void* pvParameters) {
 
         // Heartbeat toutes les 5 secondes
         if (millis() - lastHeartbeat >= 5000) {
-            char hb[64];
-            snprintf(hb, sizeof(hb), "[BLE] Heartbeat | connected=%d | uptime=%lus",
-                      bleBridge.isConnected(), millis() / 1000);
+            char hb[128];
+            snprintf(
+                hb,
+                sizeof(hb),
+                "[BLE] Heartbeat | connected=%d | uptime=%lus | team=%s | tirette=%s",
+                bleBridge.isConnected(),
+                millis() / 1000,
+                heartbeatTeamName(),
+                heartbeatTiretteState()
+            );
             bleSerial.println(hb);
             lastHeartbeat = millis();
         }
@@ -135,6 +150,8 @@ void setup() {
   // Init Hardware et Robot
   ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
   ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
+    startSwitch.begin();
+    teamSwitch.begin();
   // bras_init();                // must run FIRST
   // robot_init();
 
