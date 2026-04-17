@@ -65,9 +65,9 @@ bool updateSensorAndStop_delayed() {
     if (sensorCount == 0) return false;
 
     unsigned long now = millis();
-    if (now - lastRead < US_DELAY) {
-        return false;
-    }
+    // if (now - lastRead < US_DELAY) {
+    //     return false;
+    // }
 
     for (uint8_t attempts = 0; attempts < sensorCount; attempts++) {
         uint8_t i = nextSensor;
