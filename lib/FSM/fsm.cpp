@@ -40,10 +40,10 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
     ctx.currentTeam = Team::TEAM_YELLOW;
     // TOD: add match timer init
     // Init Match Timer
-    // ctx.matchActive = false;
-    // ctx.matchDurationMs = MATCH_DURATION_MS;
-    // ctx.matchStartMs = 0;
-    // debugPrintf(DBG_FSM, "FSM -> INIT");
+    ctx.matchActive = false;
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+    ctx.matchStartMs = 0;
+    debugPrintf(DBG_FSM, "FSM -> INIT");
     
     Serial.println("[FSM] Context initialized");
     bleSerial.println("[FSM] Context initialized");
@@ -78,7 +78,6 @@ void hardware_init(Context &ctx)
     // debugPrintf(DBG_FSM, "FSM -> INIT");
 
     // Read switch
-    bool team = 0;  //TODO read teamswitch
     ctx.currentTeam = Team::TEAM_YELLOW;    // TODO: read TeamSwicth
     // heartbeatTeamName(); // done in main.cpp
     ctx.currentAction = Robot::INIT;
@@ -101,33 +100,63 @@ bool isMatchTimeEnded(const Context& ctx) {
 
 // ---- US obstacle movement -------
 void driveForward(float mm, int speed) {
-    // setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
+    setZones(ZONE_FRONT);
     motion.startLinear(mm, speed);
 }
 void driveBackward(float mm, int speed) {
-    // setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
+    setZones(ZONE_BACK);
     motion.startLinear(-mm, speed);
 }
 void rotate(float angle, int speed) {
-    // setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
+    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
     motion.startRotate(angle, speed);
 }
-static void emergencyBrakePulse(float gyroRateDps, CommandType lastCmdType) {
-    const float baseBrake = 70.0f;
-    const float extraBrake = constrain(fabsf(gyroRateDps) * 1.5f, 0.0f, 40.0f);
-    const float brakePwm = constrain(baseBrake + extraBrake, 50.0f, 110.0f);
 
+
+
+static void emergencyBrakePulse(float gyroRateDps, CommandType lastCmdType) {
+    // keep your forward braking behavior unchanged
+    if (lastCmdType == CommandType::MoveForward) {
+        const float baseBrake = 230.0f;
+        const float extraBrake = constrain(fabsf(gyroRateDps) * 1.5f, 0.0f, 40.0f);
+        const float brakePwm = constrain(baseBrake + extraBrake, 50.0f, 240.0f);
+
+        motors.applyMotorOutputs(-brakePwm, -brakePwm);
+        vTaskDelay(pdMS_TO_TICKS(90));
+        motors.stopMotors();
+        return;
+    }
+
+    // backward braking: opposite of backward motion
+    if (lastCmdType == CommandType::MoveBackward) {
+        const float brakePwm = 230.0f;   // adjust if needed
+        motors.applyMotorOutputs(brakePwm, brakePwm);
+        vTaskDelay(pdMS_TO_TICKS(70));
+        motors.stopMotors();
+        return;
+    }
+
+    // rotation braking: gentler, shorter pulse to avoid reversing too far
     if (lastCmdType == CommandType::Rotate) {
+        if (fabsf(gyroRateDps) < 5.0f) {
+            motors.stopMotors();
+            return;
+        }
+
+        const float brakePwm = constrain(200.0f + fabsf(gyroRateDps) * 0.35f, 25.0f, 230.0f);
+
+        // positive gyro => rotate one way, brake with opposite torque
         if (gyroRateDps > 0.0f) {
             motors.applyMotorOutputs(brakePwm, -brakePwm);
         } else {
             motors.applyMotorOutputs(-brakePwm, brakePwm);
         }
-    } else {
-        motors.applyMotorOutputs(-brakePwm, -brakePwm);
+
+        vTaskDelay(pdMS_TO_TICKS(35));
+        motors.stopMotors();
+        return;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(90));
     motors.stopMotors();
 }
 
@@ -251,6 +280,36 @@ void competitionRoutine(Context &ctx){
 
 }
 
+void testObstacleBrakeRoutine(Context &ctx) {
+    if (!ctx.commandQueue) return;
+
+    // 1) Forward obstacle test
+    // Put an obstacle in FRONT so the US stop/brake can trigger.
+    RobotCommand forward1{CommandType::MoveForward, 500.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &forward1, 0);
+
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 1500};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // 2) Backward obstacle test
+    // Put an obstacle in BACK so it can trigger while reversing.
+    RobotCommand backward1{CommandType::MoveBackward, 500.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &backward1, 0);
+
+    RobotCommand wait2{CommandType::Wait, 0.0f, 0, 1500};
+    xQueueSendToBack(ctx.commandQueue, &wait2, 0);
+
+    // 3) Rotation obstacle test
+    // Put obstacles around the robot, especially on the side where it rotates into them.
+    RobotCommand rotate1{CommandType::Rotate, 180.0f, 80, 0};
+    xQueueSendToBack(ctx.commandQueue, &rotate1, 0);
+
+    RobotCommand wait3{CommandType::Wait, 0.0f, 0, 1500};
+    xQueueSendToBack(ctx.commandQueue, &wait3, 0);
+
+    RobotCommand rotate2{CommandType::Rotate, -180.0f, 80, 0};
+    xQueueSendToBack(ctx.commandQueue, &rotate2, 0);
+}
 
 
 // -------- helpers ----------
@@ -354,7 +413,7 @@ void robot_step(Context &ctx)
     debugPrints(ctx);
     
     // Match time end check
-    if (isMatchTimeEnded(ctx)) { ctx.currentAction = Robot::TIMER_END; }
+    // if (isMatchTimeEnded(ctx)) { ctx.currentAction = Robot::TIMER_END; }
 
     // ===================================================
     switch (ctx.currentAction)
@@ -367,6 +426,7 @@ void robot_step(Context &ctx)
             // testElectroAimant(ctx);
             
             // competitionRoutine(ctx);
+            testObstacleBrakeRoutine(ctx);
             ctx.currentAction = Robot::WAIT_START;
             break;
 
@@ -404,6 +464,7 @@ void robot_step(Context &ctx)
 
             ctx.queueWasRunning = true;
 
+            setZones(0);
             #if DBG_FSM
                 printCommand(ctx.currentCommand);
                 Serial.print(" queue=");

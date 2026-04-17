@@ -123,6 +123,7 @@ float PIDController::updatePID_(PID& pid, float error, float dt) {
 bool PIDController::update() {
     if (mode_ == Mode::Idle) return true;
     
+    
     // Movement TIMEOUT   //TODO: dynamically compute timeout on distance and speed
     if (motionStartMs_ != 0 && (millis() - motionStartMs_ >= MOTION_TIMEOUT_MS)) {
         stopMotors_();

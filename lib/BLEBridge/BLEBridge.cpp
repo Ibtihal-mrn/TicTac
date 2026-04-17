@@ -18,7 +18,7 @@ BLEBridge bleBridge;
 BleSerial bleSerial;
 
 static constexpr int DEFAULT_MOVE_SPEED = 230;
-static constexpr int DEFAULT_ROTATE_SPEED = 150;
+static constexpr int DEFAULT_ROTATE_SPEED = 80;
 
 // ── Forward declaration ──────────────────────────────────────────────────────
 static void onRxWrite(NimBLECharacteristic* pChar);
