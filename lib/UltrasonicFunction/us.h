@@ -7,7 +7,7 @@
 
 // ====== CONFIG =======
 #define MAX_SENSORS 10
-#define US_DELAY    30
+#define US_DELAY    40
 
 // ===== SENSOR STRUCT =====
 struct Sensor {
