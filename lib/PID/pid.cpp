@@ -149,43 +149,23 @@ bool PIDController::update() {
 
     // ====================== LINEAR =========================
     if (mode_ == Mode::Linear) {
+        const float motionSign = (targetDistanceMm_ >= 0.0f) ? 1.0f : -1.0f;
+    
         const float deltaDistanceMm = 0.5f * (deltaLeft + deltaRight) * mm_per_tick();
-        traveledDistanceMm_ += deltaDistanceMm;
+        traveledDistanceMm_ += motionSign * deltaDistanceMm;
     
-        const float distanceError = targetDistanceMm_ - traveledDistanceMm_;
-        const float headingError = -headingDeg_; // target heading = 0
+        const float distanceError = fabsf(targetDistanceMm_) - fabsf(traveledDistanceMm_);
+        const float headingError = -headingDeg_;
     
-        // Distance control is still simple open-loop forward speed for now
-        // but heading correction now uses full PID (P + I + D)
-        const float baseSpeed = 150.0f;
+        const float baseSpeed = motionSign * 150.0f;
+    
         float steerCmd = updatePID_(anglePid_, headingError, dt);
-    
         steerCmd = constrain(steerCmd, -40.0f, 40.0f);
     
         float leftCmd  = baseSpeed - steerCmd;
         float rightCmd = baseSpeed + steerCmd;
     
-        leftCmd  = constrain(leftCmd,  40.0f, 255.0f);
-        rightCmd = constrain(rightCmd, 40.0f, 255.0f);
-    
         motors_.applyMotorOutputs(leftCmd, rightCmd);
-    
-    #if DBG_PID
-        static unsigned long lastPidPrintMs = 0;
-        if (millis() - lastPidPrintMs >= 500) {
-            Serial.print(" targetDist="); Serial.print(targetDistanceMm_, 2);
-            Serial.print(" dist="); Serial.print(traveledDistanceMm_, 2);
-            Serial.print(" distErr="); Serial.print(distanceError, 2);
-            Serial.print(" head="); Serial.print(headingDeg_, 2);
-            Serial.print(" hErr="); Serial.print(headingError, 2);
-            Serial.print(" steer="); Serial.print(steerCmd, 2);
-            Serial.print(" dL="); Serial.print(deltaLeft);
-            Serial.print(" dR="); Serial.print(deltaRight);
-            Serial.print(" Lcmd="); Serial.print(leftCmd, 1);
-            Serial.print(" Rcmd="); Serial.println(rightCmd, 1);
-            lastPidPrintMs = millis();
-        }
-    #endif
     
         if (fabsf(distanceError) <= DONE_DISTANCE_MM) {
             stopMotors_();
@@ -195,7 +175,6 @@ bool PIDController::update() {
     
         return false;
     }
-
     // OLD impl
     // if (false) {
     //     // 1. Total Travelled distance

@@ -100,15 +100,15 @@ bool isMatchTimeEnded(const Context& ctx) {
 
 // ---- US obstacle movement -------
 void driveForward(float mm, int speed) {
-    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
+    // setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT);
     motion.startLinear(mm, speed);
 }
 void driveBackward(float mm, int speed) {
-    setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
+    // setZones(ZONE_BACK | ZONE_LEFT | ZONE_RIGHT);
     motion.startLinear(-mm, speed);
 }
 void rotate(float angle, int speed) {
-    setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
+    // setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
     motion.startRotate(angle, speed);
 }
 
@@ -130,13 +130,13 @@ void testRotation(Context &ctx){
 void testLinearMotion(Context &ctx){
     if (!ctx.commandQueue) return;
 
-    RobotCommand move1{CommandType::MoveForward, 1000.0f, 200, 0};
+    RobotCommand move1{CommandType::MoveForward, 500.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move1, 0);
 
-    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 5000};
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
     xQueueSendToBack(ctx.commandQueue, &wait1, 0);
 
-    RobotCommand move2{CommandType::MoveBackward, 900.0f, 200, 0};
+    RobotCommand move2{CommandType::MoveBackward, 500.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move2, 0);
     
 //     RobotCommand rotate1{CommandType::Rotate, 90.0f, 200, 0};
@@ -340,11 +340,11 @@ void robot_step(Context &ctx)
     {   
         case Robot::INIT:
             // MOVE COMMANDS
-            testRotation(ctx);
+            // testRotation(ctx);
             // testLinearMotion(ctx);
             // testServos(ctx);
             // testElectroAimant(ctx);
-            ;
+            
             // competitionRoutine(ctx);
             ctx.currentAction = Robot::WAIT_START;
             break;
@@ -355,8 +355,9 @@ void robot_step(Context &ctx)
             if (startSwitch.isInserted()) {
                 // start 100sec timer
                 startMatchTimer(ctx);    // TODO
-
+                // setThresholds(10, 15);
                 
+                setZones(0);
                 // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
                 ctx.currentAction = Robot::DISPATCH_CMD;
             }
@@ -368,11 +369,20 @@ void robot_step(Context &ctx)
 
         case Robot::DISPATCH_CMD:
             // 1. Empty Queue
-            if (!ctx.commandQueue) { break;}
+            if (!ctx.commandQueue) {break;}
 
             // 2. Get next command
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
+                if (ctx.queueWasRunning) {
+                    ctx.queueWasRunning = false;
+                    Serial.println("[FSM] Queue terminee");
+                    bleBridge.sendLog("[EVENT] QUEUE_DONE");
+                }
+                ctx.currentAction = Robot::IDLE;
+                break;
+            }
 
+            ctx.queueWasRunning = true;
 
             #if DBG_FSM
                 printCommand(ctx.currentCommand);

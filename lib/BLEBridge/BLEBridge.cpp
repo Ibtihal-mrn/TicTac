@@ -17,7 +17,7 @@
 BLEBridge bleBridge;
 BleSerial bleSerial;
 
-static constexpr int DEFAULT_MOVE_SPEED = 80;
+static constexpr int DEFAULT_MOVE_SPEED = 120;
 static constexpr int DEFAULT_ROTATE_SPEED = 200;
 
 // ── Forward declaration ──────────────────────────────────────────────────────
