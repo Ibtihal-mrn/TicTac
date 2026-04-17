@@ -37,6 +37,7 @@ uint8_t us_getZone(uint8_t index);
 int16_t us_getDistance(uint8_t index);
 int16_t us_getDistanceForZone(uint8_t zone);
 
+bool updateSensorAndStop_delayed();
 bool updateSensorAndStop(int i);
 
 
