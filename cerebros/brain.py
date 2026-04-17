@@ -279,18 +279,8 @@ class Brain:
         # ── Faire avancer l'executor ──────────────────────────────────
         self.executor.tick()
 
-        # ── Vérifier si on a atteint un objectif ─────────────────────
-        self.mission_mgr.check_and_advance(self.robot.position)
-
-        # ── Route terminée ? ──────────────────────────────────────────
-        if self.mission_mgr.is_route_complete and self.action_queue.is_empty():
-            print(f"[Brain] Route terminée! "
-                  f"{self.mission_mgr.progress} objectifs atteints")
-            self.phase = BrainPhase.FINISHED
-            return
-
-        # ── Monitoring ────────────────────────────────────────────────
-        self._monitor()
+        # Monitoring et replanning désactivés — le robot exécute la queue
+        # sans correction en temps réel.
 
         # ── Debug périodique ──────────────────────────────────────────
         if DEBUG and self._tick_count % 50 == 0:

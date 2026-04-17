@@ -63,7 +63,7 @@ GOAL_REACHED_THRESHOLD_MM = 50         # distance pour considérer un goal attei
 REPLAN_DISTANCE_MM        = 150        # distance mini avant re-planification
 
 # ── Paramètres de monitoring ─────────────────────────────────────────────────
-MONITORING_STUCK_THRESHOLD = 30        # ticks sans mouvement avant replan (~3s à 10Hz)
+MONITORING_STUCK_THRESHOLD = 1         # ticks sans mouvement avant replan
 MONITORING_STUCK_MIN_MOVE_MM = 5       # mouvement minimum pour ne pas être "stuck"
 
 # ── Paramètres de mouvement ──────────────────────────────────────────────────

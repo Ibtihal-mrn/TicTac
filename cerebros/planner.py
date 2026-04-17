@@ -170,7 +170,7 @@ class Planner:
                 heading = desired_angle
 
             # ── Avancer ───────────────────────────────────────────────
-            if distance > 10:  # pas la peine d'avancer pour < 10mm
+            if distance > 100:  # pas la peine d'avancer pour < 10mm
                 actions.append(Action(ActionType.FORWARD, distance))
                 if DEBUG:
                     print(f"    → FORWARD {distance:.0f}mm")

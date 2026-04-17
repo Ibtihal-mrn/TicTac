@@ -95,9 +95,17 @@ def main() -> None:
     # ── PHASE INIT : mission hardcodee ────────────────────────────────
     #  Mission : centre table → centre-droit → retour base
     targets = [
-        Position(1500, 0),   # Centre de la table
-        Position(0, 1000), # Centre-droit
-        Position(200,1700),  # Retour a la position de base
+        Position(1500, 1200),
+        Position(1500, 800),
+        Position(2100, 800),
+        Position(1500, 800),
+        Position(1500, 0),
+        Position(2200,0),
+        Position(2000,0),
+        Position(2000,400),
+        Position(2900,800),
+        Position(2900,1800),
+        # Retour a la position de base
     ]
     labels = ["CENTRE_TABLE", "CENTRE_DROIT", "RETOUR_BASE"]
     print(f"[INIT] Mission : {labels}")
@@ -123,8 +131,8 @@ def main() -> None:
     while True:
 
         ret, frame = cap.read()
-        if not ret:
-            break
+        if not ret or frame is None:
+            continue
 
         # Detecteurs en niveaux de gris.
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -214,18 +222,18 @@ def main() -> None:
                 if brain.phase == BrainPhase.RUNNING:
                     brain.tick()
 
-        draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
+        # draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
 
         # ── Overlay Cerebros : targets + path A* + position robot ─────
-        draw_brain_overlay(
-            frame, aerial,
-            brain.planned_path,
-            brain.planned_targets,
-            brain.planned_target_labels,
-            brain.robot.position,
-            brain.robot.heading_deg,
-            h_grid_to_img,
-        )
+        # draw_brain_overlay(
+        #     frame, aerial,
+        #     brain.planned_path,
+        #     brain.planned_targets,
+        #     brain.planned_target_labels,
+        #     brain.robot.position,
+        #     brain.robot.heading_deg,
+        #     h_grid_to_img,
+        # )
 
         cv2.imshow(config.WINDOW_CAMERA, frame)
 
@@ -234,7 +242,7 @@ def main() -> None:
 
         frame_count += 1
 
-        if cv2.waitKey(50) & 0xFF == ord("q"):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break  # Quitter avec 'q'.
 
     # shut down proprement les ressources.
