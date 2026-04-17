@@ -17,8 +17,8 @@
 BLEBridge bleBridge;
 BleSerial bleSerial;
 
-static constexpr int DEFAULT_MOVE_SPEED = 120;
-static constexpr int DEFAULT_ROTATE_SPEED = 200;
+static constexpr int DEFAULT_MOVE_SPEED = 230;
+static constexpr int DEFAULT_ROTATE_SPEED = 150;
 
 // ── Forward declaration ──────────────────────────────────────────────────────
 static void onRxWrite(NimBLECharacteristic* pChar);
@@ -183,21 +183,30 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         param = atof(space + 1);
     }
 
+    float value = 0.0f;
+    float speed = DEFAULT_MOVE_SPEED;
+
     // FORWARD
     if (strcmp(upper, "FORWARD") == 0 || strcmp(upper, "MOVE_FORWARD") == 0) {
-        cmd.type = CommandType::MoveForward;
-        cmd.value = param;
-        cmd.speed = DEFAULT_MOVE_SPEED;
+        // if (parseTwoFloats(upper, value, speed)) {
+            cmd.type = CommandType::MoveForward;
+            cmd.value = param;
+            cmd.speed = (int)speed;
+        // }
     // BACKWARD
     } else if (strcmp(upper, "BACKWARD") == 0 || strcmp(upper, "MOVE_BACKWARD") == 0) {
-        cmd.type = CommandType::MoveBackward;
-        cmd.value = param;
-        cmd.speed = DEFAULT_MOVE_SPEED;
+        // if (parseTwoFloats(upper, value, speed)) {
+            cmd.type = CommandType::MoveBackward;
+            cmd.value = param;
+            cmd.speed = (int)speed;
+        // }
     // ROTATE
     } else if (strcmp(upper, "ROTATE") == 0) {
-        cmd.type = CommandType::Rotate;
-        cmd.value = param;
-        cmd.speed = DEFAULT_ROTATE_SPEED;
+        // if (parseTwoFloats(upper, value, speed)) {
+            cmd.type = CommandType::Rotate;
+            cmd.value = param;
+            cmd.speed = (int)speed;
+        // }
     // WAIT
     } else if (strcmp(upper, "WAIT") == 0) {
         cmd.type = CommandType::Wait;
@@ -231,6 +240,29 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
         bleBridge.sendLog("[ESP32] BLE STOP received");
         return;
 
+    } else if (strcmp(upper, "ZONES") == 0) {
+        cmd.type = CommandType::SetZones;
+        cmd.value = param;
+    } else if (strcmp(upper, "THRESH") == 0 || strcmp(upper, "THRESHOLDS") == 0) {
+        cmd.type = CommandType::SetThresholds;
+    
+        char* second = nullptr;
+        float obst = param;
+        float clear = obst;
+    
+        if (space) {
+            second = strchr(space + 1, ' ');
+            if (second) {
+                *second = '\0';
+                clear = atof(second + 1);
+            }
+        }
+    
+        cmd.speed = (int)obst;
+        cmd.waitMs = (unsigned long)clear;
+
+
+
     // UNKNOWN COMMAND / ERROR
     } else {
         Serial.printf("[BLE] Commande inconnue: '%s'\n", localRaw);
@@ -260,4 +292,19 @@ static void onRxWrite(NimBLECharacteristic* pChar) {
 
     Serial.printf("[BLE] RX reçu (%d bytes): %s\n", val.length(), val.c_str());
     bleBridge.parseCommand_(val.c_str(), val.length());
+}
+
+
+// ------ Helpers ------
+// helper to read two floats from "CMD a b"
+static bool parseTwoFloats(char* text, float& a, float& b) {
+    char* first = strchr(text, ' ');
+    if (!first) return false;
+    *first = '\0';
+    a = atof(first + 1);
+
+    char* second = strchr(first + 1, ' ');
+    if (!second) return false;
+    b = atof(second + 1);
+    return true;
 }

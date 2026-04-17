@@ -51,6 +51,10 @@ enum class CommandType {
     //
     Ping,
     ClearQueue,
+
+    //
+    SetZones,
+    SetThresholds,
     // SetDistancePID,
     // SetAnglePID
 };

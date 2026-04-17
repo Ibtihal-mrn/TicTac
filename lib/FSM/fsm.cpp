@@ -75,13 +75,14 @@ void hardware_init(Context &ctx)
     ctx.matchActive = false;
     ctx.matchDurationMs = MATCH_DURATION_MS;
     ctx.matchStartMs = 0;
-    debugPrintf(DBG_FSM, "FSM -> INIT");
-    ctx.currentAction = Robot::INIT;
+    // debugPrintf(DBG_FSM, "FSM -> INIT");
 
     // Read switch
     bool team = 0;  //TODO read teamswitch
     ctx.currentTeam = Team::TEAM_YELLOW;    // TODO: read TeamSwicth
     // heartbeatTeamName(); // done in main.cpp
+    ctx.currentAction = Robot::INIT;
+
 }
 
 
@@ -111,7 +112,24 @@ void rotate(float angle, int speed) {
     // setZones(ZONE_FRONT | ZONE_LEFT | ZONE_RIGHT | ZONE_BACK);
     motion.startRotate(angle, speed);
 }
+static void emergencyBrakePulse(float gyroRateDps, CommandType lastCmdType) {
+    const float baseBrake = 70.0f;
+    const float extraBrake = constrain(fabsf(gyroRateDps) * 1.5f, 0.0f, 40.0f);
+    const float brakePwm = constrain(baseBrake + extraBrake, 50.0f, 110.0f);
 
+    if (lastCmdType == CommandType::Rotate) {
+        if (gyroRateDps > 0.0f) {
+            motors.applyMotorOutputs(brakePwm, -brakePwm);
+        } else {
+            motors.applyMotorOutputs(-brakePwm, brakePwm);
+        }
+    } else {
+        motors.applyMotorOutputs(-brakePwm, -brakePwm);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(90));
+    motors.stopMotors();
+}
 
 
 // ------- ROUTINES ----------
@@ -269,16 +287,14 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
+
 void debugPrints(Context &ctx){
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
-            Serial.print("[FSM] state=");
-            Serial.print(stateList[(int)ctx.currentAction]);
-            Serial.print(" stop=");
-            Serial.print(emergencyStopUS);
-            Serial.print(" busy=");
-            Serial.println(motion.isBusy());
+            bleSerial.print("[FSM] state="); bleSerial.print(stateList[(int)ctx.currentAction]);
+            bleSerial.print(" stop="); bleSerial.print(emergencyStopUS);
+            Serial.print(" busy="); Serial.println(motion.isBusy());
             lastStatePrintMs = millis();
         }
     #endif
@@ -291,7 +307,12 @@ void debugPrints(Context &ctx){
 // Stop Conditions
 void US_STOP(Context &ctx){
     if (emergencyStopUS) {
+        const float gyroRateDps = imu_readGyroZ_dps();
+
         motion.abort();
+        emergencyBrakePulse(gyroRateDps, ctx.currentCommand.type);
+
+
         emergencyStopUS = false;
         ctx.currentAction = Robot::EMERGENCY_STOP_US;
         static unsigned long Lpwm = 0;
@@ -363,7 +384,6 @@ void robot_step(Context &ctx)
             }
             // startSwitch.waitForStart();
 
-            
             break;
 
 
@@ -378,7 +398,7 @@ void robot_step(Context &ctx)
                     Serial.println("[FSM] Queue terminee");
                     bleBridge.sendLog("[EVENT] QUEUE_DONE");
                 }
-                ctx.currentAction = Robot::IDLE;
+                // ctx.currentAction = Robot::IDLE;
                 break;
             }
 
@@ -435,6 +455,16 @@ void robot_step(Context &ctx)
                     clearCommandQueue(ctx.commandQueue);
                     break;
 
+                case CommandType::SetZones:
+                    setZones((uint8_t)ctx.currentCommand.value);
+                    ctx.currentAction = Robot::DISPATCH_CMD;
+                    break;
+                
+                case CommandType::SetThresholds:
+                    setThresholds(  (uint8_t)ctx.currentCommand.speed,
+                                    (uint8_t)ctx.currentCommand.waitMs);
+                    ctx.currentAction = Robot::DISPATCH_CMD;
+                    break;
 
                 default: ctx.currentAction = Robot::DISPATCH_CMD; break;
             }
@@ -484,6 +514,12 @@ void robot_step(Context &ctx)
         {
             motion.abort();
             ctx.matchActive = false;
+            static unsigned long lastStatePrintMs = 0;
+            if (millis() - lastStatePrintMs >= 2000) {
+                bleSerial.println("[FSM] TIMER_END");
+                lastStatePrintMs = millis();
+            }
+            
             break;
         }
 
