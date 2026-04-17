@@ -285,7 +285,7 @@ void testObstacleBrakeRoutine(Context &ctx) {
 
     // 1) Forward obstacle test
     // Put an obstacle in FRONT so the US stop/brake can trigger.
-    RobotCommand forward1{CommandType::MoveForward, 500.0f, 200, 0};
+    RobotCommand forward1{CommandType::MoveForward, 800.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &forward1, 0);
 
     RobotCommand wait1{CommandType::Wait, 0.0f, 0, 1500};
@@ -368,6 +368,12 @@ void US_STOP(Context &ctx){
     if (emergencyStopUS) {
         const float gyroRateDps = imu_readGyroZ_dps();
 
+        // Go backwards when front obstacle
+        if (ctx.currentCommand.type == CommandType::MoveForward) {
+            ctx.pendingBlockedRecovery = true;
+            ctx.blockedRecoverySinceMs = millis();
+        }
+
         motion.abort();
         emergencyBrakePulse(gyroRateDps, ctx.currentCommand.type);
 
@@ -426,22 +432,22 @@ void robot_step(Context &ctx)
             // testElectroAimant(ctx);
             
             // competitionRoutine(ctx);
-            testObstacleBrakeRoutine(ctx);
+            // testObstacleBrakeRoutine(ctx);
             ctx.currentAction = Robot::WAIT_START;
             break;
 
         case Robot::WAIT_START:
             // ADD LaunchTrigger HERE
-            startSwitch.begin();
-            if (startSwitch.isInserted()) {
+            // startSwitch.begin();
+            // if (startSwitch.isInserted()) {
                 // start 100sec timer
-                startMatchTimer(ctx);    // TODO
+                // startMatchTimer(ctx);    // TODO
                 // setThresholds(10, 15);
                 
                 setZones(0);
                 // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
                 ctx.currentAction = Robot::DISPATCH_CMD;
-            }
+            // }
             // startSwitch.waitForStart();
 
             break;
@@ -538,6 +544,17 @@ void robot_step(Context &ctx)
 
         case Robot::EXEC:
             if (motion.update()) {
+
+                // Forward detection for timeout go backwards and do next task
+                if (motion.blockedForward()) {
+                    motion.clearBlockedForward();
+
+                    // short recovery back
+                    driveBackward(100.0f, 120);
+                    ctx.currentAction = Robot::EXEC;
+                    break;
+                }
+
                 #if DBG_FSM
                     Serial.print("[FSM] END   ");
                     Serial.println(commandTypeToString(ctx.currentCommand.type));
@@ -560,15 +577,29 @@ void robot_step(Context &ctx)
 
         case Robot::EMERGENCY_STOP_US:
             motion.abort();
+
+            // Obstacle not there, resume motion
             if (digitalRead(STOP_PIN) == LOW) {
                 emergencyStopUS = false;
                 ctx.currentAction = Robot::DISPATCH_CMD;
-
                 // Turn off builtin led
                 #ifdef LED_BUILTIN
                     digitalWrite(LED_BUILTIN, LOW);
                 #endif
             }
+
+            // Forward blocked for 8s, move backwards to clear
+            if (ctx.pendingBlockedRecovery) {
+        if (millis() - ctx.blockedRecoverySinceMs >= 8000UL) {
+            ctx.pendingBlockedRecovery = false;
+            driveBackward(100.0f, 120);
+            ctx.currentAction = Robot::EXEC;
+        }
+        break;
+    }
+
+
+
             break;
 
         case Robot::TIMER_END:

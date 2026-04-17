@@ -37,6 +37,10 @@ void PIDController::resetState() {
     anglePid_.integral = 0.0f;
     anglePid_.previousError = 0.0f;
 
+    blockedSinceMs_ = 0;
+    lastProgressMm_ = 0.0f;
+    blockedForward_ = false;
+
     encoders_reset();
 }
 
@@ -123,14 +127,6 @@ float PIDController::updatePID_(PID& pid, float error, float dt) {
 bool PIDController::update() {
     if (mode_ == Mode::Idle) return true;
     
-    
-    // Movement TIMEOUT   //TODO: dynamically compute timeout on distance and speed
-    if (motionStartMs_ != 0 && (millis() - motionStartMs_ >= MOTION_TIMEOUT_MS)) {
-        stopMotors_();
-        mode_ = Mode::Idle;
-        stableSinceMs_ = 0;
-        return true;
-    }
 
 
     // Read Encoders, Gyro and convert ticks to distance
@@ -173,116 +169,43 @@ bool PIDController::update() {
             mode_ = Mode::Idle;
             return true;
         }
+
+        // Forward detection timeout to go backwards a bit
+        const float progressMm = fabsf(traveledDistanceMm_);
+        
+        if (targetDistanceMm_ > 0.0f) { // only for forward moves
+            if (progressMm - lastProgressMm_ < 5.0f) {   // no real progress
+                if (blockedSinceMs_ == 0) blockedSinceMs_ = millis();
+            } else {
+                blockedSinceMs_ = 0;
+            }
+            lastProgressMm_ = progressMm;
+        
+            if (blockedSinceMs_ != 0 && (millis() - blockedSinceMs_ >= FORWARD_TIMEOUT_MS)) {
+                blockedForward_ = true;
+                stopMotors_();
+                mode_ = Mode::Idle;
+                return true;
+            }
+        }
     
         return false;
     }
-    // OLD impl
-    // if (false) {
-    //     // 1. Total Travelled distance
-    //     const float deltaDistanceMm = 0.5f * (deltaLeft + deltaRight) * mm_per_tick();
-    //     traveledDistanceMm_ += deltaDistanceMm;
     
-    //     // 2. Total Error (distance left to go)
-    //     const float distanceError = targetDistanceMm_ - traveledDistanceMm_;
-    //     const float headingError = -headingDeg_; // how much we drifted : target heading = 0
-    
-    //     // 3. PID compute
-    //     float linearCmd  = updatePID_(distancePid_, distanceError, dt);
-    //     float angularCmd = updatePID_(anglePid_, headingError, dt);
-    
-    //     // 4. Reserve steering headroom
-    //     const float steerHeadroom = 50.0f;
-    //     const float linearLimit = max(0.0f, (float)maxPwm_ - steerHeadroom);
-    
-    //     linearCmd = constrain(linearCmd, -linearLimit, linearLimit);
-    //     angularCmd = constrain(angularCmd, -steerHeadroom, steerHeadroom);
-    
-    //     // 5. Apply a floor to the forward command, not the wheels
-    //     float forwardCmd = linearCmd;
-    //     const bool farFromTarget = fabsf(distanceError) > DONE_DISTANCE_MM;
-    
-    //     if (farFromTarget) {
-    //         forwardCmd = applyMinPwm(forwardCmd, min((float)PWM_MIN_LINEAR, linearLimit));
-    //     }
-    
-    //     // 6. Mix forward + steering into wheel outputs
-    //     float leftCmd  = forwardCmd - angularCmd;
-    //     float rightCmd = (forwardCmd + angularCmd) * 1.03;
-    
-    //     // 7. Optional trim — start at 0 for now
-    //     const float trim = 0.0f;
-    //     leftCmd  -= trim;
-    //     rightCmd += trim;
-    
-    //     // 8. Clamp final wheel outputs
-    //     leftCmd  = constrain(leftCmd,  -maxPwm_, maxPwm_);
-    //     rightCmd = constrain(rightCmd, -maxPwm_, maxPwm_);
-    
-    //     // 9. Debug prints
-    //     #if DBG_PID
-    //     static unsigned long lastPidPrintMs = 0;
-    //     if (millis() - lastPidPrintMs >= 500) {
-    //         const float tickRatio = (fabsf((float)rightTicks) > 0.001f)
-    //             ? ((float)leftTicks / (float)rightTicks)
-    //             : 0.0f;
-
-    //         const float deltaRatio = (fabsf((float)deltaRight) > 0.001f)
-    //             ? ((float)deltaLeft / (float)deltaRight)
-    //             : 0.0f;
-
-    //         const float trimHint = calcTrimHintFromTicks(leftTicks, rightTicks);
-
-    //         Serial.print("[PID LIN] ");
-    //         Serial.print("dt="); Serial.print(dt, 3);
-    //         Serial.print(" lt="); Serial.print(leftTicks);
-    //         Serial.print(" rt="); Serial.print(rightTicks);
-    //         Serial.print(" dL="); Serial.print(deltaLeft);
-    //         Serial.print(" dR="); Serial.print(deltaRight);
-    //         Serial.print(" targetD="); Serial.print(targetDistanceMm_);
-    //         Serial.print(" travelledD="); Serial.print(traveledDistanceMm_);
-    //         Serial.print(" distError="); Serial.print(distanceError);
-
-    //         Serial.print(" head="); Serial.print(headingDeg_, 2);
-    //         Serial.print(" headingError="); Serial.print(headingError, 2);
-    //         Serial.print(" gyro="); Serial.print(gyroRateDps, 2);
-    //         Serial.print(" linearCmd="); Serial.println(linearCmd, 2);
-    //         Serial.print(" angularCmd="); Serial.println(angularCmd, 2);
-    //         Serial.print(" forwardCmd="); Serial.print(forwardCmd, 2);
-    //         Serial.print(" farFromTarget="); Serial.print(farFromTarget);
-    //         Serial.print(" floorPwm="); Serial.print(min((float)PWM_MIN_LINEAR, linearLimit));
-    //         Serial.print(" tickRatio="); Serial.print(tickRatio, 3);
-    //         Serial.print(" deltaRatio="); Serial.print(deltaRatio, 3);
-    //         Serial.print(" trimHint="); Serial.print(trimHint, 2);
-    //         Serial.print(" Lcmd="); Serial.print(leftCmd);
-    //         Serial.print(" Rcmd="); Serial.println(rightCmd);
-    //         lastPidPrintMs = millis();
-    //     }
-    //     #endif
-    
-    //     // 10. Apply motors output
-    //     motors_.applyMotorOutputs(leftCmd, rightCmd);
-    
-    //     // 11. Finish Condition
-    //     if (fabs(distanceError) <= DONE_DISTANCE_MM && fabs(headingError) <= 2.0f) {
-    //         if (stableSinceMs_ == 0) stableSinceMs_ = millis();
-    //         if (millis() - stableSinceMs_ >= STABLE_MS) {
-    //             stopMotors_();
-    //             mode_ = Mode::Idle;
-    //             return true;
-    //         }
-    //     } else {
-    //         stableSinceMs_ = 0;
-    //     }
-    
-    //     // 12.
-    //     return false;
-    // }
-        
-
 
 
     // ====================== ROTATE =========================
     if (mode_ == Mode::Rotate) {
+
+    // Movement TIMEOUT   //TODO: dynamically compute timeout on distance and speed
+    if (motionStartMs_ != 0 && (millis() - motionStartMs_ >= MOTION_TIMEOUT_MS)) {
+        stopMotors_();
+        mode_ = Mode::Idle;
+        stableSinceMs_ = 0;
+        return true;
+    }
+
+
     // 2. 
     const float angleError = targetAngleDeg_ - headingDeg_;
 
@@ -354,6 +277,10 @@ bool PIDController::update() {
 
 
 // ------ dbg prints ------
+bool PIDController::blockedForward() const { return blockedForward_; }
+void PIDController::clearBlockedForward() { blockedForward_ = false; }
+
+
 void PIDController::printLinearDebug(
     float dt,
     long leftTicks,

@@ -36,6 +36,15 @@ public:
     bool isBusy() const;
     Mode mode() const;
 
+    // Forward motion obstacle reculer
+    unsigned long blockedSinceMs_ = 0;
+    float lastProgressMm_ = 0.0f;
+    bool blockedForward_ = false;
+    static constexpr unsigned long FORWARD_TIMEOUT_MS = 7000; 
+    bool blockedForward() const;
+    void clearBlockedForward();
+
+
     static void printLinearDebug( float dt,
         long leftTicks,
         long rightTicks,
@@ -83,6 +92,7 @@ private:
     static constexpr float INTEGRAL_CLAMP = 300.0f;
     static constexpr unsigned long STABLE_MS = 120;
 
+    
 
     void resetState();
     void stopMotors_();

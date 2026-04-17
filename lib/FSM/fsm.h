@@ -31,6 +31,7 @@ static const char* const stateList[] = {
     "DISPATCH_CMD",
     "EXEC",
     "EXEC_WAIT",
+    "EXEC_SERVO",
     "EMERGENCY_STOP_US",
     "TIMER_END"
 };
@@ -80,6 +81,9 @@ struct Context {
     unsigned long matchStartMs = 0;
     unsigned long matchDurationMs = 0;
     unsigned long waitEndMs = 0;
+
+    bool pendingBlockedRecovery = false;
+    unsigned long blockedRecoverySinceMs = 0;
 
      // Queue of robot commands
     QueueHandle_t commandQueue = nullptr;
