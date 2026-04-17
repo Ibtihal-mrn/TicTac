@@ -49,6 +49,8 @@ class ActionType(Enum):    # TODO: sync with robot
     ROTATE      = "ROTATE"
     DEPLOY      = "DEPLOY"
     RETRACT     = "RETRACT"
+    RELAIS_ON   = "RELAISON"
+    RELAIS_OFF  = "RELAISOFF"
     STOP        = "STOP"
     STATUS      = "STATUS"
     RESET       = "RESET"

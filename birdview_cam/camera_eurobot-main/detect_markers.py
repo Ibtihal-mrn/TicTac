@@ -45,7 +45,7 @@ from marker_detection.markers import _build_detected_list, get_marker_heading
 # Ajouter le dossier racine TicTac au path pour importer cerebros
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from cerebros.brain import Brain, BrainPhase
-from cerebros.models import Position, Team
+from cerebros.models import Action, ActionType, Position, Team
 from cerebros import config as cerebros_config
 
 
@@ -111,6 +111,12 @@ def main() -> None:
     # Batch 2 : correction + suite depuis la position caméra
     # Batch 3 : retour au nid
     if team == Team.BLUE:
+        # 3 commandes de sortie de zone (avant le batch)
+        exit_actions = [
+            Action(ActionType.FORWARD, 500),
+            Action(ActionType.ROTATE, -90),
+            Action(ActionType.FORWARD, 500),
+        ]
         batch1 = [
             # batch 1 : curseur de température et amener 12 caisses au nid
             #Position(1000, 400),
@@ -126,11 +132,10 @@ def main() -> None:
             
             ]
         batch2 = [
-            Position(3000, 0),
-            Position(2400, 0), #position centrale pour recalcul
+            Position(3000, 0),       # target 0 → RELAIS_ON après
+            Position(2400, 0),       # target 1 → RELAIS_OFF après
             Position(2800, 1000),
             Position(2800, 1800),
-            
         ]
         batch3 = [
             # batch 3 : retour au nid
@@ -138,23 +143,29 @@ def main() -> None:
             #Position(2600, 1900),  
         ]
     else:  # Team.YELLOW
+        # 3 commandes de sortie de zone (avant le batch)
+        exit_actions = [
+            Action(ActionType.FORWARD, 500),
+            Action(ActionType.ROTATE, 90),
+            Action(ActionType.FORWARD, 500),
+        ]
         batch1 = [
-            Position(1700, 800),
-            Position(2400, 800),
-            Position(700, 800),#activer electr
-            Position(1500, 800),#désactiver electr
+            Position(700, 700),
+            Position(400, 0),
+            Position(100, 50),#activer electr
+            Position(50, 1600),
+            Position(2500, 500),#désactiver electr
             #Position(150, 0),
             #Position(150, 1000),
             #Position(1500, 800), #position centrale pour recalcul
             
         ]
         batch2 = [
-            # batch 2 : aller vider les nids adverses 
-            Position(500, 50),#vider centre
-            Position(100, 50),
-            Position(50, 1600),#vider haut
-            #Position(2600, 50),
-            #Position(1500, 800),#position centrale pour recalcul
+            # batch 2 : aller vider les nids adverses
+            Position(100, 0),        # target 0 → RELAIS_ON après
+            Position(600, 0),        # target 1 → RELAIS_OFF après
+            Position(100, 1000),
+            Position(100, 1600),     # vider haut
         ]
         batch3 = [
             #Position(400, 1100),
@@ -167,8 +178,15 @@ def main() -> None:
         ["B2_T" + str(i+1) for i in range(len(batch2))],
         ["B3_RETOUR"],
     ]
+    brain.set_exit_actions(exit_actions)
     brain.set_batches(batches, batch_labels)
-    print(f"[INIT] Team={team.value} — {len(batches)} batches")
+    # Inject electroaimant ON/OFF in batch 2 (index 1)
+    brain.set_batch_inject_actions({
+        (1, 0): [Action(ActionType.RELAIS_ON)],   # after batch2 target 0
+        (1, 1): [Action(ActionType.RELAIS_OFF)],  # after batch2 target 1
+    })
+    print(f"[INIT] Team={team.value} — {len(batches)} batches, "
+          f"{len(exit_actions)} exit commands")
 
 
     # 7. OpenCv Window and Tag Detection
