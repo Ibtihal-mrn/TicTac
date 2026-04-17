@@ -75,7 +75,7 @@ BRAIN_LOOP_HZ   = 10                   # fréquence de la boucle (Hz)
 BRAIN_LOOP_DT_S = 1.0 / BRAIN_LOOP_HZ
 
 # ── Durée du match (ms) ─────────────────────────────────────────────────────
-MATCH_DURATION_MS = 90_000             # 90 secondes (ou 100s selon règlement)
+MATCH_DURATION_MS = 100_000            # 100 secondes selon règlement
 
 # ── Debug ────────────────────────────────────────────────────────────────────
 DEBUG = True

@@ -69,10 +69,17 @@ class BLEBridge:
 
         for svc in self._client.services:
             for c in svc.characteristics:
-                if c.uuid == NUS_TX_UUID:
+                cuuid = c.uuid.lower()
+                print(f"[BLEBridge]   char: {cuuid}")
+                if cuuid == NUS_TX_UUID:
                     await self._client.start_notify(c, self._on_notify)
-                if c.uuid == NUS_RX_UUID:
+                    print(f"[BLEBridge]   -> TX notify activé")
+                if cuuid == NUS_RX_UUID:
                     self._rx_char = c
+                    print(f"[BLEBridge]   -> RX char trouvé")
+
+        if self._rx_char is None:
+            print("[BLEBridge] ATTENTION: RX characteristic non trouvée! L'envoi ne fonctionnera pas.")
 
         self._connected = True
         print(f"[BLEBridge] Connected to {device.name}")

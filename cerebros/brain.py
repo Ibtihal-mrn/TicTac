@@ -94,7 +94,9 @@ class Brain:
         self._batches: List[List[Position]] = []     # list of target batches
         self._batch_labels: List[List[str]] = []     # labels per batch
         self._current_batch_idx: int = 0
-        self._ble_bridge = None  # set via set_ble_bridge()        self._last_batch_wait_s: float = 87.0  # attendre 87s avant le dernier batch
+        self._waiting_for_exit_queue_done: bool = False
+        self._ble_bridge = None  # set via set_ble_bridge()
+        self._last_batch_wait_s: float = 87.0  # attendre 87s avant le dernier batch
         # ── Monitoring ────────────────────────────────────────────────
         self._monitoring_deviation_threshold_mm = config.REPLAN_DISTANCE_MM
         self._monitoring_stuck_ticks = 0
@@ -167,8 +169,13 @@ class Brain:
                 print(f"[Brain] Heading vision: {robot_heading:.1f}°")
 
         # Compter les frames vision pendant le recalcul inter-batch
+        # Ne compter que si le robot est réellement détecté dans cette frame
         if self.phase == BrainPhase.WAITING_RECALC:
-            self._recalc_vision_frames = getattr(self, '_recalc_vision_frames', 0) + 1
+            robot_seen = any(label == self.robot.robot_id for label, _, _ in detections)
+            if robot_seen:
+                self._recalc_vision_frames = getattr(self, '_recalc_vision_frames', 0) + 1
+            else:
+                self._recalc_vision_frames = 0  # reset si le robot n'est plus vu
 
     # ══════════════════════════════════════════════════════════════════
     # PHASE 1 — INIT : Planification A* avant la tirette
@@ -293,9 +300,11 @@ class Brain:
             # Multi-batch mode : envoyer le FORWARD de sortie seul,
             # puis attendre QUEUE_DONE avant de calculer le batch 1.
             self._current_batch_idx = 0
+            self._waiting_for_exit_queue_done = True
             self._send_exit_forward()
         else:
             # Legacy mode : queue unique déjà remplie par init_plan
+            self._waiting_for_exit_queue_done = False
             print(f"[Brain] Actions en queue: {self.action_queue.size}")
             self.executor.send_full_queue()
             self.phase = BrainPhase.RUNNING_BATCH
@@ -305,13 +314,15 @@ class Brain:
     def _send_exit_forward(self) -> None:
         """Envoie la séquence de sortie de zone hardcodée, avant le batch 1."""
         exit_mm = config.EXIT_ZONE_MM
+        # BLUE → tourner à droite (-90°), YELLOW → tourner à gauche (+90°)
+        rotate_angle = -90 if self.robot.team == Team.BLUE else 90
         print(f"[Brain] Envoi séquence sortie de zone: FORWARD {exit_mm}mm → "
-              f"ROTATE -90° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
+              f"ROTATE {rotate_angle}° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
 
         self.action_queue.clear()
         self.action_queue.enqueue_many([
             Action(ActionType.FORWARD, exit_mm),
-            Action(ActionType.ROTATE, -90),
+            Action(ActionType.ROTATE, rotate_angle),
             Action(ActionType.FORWARD, exit_mm),
         ])
         self.executor.send_full_queue()
@@ -378,6 +389,7 @@ class Brain:
         print(f"[Brain] Batch {idx + 1} envoyé: {len(actions)} actions")
         return True
 
+
     def tick(self) -> None:
         """Un cycle de la boucle principale. Appeler à ~10 Hz."""
         self._tick_count += 1
@@ -397,6 +409,14 @@ class Brain:
         # ── RUNNING_BATCH : attendre QUEUE_DONE du robot ─────────────
         if self.phase == BrainPhase.RUNNING_BATCH:
             if self._ble_bridge and self._ble_bridge.queue_done:
+                if self._waiting_for_exit_queue_done:
+                    self._waiting_for_exit_queue_done = False
+                    print("[Brain] QUEUE_DONE reçu — sortie de zone terminée")
+                    self.phase = BrainPhase.WAITING_RECALC
+                    self._recalc_vision_frames = 0
+                    print("[Brain] Attente de vision stable pour batch 1...")
+                    return
+
                 print(f"[Brain] QUEUE_DONE reçu — batch "
                       f"{self._current_batch_idx + 1} terminé")
                 self._current_batch_idx += 1

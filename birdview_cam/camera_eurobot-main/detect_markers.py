@@ -1,6 +1,5 @@
-"""Point d'entree du pipeline de detection ArUco/QR."""
+"""Point d'entree du pipeline de detection ArUco/QR.
 
-"""
 Birdview camera pipeline. Its job is to:
     - open the camera,
     - detect ArUco and QR markers,
@@ -10,13 +9,12 @@ Birdview camera pipeline. Its job is to:
     - feed detections into cerebros for autonomy planning,
     - start the match when the team switch / “tirette” condition is met.
 """
-
+from __future__ import annotations
 
 
 import cv2
 import sys, os
 import time as _time
-from __future__ import annotations
 
 # 
 from marker_detection import config
@@ -41,8 +39,7 @@ from marker_detection.visualization import (
     draw_status,
     draw_table_outline,
 )
-from marker_detection.esp32_sender import ESP32Sender
-from marker_detection.markers import send_detected_objects, _build_detected_list, get_marker_heading
+from marker_detection.markers import _build_detected_list, get_marker_heading
 
 
 # Ajouter le dossier racine TicTac au path pour importer cerebros
@@ -60,11 +57,9 @@ BYPASS_TIRETTE = False
 def main() -> None:
     """Boucle principale du pipeline."""
 
-    # 1. Ouvre une connexion camera et esp32.
+    # 1. Ouvre la camera.
     try:
         cap = create_capture()
-        sender = ESP32Sender()
-        sender.connect()
     except RuntimeError as exc:
         print(f"[ERREUR] {exc}")
         return
@@ -106,6 +101,8 @@ def main() -> None:
         initial_pos=None,        # Pas de position par defaut — attente de la vision
         initial_heading=0.0,
     )
+    # --- Patch : on démarre même sans voir le marker robot ---
+    brain._robot_position_known = True
     brain.set_send_function(ble.send)
     brain.set_ble_bridge(ble)
 
@@ -116,51 +113,52 @@ def main() -> None:
     if team == Team.BLUE:
         batch1 = [
             # batch 1 : curseur de température et amener 12 caisses au nid
-            Position(1500, 1100),
-            Position(1200, 0),
-            Position(1500, 0), #activer electr
-            Position(2200, 0),#désactiver electr
-            Position(2850, 0),
-            Position(2850, 1800),
-            Position(1500, 800), #position centrale pour recalcul
+            #Position(1000, 400),
+            #Position(1000, 700),#nid du milieu
+            #Position(700, 800),
+            Position(2300, 700),#vider haut
+            #Position(1500, 800), #position centrale pour recalcul
+            Position(2600, 0),
+            Position(3000, 50),
+            Position(3050, 1600), #activer electr
+            Position(500, 300),
             
             
             ]
         batch2 = [
-            # batch 2 : aller vider les nids adveres 
-            Position(1600, 800),#nid du milieu
-            Position(600, 800),
-            Position(2000, 50),#vider haut
-            Position(500, 50),
-            Position(1500, 800), #position centrale pour recalcul
+            Position(3000, 0),
+            Position(2400, 0), #position centrale pour recalcul
+            Position(2800, 1000),
+            Position(2800, 1800),
+            
         ]
         batch3 = [
             # batch 3 : retour au nid
-            Position(2600, 1100),
-            Position(2600, 1900),  
+            #Position(2600, 1100),
+            #Position(2600, 1900),  
         ]
     else:  # Team.YELLOW
         batch1 = [
-            Position(1500, 1100),
-            Position(1800, 0),
-            Position(1500, 0),#activer electr
-            Position(1000, 0),#désactiver electr
-            Position(150, 0),
-            Position(150, 1000),
-            Position(1500, 800), #position centrale pour recalcul
+            Position(1700, 800),
+            Position(2400, 800),
+            Position(700, 800),#activer electr
+            Position(1500, 800),#désactiver electr
+            #Position(150, 0),
+            #Position(150, 1000),
+            #Position(1500, 800), #position centrale pour recalcul
             
         ]
         batch2 = [
             # batch 2 : aller vider les nids adverses 
-            Position(1400, 800),#vider centre
-            Position(2500, 800),
-            Position(1100, 50),#vider haut
-            Position(2600, 50),
-            Position(1500, 800),#position centrale pour recalcul
+            Position(500, 50),#vider centre
+            Position(100, 50),
+            Position(50, 1600),#vider haut
+            #Position(2600, 50),
+            #Position(1500, 800),#position centrale pour recalcul
         ]
         batch3 = [
-            Position(400, 1100),
-            Position(400, 1900),# retour au nid
+            #Position(400, 1100),
+            #Position(400, 1900),# retour au nid
         ]
 
     batches = [batch1, batch2, batch3]
@@ -238,11 +236,8 @@ def main() -> None:
         draw_object_markers(frame, aerial, obj_aruco, h_img_to_grid, last_h_aerial, frame_count)    # object positions,
         draw_qr_codes(frame, aerial, q_data, q_corners, h_img_to_grid, last_h_aerial, frame_count)  # QR codes
 
-        # 10. Send to ESP32 Robot
+        # 10. Feed vision to Cerebros
         if h_img_to_grid is not None and frame_count % 2 == 0:
-            # Send every 2 frames
-            send_detected_objects(corners_by_id, obj_aruco, h_img_to_grid, sender)
-
             # Build Detection List for Cerebros
             detections = _build_detected_list(
                 corners_by_id, obj_aruco, h_img_to_grid)
@@ -267,18 +262,10 @@ def main() -> None:
                     else:
                         brain.phase = BrainPhase.READY
                         print("[INIT] Insere la tirette puis retire-la pour lancer le match.")
-
-                # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
-                if (not BYPASS_TIRETTE and init_plan_done
-                        and brain.phase == BrainPhase.READY):
-                    if ble.tirette_inserted is True:
-                        if not tirette_seen_inserted:
-                            print("[MATCH] Tirette détectée IN — attente du retrait")
-                        tirette_seen_inserted = True
-                    elif ble.tirette_inserted is False and tirette_seen_inserted:
-                        print("[MATCH] Front tirette IN -> OUT détecté — démarrage!")
-                        brain.start_match()
-                        tirette_seen_inserted = False
+                elif not init_plan_done and init_vision_frames % 30 == 0 and init_vision_frames > 0:
+                    labels_seen = [d[0] for d in detections[:5]]
+                    print(f"[INIT] frames={init_vision_frames}, robot_known={brain.robot_position_known}, "
+                          f"labels={labels_seen}...")
 
                 # ── RUN : tick du pipeline multi-batch ─────────────────
                 if brain.phase in (BrainPhase.RUNNING_BATCH,
@@ -286,6 +273,19 @@ def main() -> None:
                                    BrainPhase.WAITING_TIMER):
                     brain.tick()
                     _ticked_this_frame = True
+
+        # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
+        # (vérifié à chaque frame, indépendamment de la vision)
+        if (not BYPASS_TIRETTE and init_plan_done
+                and brain.phase == BrainPhase.READY):
+            if ble.tirette_inserted is True:
+                if not tirette_seen_inserted:
+                    print("[MATCH] Tirette détectée IN — attente du retrait")
+                tirette_seen_inserted = True
+            elif ble.tirette_inserted is False and tirette_seen_inserted:
+                print("[MATCH] Front tirette IN -> OUT détecté — démarrage!")
+                brain.start_match()
+                tirette_seen_inserted = False
 
         # ── Tick hors détection : garantir les timers même sans vision ──
         if not _ticked_this_frame and brain.phase in (
@@ -314,7 +314,6 @@ def main() -> None:
 
     # Clean Shutdown
     ble.disconnect()
-    sender.disconnect()
     cap.release()
     cv2.destroyAllWindows()
 

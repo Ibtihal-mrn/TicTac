@@ -307,6 +307,7 @@ void BLE_STOP(Context &ctx){
     if (bleStopRequested) {
         motion.abort();
         clearCommandQueue(ctx.commandQueue);
+        ctx.queueWasRunning = false;
         ctx.currentAction = Robot::DISPATCH_CMD;
         bleStopRequested = false;
 
@@ -371,7 +372,17 @@ void robot_step(Context &ctx)
             if (!ctx.commandQueue) { break;}
 
             // 2. Get next command
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
+                if (ctx.queueWasRunning) {
+                    ctx.queueWasRunning = false;
+                    Serial.println("[FSM] Queue terminee");
+                    bleBridge.sendLog("[EVENT] QUEUE_DONE");
+                }
+                ctx.currentAction = Robot::IDLE;
+                break;
+            }
+
+            ctx.queueWasRunning = true;
 
 
             #if DBG_FSM
@@ -423,6 +434,7 @@ void robot_step(Context &ctx)
 
                 case CommandType::ClearQueue:
                     clearCommandQueue(ctx.commandQueue);
+                    ctx.queueWasRunning = false;
                     break;
 
 
@@ -433,6 +445,10 @@ void robot_step(Context &ctx)
 
 
         case Robot::IDLE:
+            // Vérifier si de nouvelles commandes BLE sont arrivées
+            if (ctx.commandQueue && uxQueueMessagesWaiting(ctx.commandQueue) > 0) {
+                ctx.currentAction = Robot::DISPATCH_CMD;
+            }
             break;
 
         case Robot::EXEC:
