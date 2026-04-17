@@ -37,8 +37,8 @@
 
 // External Objects
 extern Motors motors;
-StartSwitch startSwitch((gpio_num_t)LAUNCH_TRIGGER_PIN);
-TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
+extern TeamSwitch teamSwitch;
+extern StartSwitch startSwitch;
 
 Context fsmCtx{};
 
@@ -49,14 +49,9 @@ void IRAM_ATTR stopISR() { emergencyStopUS = digitalRead(STOP_PIN); }
 // BLE flag
 volatile bool bleStopRequested = false;
 
-static const char* heartbeatTeamName() {
-    return teamSwitch.readTeam() == TeamSwitchTeam::A ? "BLUE" : "YELLOW";
-}
 
-static const char* heartbeatTiretteState() {
-    return startSwitch.isInserted() ? "IN" : "OUT";
-}
-
+static const char* heartbeatTeamName() { return teamSwitch.readTeam() == TeamSwitchTeam::A ? "BLUE" : "YELLOW"; }
+static const char* heartbeatTiretteState() { return startSwitch.isInserted() ? "IN" : "OUT"; }
 
 
 // ========= TACHE BLE — Core 0 =========
@@ -69,8 +64,8 @@ void bleTask(void* pvParameters) {
         // Flush les logs en attente vers le PC via BLE notify
         bleBridge.update();
 
-        // Heartbeat toutes les 5 secondes
-        if (millis() - lastHeartbeat >= 5000) {
+        // Heartbeat toutes les 500ms
+        if (millis() - lastHeartbeat >= 500) {
             char hb[128];
             snprintf(
                 hb,
@@ -136,8 +131,7 @@ void setup() {
     ESP32PWM::allocateTimer(1);
     hardware_init(fsmCtx);
 
-    // Init relais
-    relais_init(RELAY_PIN, true);
+    
 
     
 
@@ -152,14 +146,8 @@ void setup() {
     xTaskCreatePinnedToCore(bleTask, "BLE_Task", BLE_TASK_STACK, NULL, BLE_TASK_PRIO, NULL, 0);
     xTaskCreatePinnedToCore(fsmTask, "FSM_Task", FSM_TASK_STACK, NULL, FSM_TASK_PRIO, NULL, 1);
 
-
-  // Init Hardware et Robot
-  ESP32PWM::allocateTimer(0); // SERVO timer (doit rester ici)
-  ESP32PWM::allocateTimer(1); // SERVO timer (doit rester ici)
     startSwitch.begin();
     teamSwitch.begin();
-  // bras_init();                // must run FIRST
-  // robot_init();
 
     Serial.println("Setup Done.");
 }

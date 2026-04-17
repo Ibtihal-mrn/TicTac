@@ -84,7 +84,9 @@ struct Context {
 };
 
 
-
+// Match timer
+void startMatchTimer(Context& ctx);
+bool isMatchTimeEnded(const Context& ctx);
 
 // Fsm
 void fsm_init(Context& ctx, QueueHandle_t cmdQueue);

@@ -56,7 +56,7 @@
 //              PINOUT
 // ==========================================
 
-#define MATCH_DURATION_MS 50000
+#define MATCH_DURATION_MS 100000
 
 // ==================== I2C ====================
 #define STOP_PIN    4

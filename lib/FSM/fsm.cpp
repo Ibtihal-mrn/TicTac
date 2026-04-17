@@ -13,6 +13,8 @@
 // #include "control.h"
 // #include "kinematics.h"
 #include "StartSwitch.h"
+#include "TeamSwitch.h"
+
 //
 #include "utils.h"
 #include "Debug.h"
@@ -21,11 +23,10 @@
 // I2C sensors
 #include "i2c_comm.h"
 
-
-
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 static PIDController motion(motors);
 StartSwitch startSwitch(GPIO_NUM_38);
+TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
 // ------- INITS ---------
 void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
@@ -53,8 +54,10 @@ void hardware_init(Context &ctx)
 {
     // To be called in setup() in main.cpp
     bras_init();
-    // motors_init();
     encoders_init();
+
+    // Init relais
+    relais_init(RELAY_PIN, true);
 
     // IMU
     if (!imu_init())
@@ -69,12 +72,28 @@ void hardware_init(Context &ctx)
     }
 
     // Init Match Timer
-    // ctx.matchActive = false;
-    // ctx.matchDurationMs = MATCH_DURATION_MS;
-    // ctx.matchStartMs = 0;
-    // debugPrintf(DBG_FSM, "FSM -> INIT");
-    // ctx.currentAction = Robot::INIT;
-    // ctx.currentTeam = Team::TEAM_YELLOW;
+    ctx.matchActive = false;
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+    ctx.matchStartMs = 0;
+    debugPrintf(DBG_FSM, "FSM -> INIT");
+    ctx.currentAction = Robot::INIT;
+
+    // Read switch
+    bool team = 0;  //TODO read teamswitch
+    ctx.currentTeam = Team::TEAM_YELLOW;    // TODO: read TeamSwicth
+    // heartbeatTeamName(); // done in main.cpp
+}
+
+
+// Match Timer
+void startMatchTimer(Context& ctx) {
+    ctx.matchActive = true;
+    ctx.matchStartMs = millis();
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+}
+
+bool isMatchTimeEnded(const Context& ctx) {
+    return ctx.matchActive && (millis() - ctx.matchStartMs >= ctx.matchDurationMs);
 }
 
 
@@ -214,6 +233,8 @@ void competitionRoutine(Context &ctx){
 
 }
 
+
+
 // -------- helpers ----------
 const char* commandTypeToString(CommandType type)
 {
@@ -248,38 +269,7 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
-<<<<<<< HEAD
 void debugPrints(Context &ctx){
-=======
-// ========== FSM ============
-void robot_step(Context &ctx)
-{
-    if (emergencyStopUS) {
-        // motion.abort();
-        // emergencyStopUS = false;
-        // ctx.currentAction = Robot::EMERGENCY_STOP;
-        static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){
-            bleSerial.println("emergencyStopUS");
-            Lpwm = millis();
-        }
-    }
-
-    // BLE Stop & Updates
-    if (bleStopRequested) {
-        motion.abort();
-        clearCommandQueue(ctx.commandQueue);
-        ctx.queueWasRunning = false;  // Eviter un faux QUEUE_DONE apres STOP
-        ctx.currentAction = Robot::DISPATCH_CMD;
-        bleStopRequested = false;
-
-        Serial.println("[FSM] BLE STOP");
-        bleSerial.println("[FSM] BLE STOP");
-        return;
-    }
-
-    // DBG
->>>>>>> BLE
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
@@ -336,44 +326,43 @@ void robot_step(Context &ctx)
     BLE_STOP(ctx);
     if(ctx.currentAction == Robot::EXEC) US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
     
-    // LED
+    // US obstacle LED
     if (emergencyStopUS) { digitalWrite(LED_BUILTIN, HIGH);} else{digitalWrite(LED_BUILTIN, LOW);}
 
     // DBG
     debugPrints(ctx);
     
-
+    // Match time end check
+    if (isMatchTimeEnded(ctx)) { ctx.currentAction = Robot::TIMER_END; }
 
     // ===================================================
     switch (ctx.currentAction)
     {   
         case Robot::INIT:
-
             // MOVE COMMANDS
-<<<<<<< HEAD
             testRotation(ctx);
             // testLinearMotion(ctx);
             // testServos(ctx);
             // testElectroAimant(ctx);
-            // startSwitch.begin();
-            // startSwitch.waitForStart();
+            ;
             // competitionRoutine(ctx);
-=======
-            // testRotation(ctx);
-            // testLinearMotion(ctx);
-
->>>>>>> BLE
-
             ctx.currentAction = Robot::WAIT_START;
             break;
 
         case Robot::WAIT_START:
             // ADD LaunchTrigger HERE
-            // start 100sec timer
-            // startMatchTimer(ctx);
+            startSwitch.begin();
+            if (startSwitch.isInserted()) {
+                // start 100sec timer
+                startMatchTimer(ctx);    // TODO
+
+                
+                // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
+                ctx.currentAction = Robot::DISPATCH_CMD;
+            }
+            // startSwitch.waitForStart();
+
             
-            // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
-            ctx.currentAction = Robot::DISPATCH_CMD;
             break;
 
 
@@ -382,16 +371,7 @@ void robot_step(Context &ctx)
             if (!ctx.commandQueue) { break;}
 
             // 2. Get next command
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
-                // Queue vide après exécution → notifier le PC
-                if (ctx.queueWasRunning) {
-                    bleSerial.println("[EVENT] QUEUE_DONE");
-                    Serial.println("[FSM] QUEUE_DONE — all commands executed");
-                    ctx.queueWasRunning = false;
-                }
-                break;
-            }
-            ctx.queueWasRunning = true;
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
 
 
             #if DBG_FSM
