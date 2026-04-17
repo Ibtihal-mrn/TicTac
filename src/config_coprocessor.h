@@ -100,8 +100,8 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define US_L8_TRIG  42     // Left
 #define US_L8_ECHO  41
 
-#define US_L9_TRIG  2  // Right
-#define US_L9_ECHO  1
+#define US_L9_TRIG  1  // Right
+#define US_L9_ECHO  2
 
 
 
