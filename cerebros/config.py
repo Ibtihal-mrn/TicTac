@@ -67,7 +67,7 @@ MONITORING_STUCK_THRESHOLD = 1         # ticks sans mouvement avant replan
 MONITORING_STUCK_MIN_MOVE_MM = 5       # mouvement minimum pour ne pas être "stuck"
 
 # ── Paramètres de mouvement ──────────────────────────────────────────────────
-EXIT_ZONE_MM              = 200        # FORWARD initial pour sortir de la zone de départ
+EXIT_ZONE_MM              = 500        # FORWARD initial pour sortir de la zone de départ
 HEADING_TOLERANCE_DEG     = 5          # tolérance angulaire avant déplacement
 
 # ── Boucle principale ────────────────────────────────────────────────────────

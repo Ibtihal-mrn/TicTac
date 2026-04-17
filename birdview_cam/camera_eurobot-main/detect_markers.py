@@ -91,24 +91,70 @@ def main() -> None:
         initial_heading=0.0,
     )
     brain.set_send_function(ble.send)
+    brain.set_ble_bridge(ble)
 
-    # ── PHASE INIT : mission hardcodee ────────────────────────────────
-    #  Mission : centre table → centre-droit → retour base
-    targets = [
-        Position(1500, 1200),
-        Position(1500, 800),
-        Position(2100, 800),
-        Position(1500, 800),
-        Position(1500, 0),
-        Position(2200,0),
-        Position(2000,0),
-        Position(2000,400),
-        Position(2900,800),
-        Position(2900,1800),
-        # Retour a la position de base
+    # ── PHASE INIT : mission en batches ───────────────────────────────
+    # Batch 1 : aller faire la mission principale
+    # Batch 2 : correction + suite depuis la position caméra
+    # Batch 3 : retour au nid
+    if team == Team.BLUE:
+        batch1 = [
+            # batch 1 : curseur de température et amener 12 caisses au nid
+            Position(1500, 1100),
+            Position(1200, 0),
+            Position(1500, 0), #activer electr
+            Position(2200, 0),#désactiver electr
+            Position(2850, 0),
+            Position(2850, 1800),
+            Position(1500, 800), #position centrale pour recalcul
+            
+            
+            ]
+        batch2 = [
+            # batch 2 : aller vider les nids adveres 
+            Position(1600, 800),#nid du milieu
+            Position(600, 800),
+            Position(2000, 50),#vider haut
+            Position(500, 50),
+            Position(1500, 800), #position centrale pour recalcul
+        ]
+        batch3 = [
+            # batch 3 : retour au nid
+            Position(2600, 1100),
+            Position(2600, 1900),  
+        ]
+    else:  # Team.YELLOW
+        batch1 = [
+            Position(1500, 1100),
+            Position(1800, 0),
+            Position(1500, 0),#activer electr
+            Position(1000, 0),#désactiver electr
+            Position(150, 0),
+            Position(150, 1000),
+            Position(1500, 800), #position centrale pour recalcul
+            
+        ]
+        batch2 = [
+            # batch 2 : aller vider les nids adverses 
+            Position(1400, 800),#vider centre
+            Position(2500, 800),
+            Position(1100, 50),#vider haut
+            Position(2600, 50),
+            Position(1500, 800),#position centrale pour recalcul
+        ]
+        batch3 = [
+            Position(400, 1100),
+            Position(400, 1900),# retour au nid
+        ]
+
+    batches = [batch1, batch2, batch3]
+    batch_labels = [
+        ["B1_T" + str(i+1) for i in range(len(batch1))],
+        ["B2_T" + str(i+1) for i in range(len(batch2))],
+        ["B3_RETOUR"],
     ]
-    labels = ["CENTRE_TABLE", "CENTRE_DROIT", "RETOUR_BASE"]
-    print(f"[INIT] Mission : {labels}")
+    brain.set_batches(batches, batch_labels)
+    print(f"[INIT] Team={team.value} — {len(batches)} batches")
 
     create_windows()  # Ouverture des fenetres camera / aerienne.
 
@@ -189,22 +235,17 @@ def main() -> None:
                 brain.feed_vision(detections, robot_heading=robot_heading)
                 init_vision_frames += 1
 
-                # ── INIT : lancer A* apres quelques frames stables ────
+                # ── INIT : lancer le premier batch apres vision stable ──
                 if (not init_plan_done and init_vision_frames >= 5
                         and brain.robot_position_known):
-                    print("[INIT] Vision stable + robot detecte — lancement planification A*")
-                    ok = brain.init_plan(
-                        target_positions=targets, target_labels=labels)
-                    if ok:
-                        init_plan_done = True
-                        if BYPASS_TIRETTE:
-                            print("[INIT] Plan OK. Bypass tirette actif — demarrage immediat du match.")
-                            brain.start_match()
-                        else:
-                            print("[INIT] Plan OK. Insere la tirette puis retire-la pour lancer le match.")
+                    print("[INIT] Vision stable + robot detecte — prêt pour batches")
+                    init_plan_done = True
+                    if BYPASS_TIRETTE:
+                        print("[INIT] Bypass tirette actif — demarrage immediat du match.")
+                        brain.start_match()
                     else:
-                        print("[INIT] Echec planification — nouvel essai dans quelques frames")
-                        init_vision_frames = 0  # retry
+                        brain.phase = BrainPhase.READY
+                        print("[INIT] Insere la tirette puis retire-la pour lancer le match.")
 
                 # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
                 if (not BYPASS_TIRETTE and init_plan_done
@@ -218,8 +259,10 @@ def main() -> None:
                         brain.start_match()
                         tirette_seen_inserted = False
 
-                # ── RUN : tick de monitoring ───────────────────────────
-                if brain.phase == BrainPhase.RUNNING:
+                # ── RUN : tick du pipeline multi-batch ─────────────────
+                if brain.phase in (BrainPhase.RUNNING_BATCH,
+                                   BrainPhase.WAITING_RECALC,
+                                   BrainPhase.WAITING_TIMER):
                     brain.tick()
 
         # draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)

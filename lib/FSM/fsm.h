@@ -78,6 +78,7 @@ struct Context {
      // Queue of robot commands
     QueueHandle_t commandQueue = nullptr;
     RobotCommand currentCommand{}; // Optionally keep a pointer to the current command
+    bool queueWasRunning = false;  // Tracks if commands were being executed
 };
 
 

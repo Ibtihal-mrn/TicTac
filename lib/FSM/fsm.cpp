@@ -258,7 +258,16 @@ void robot_step(Context &ctx)
             if (!ctx.commandQueue) { break;}
 
             // 2. Get next command
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
+                // Queue vide après exécution → notifier le PC
+                if (ctx.queueWasRunning) {
+                    bleSerial.println("[EVENT] QUEUE_DONE");
+                    Serial.println("[FSM] QUEUE_DONE — all commands executed");
+                    ctx.queueWasRunning = false;
+                }
+                break;
+            }
+            ctx.queueWasRunning = true;
 
 
             #if DBG_FSM
