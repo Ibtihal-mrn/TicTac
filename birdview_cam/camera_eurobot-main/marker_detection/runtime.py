@@ -3,16 +3,53 @@
 from __future__ import annotations
 
 import platform
+import threading
 
 import cv2
+import numpy as np
 
 from marker_detection import config
 
 _CAP_BACKEND = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_V4L2
 
 
-def create_capture() -> cv2.VideoCapture:
-    """Initialise la camera avec les parametres du projet."""
+class CameraStream:
+    """Lecteur camera threade — retourne toujours la frame la plus recente.
+
+    Un thread dedié fait `cap.read()` en boucle et ecrase la frame
+    precedente. La boucle principale appelle `read()` et obtient
+    instantanement la derniere image sans latence de buffer.
+    """
+
+    def __init__(self, cap: cv2.VideoCapture):
+        self._cap = cap
+        self._lock = threading.Lock()
+        self._frame: np.ndarray | None = None
+        self._ret = False
+        self._running = True
+        self._thread = threading.Thread(target=self._reader, daemon=True)
+        self._thread.start()
+
+    def _reader(self) -> None:
+        while self._running:
+            ret, frame = self._cap.read()
+            with self._lock:
+                self._ret = ret
+                self._frame = frame
+
+    def read(self) -> tuple[bool, np.ndarray | None]:
+        """Retourne (ret, frame) — la frame la plus recente."""
+        with self._lock:
+            return self._ret, self._frame
+
+    def release(self) -> None:
+        self._running = False
+        self._thread.join(timeout=2.0)
+        self._cap.release()
+
+
+def create_capture() -> CameraStream:
+    """Initialise la camera avec les parametres du projet (threaded)."""
     candidates = [config.CAMERA_INDEX]
     candidates.extend(i for i in range(1,5) if i != config.CAMERA_INDEX)
 
@@ -25,7 +62,7 @@ def create_capture() -> cv2.VideoCapture:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_W)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_H)
         cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
-        return cap
+        return CameraStream(cap)
 
     raise RuntimeError(
         "Aucune camera accessible via V4L2 (index testes: "

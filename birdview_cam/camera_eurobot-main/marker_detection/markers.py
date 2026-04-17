@@ -72,8 +72,8 @@ def get_marker_heading(
         pts = corner[0]  # shape (4, 2) — les 4 coins en pixels image
 
         # Projeter corner 0 et corner 1 dans l'espace grille
-        c0 = to_cell(pts[0][0], pts[0][1], h_img_to_grid)
-        c1 = to_cell(pts[1][0], pts[1][1], h_img_to_grid)
+        c0 = to_cell(pts[0][0], pts[0][1], h_img_to_grid, strict=False)
+        c1 = to_cell(pts[1][0], pts[1][1], h_img_to_grid, strict=False)
 
         if c0 is None or c1 is None:
             return None
@@ -104,7 +104,10 @@ def _build_detected_list(
 
     for marker_id, corner in all_markers:
         center = corner[0].mean(axis=0)
-        pos = to_cell(center[0], center[1], h_img_to_grid)
+        # Robots (ids 1-10) : accepter meme hors table
+        is_robot = isinstance(marker_id, int) and 1 <= marker_id <= 10
+        pos = to_cell(center[0], center[1], h_img_to_grid,
+                      strict=not is_robot)
 
         if pos is None:
             continue

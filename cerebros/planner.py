@@ -15,6 +15,7 @@ from cerebros.astar import (
     mm_to_grid,
     path_cells_to_mm,
     simplify_path,
+    smooth_path,
 )
 from cerebros.config import DEBUG
 from cerebros.models import Action, ActionType, ObjectInfo, Position
@@ -62,12 +63,12 @@ class Planner:
                       "Fallback: ligne droite")
             return [Position(start.x, start.y), Position(goal.x, goal.y)]
 
-        # Simplifier (supprimer les points colinéaires)
-        simplified = simplify_path(cell_path)
+        # Lisser le chemin par ligne de vue (élimine les zig-zags grille)
+        simplified = smooth_path(self._grid, cell_path)
 
         if DEBUG:
             print(f"[Planner] A* brut: {len(cell_path)} cellules → "
-                  f"simplifié: {len(simplified)} waypoints")
+                  f"lissé: {len(simplified)} waypoints")
 
         # Convertir en mm
         path_mm = path_cells_to_mm(simplified)
@@ -125,7 +126,7 @@ class Planner:
 
         Pour chaque segment :
           1. Calculer l'angle vers le prochain waypoint
-          2. Tourner (LEFT/RIGHT) pour s'aligner
+          2. Tourner (ROTATE angle) pour s'aligner
           3. Avancer (FORWARD) de la distance du segment
 
         Args:
@@ -162,19 +163,14 @@ class Planner:
 
             # ── Rotation si nécessaire ────────────────────────────────
             if abs(delta) > 5:  # tolérance 5°
-                if delta > 0:
-                    actions.append(Action(ActionType.LEFT, abs(delta)))
-                    if DEBUG:
-                        print(f"    → LEFT {abs(delta):.0f}°")
-                else:
-                    actions.append(Action(ActionType.RIGHT, abs(delta)))
-                    if DEBUG:
-                        print(f"    → RIGHT {abs(delta):.0f}°")
+                actions.append(Action(ActionType.ROTATE, delta))
+                if DEBUG:
+                    print(f"    → ROTATE {delta:.0f}°")
 
                 heading = desired_angle
 
             # ── Avancer ───────────────────────────────────────────────
-            if distance > 10:  # pas la peine d'avancer pour < 10mm
+            if distance > 100:  # pas la peine d'avancer pour < 10mm
                 actions.append(Action(ActionType.FORWARD, distance))
                 if DEBUG:
                     print(f"    → FORWARD {distance:.0f}mm")

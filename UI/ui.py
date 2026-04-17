@@ -21,7 +21,7 @@ NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 NUS_RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # PC → ESP32
 NUS_TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # ESP32 → PC
 
-TARGET_NAMES    = ["Eurobot", "Eurobot1"]   # one per panel
+TARGET_NAMES    = ["Eurobot", "TicTac"]   # one per panel
 MAX_LOG_LINES   = 800
 RECONNECT_S     = 3
 

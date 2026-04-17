@@ -31,6 +31,7 @@ class BLEBridge:
         self._detected_team: Optional[str] = None  # "BLUE" ou "YELLOW", lu depuis le heartbeat
         self._tirette_inserted: Optional[bool] = None  # True=IN, False=OUT
         self._match_started: bool = False  # passe a True sur [EVENT] MATCH_START
+        self._queue_done: bool = False  # passe a True sur [EVENT] QUEUE_DONE
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -92,6 +93,11 @@ class BLEBridge:
                 self._match_started = True
                 print("[BLEBridge] >>> MATCH_START recu! <<<")
 
+            # Detect [EVENT] QUEUE_DONE (robot a fini d'executer la queue)
+            if "QUEUE_DONE" in text:
+                self._queue_done = True
+                print("[BLEBridge] >>> QUEUE_DONE recu! <<<")
+
             # Parse heartbeat: "[BLE] Heartbeat | ... | team=BLUE | tirette=IN"
             if "Heartbeat" in text:
                 for part in text.split("|"):
@@ -117,6 +123,15 @@ class BLEBridge:
     def match_started(self) -> bool:
         """True des que l'event MATCH_START a ete recu."""
         return self._match_started
+
+    @property
+    def queue_done(self) -> bool:
+        """True des que l'event QUEUE_DONE a ete recu (robot a fini sa queue)."""
+        return self._queue_done
+
+    def clear_queue_done(self) -> None:
+        """Reset le flag queue_done pour attendre le prochain batch."""
+        self._queue_done = False
 
     # -- Envoi (sync, utilisable comme callback Executor) --------------
 

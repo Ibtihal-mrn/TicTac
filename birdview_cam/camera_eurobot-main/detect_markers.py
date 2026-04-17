@@ -33,6 +33,7 @@ from marker_detection.runtime import (
 from marker_detection.tracking import Tracker
 from marker_detection.visualization import (
     compute_aerial,
+    draw_brain_overlay,
     draw_corner_markers,
     draw_grid,
     draw_object_markers,
@@ -49,6 +50,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from cerebros.brain import Brain, BrainPhase
 from cerebros.models import Position, Team
 from cerebros import config as cerebros_config
+
+
+# Bypass de la tirette pour les tests PC/vision.
+# Remettre a False pour revenir au demarrage sur front IN -> OUT.
+BYPASS_TIRETTE = False
 
 
 def main() -> None:
@@ -93,22 +99,78 @@ def main() -> None:
         print("[INIT] Timeout — équipe par défaut: BLUE")
 
     # 5. Creating the Robot Brain
+    home_pos = Position(150, 1000)  # Position de base pour retour (pas la pos reelle)
     brain = Brain(
         team=team,
         robot_id=robot_id,
-        initial_pos=Position(150, 1000),
+        initial_pos=None,        # Pas de position par defaut — attente de la vision
         initial_heading=0.0,
     )
     brain.set_send_function(ble.send)
+    brain.set_ble_bridge(ble)
 
-    # 6. PHASE INIT : mission hardcodee ────────────────────────────────
-    targets = [
-        #  Mission : milieu de la table, puis milieu tout a droite
-        Position(1500, 1000),   # Centre de la table  
-        Position(2850, 1000),   # Centre-droit
+    # ── PHASE INIT : mission en batches ───────────────────────────────
+    # Batch 1 : aller faire la mission principale
+    # Batch 2 : correction + suite depuis la position caméra
+    # Batch 3 : retour au nid
+    if team == Team.BLUE:
+        batch1 = [
+            # batch 1 : curseur de température et amener 12 caisses au nid
+            Position(1500, 1100),
+            Position(1200, 0),
+            Position(1500, 0), #activer electr
+            Position(2200, 0),#désactiver electr
+            Position(2850, 0),
+            Position(2850, 1800),
+            Position(1500, 800), #position centrale pour recalcul
+            
+            
+            ]
+        batch2 = [
+            # batch 2 : aller vider les nids adveres 
+            Position(1600, 800),#nid du milieu
+            Position(600, 800),
+            Position(2000, 50),#vider haut
+            Position(500, 50),
+            Position(1500, 800), #position centrale pour recalcul
+        ]
+        batch3 = [
+            # batch 3 : retour au nid
+            Position(2600, 1100),
+            Position(2600, 1900),  
+        ]
+    else:  # Team.YELLOW
+        batch1 = [
+            Position(1500, 1100),
+            Position(1800, 0),
+            Position(1500, 0),#activer electr
+            Position(1000, 0),#désactiver electr
+            Position(150, 0),
+            Position(150, 1000),
+            Position(1500, 800), #position centrale pour recalcul
+            
+        ]
+        batch2 = [
+            # batch 2 : aller vider les nids adverses 
+            Position(1400, 800),#vider centre
+            Position(2500, 800),
+            Position(1100, 50),#vider haut
+            Position(2600, 50),
+            Position(1500, 800),#position centrale pour recalcul
+        ]
+        batch3 = [
+            Position(400, 1100),
+            Position(400, 1900),# retour au nid
+        ]
+
+    batches = [batch1, batch2, batch3]
+    batch_labels = [
+        ["B1_T" + str(i+1) for i in range(len(batch1))],
+        ["B2_T" + str(i+1) for i in range(len(batch2))],
+        ["B3_RETOUR"],
     ]
-    labels = ["CENTRE_TABLE", "CENTRE_DROIT"]
-    print(f"[INIT] Mission : {labels}")
+    brain.set_batches(batches, batch_labels)
+    print(f"[INIT] Team={team.value} — {len(batches)} batches")
 
 
     # 7. OpenCv Window and Tag Detection
@@ -122,19 +184,21 @@ def main() -> None:
     aruco_tracker = Tracker(buffer_size=3, min_hits=2)   # mutliple stable frames before accepting Aruco Tag
     qr_tracker = Tracker(buffer_size=3, min_hits=2)
 
-    # 9. State Variables
-    last_h_aerial = None         # last valid aerial homography.
-    frame_count = 0              # frame-based throttling.
-    init_plan_done = False       # ensures A* planning happens only once.
-    init_vision_frames = 0       # counts stable frames before planning starts.
+    last_h_aerial = None
+    frame_count = 0
+    init_plan_done = False       # A* calcule une seule fois
+    init_vision_frames = 0       # Compteur de frames avec vision valide
+    tirette_seen_inserted = False
 
 
     # 10. Main Frame Loop
     while True:
         # 1. Read
         ret, frame = cap.read()
-        if not ret:
-            break
+        if not ret or frame is None:
+            continue
+
+        _ticked_this_frame = False
 
         # 2. Convert to grayScale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -192,37 +256,60 @@ def main() -> None:
                 brain.feed_vision(detections, robot_heading=robot_heading)
                 init_vision_frames += 1
 
-                # ── INIT : lancer A* apres quelques frames stables ────
-                if not init_plan_done and init_vision_frames >= 10:
-                    print("[INIT] Vision stable — lancement planification A*")
-                    ok = brain.init_plan(
-                        target_positions=targets, target_labels=labels)
-                    if ok:
-                        init_plan_done = True
-                        print("[INIT] Plan OK. Insere la tirette puis retire-la pour lancer le match.")
-                    else:
-                        print("[INIT] Echec planification — nouvel essai dans quelques frames")
-                        init_vision_frames = 0  # retry
-
-                # TIRETTE : demarrer le match quand elle est retiree ─
-                if init_plan_done and brain.phase == BrainPhase.READY:
-                    if ble.match_started:
-                        print("[MATCH] Tirette retiree — MATCH START!")
+                # ── INIT : lancer le premier batch apres vision stable ──
+                if (not init_plan_done and init_vision_frames >= 5
+                        and brain.robot_position_known):
+                    print("[INIT] Vision stable + robot detecte — prêt pour batches")
+                    init_plan_done = True
+                    if BYPASS_TIRETTE:
+                        print("[INIT] Bypass tirette actif — demarrage immediat du match.")
                         brain.start_match()
+                    else:
+                        brain.phase = BrainPhase.READY
+                        print("[INIT] Insere la tirette puis retire-la pour lancer le match.")
 
-                # RUN : tick de monitoring ───────────────────────────
-                if brain.phase == BrainPhase.RUNNING:
+                # ── TIRETTE : demarrer uniquement sur front IN -> OUT ──
+                if (not BYPASS_TIRETTE and init_plan_done
+                        and brain.phase == BrainPhase.READY):
+                    if ble.tirette_inserted is True:
+                        if not tirette_seen_inserted:
+                            print("[MATCH] Tirette détectée IN — attente du retrait")
+                        tirette_seen_inserted = True
+                    elif ble.tirette_inserted is False and tirette_seen_inserted:
+                        print("[MATCH] Front tirette IN -> OUT détecté — démarrage!")
+                        brain.start_match()
+                        tirette_seen_inserted = False
+
+                # ── RUN : tick du pipeline multi-batch ─────────────────
+                if brain.phase in (BrainPhase.RUNNING_BATCH,
+                                   BrainPhase.WAITING_RECALC,
+                                   BrainPhase.WAITING_TIMER):
                     brain.tick()
+                    _ticked_this_frame = True
 
+        # ── Tick hors détection : garantir les timers même sans vision ──
+        if not _ticked_this_frame and brain.phase in (
+                BrainPhase.RUNNING_BATCH, BrainPhase.WAITING_TIMER):
+            brain.tick()
+        # draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
 
-        # 11. Display status and windows
-        draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
+        # ── Overlay Cerebros : targets + path A* + position robot ─────
+        # draw_brain_overlay(
+        #     frame, aerial,
+        #     brain.planned_path,
+        #     brain.planned_targets,
+        #     brain.planned_target_labels,
+        #     brain.robot.position,
+        #     brain.robot.heading_deg,
+        #     h_grid_to_img,
+        # )
+
         cv2.imshow(config.WINDOW_CAMERA, frame)
         if aerial is not None: cv2.imshow(config.WINDOW_AERIAL, aerial)
         frame_count += 1
 
-        # 12. Exit Condition
-        if cv2.waitKey(50) & 0xFF == ord("q"): break  # Quitter avec 'q'.
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break  # Quitter avec 'q'.
 
 
     # Clean Shutdown

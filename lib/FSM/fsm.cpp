@@ -248,7 +248,38 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
+<<<<<<< HEAD
 void debugPrints(Context &ctx){
+=======
+// ========== FSM ============
+void robot_step(Context &ctx)
+{
+    if (emergencyStopUS) {
+        // motion.abort();
+        // emergencyStopUS = false;
+        // ctx.currentAction = Robot::EMERGENCY_STOP;
+        static unsigned long Lpwm = 0;
+        if (millis() - Lpwm >= 2000){
+            bleSerial.println("emergencyStopUS");
+            Lpwm = millis();
+        }
+    }
+
+    // BLE Stop & Updates
+    if (bleStopRequested) {
+        motion.abort();
+        clearCommandQueue(ctx.commandQueue);
+        ctx.queueWasRunning = false;  // Eviter un faux QUEUE_DONE apres STOP
+        ctx.currentAction = Robot::DISPATCH_CMD;
+        bleStopRequested = false;
+
+        Serial.println("[FSM] BLE STOP");
+        bleSerial.println("[FSM] BLE STOP");
+        return;
+    }
+
+    // DBG
+>>>>>>> BLE
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
@@ -319,6 +350,7 @@ void robot_step(Context &ctx)
         case Robot::INIT:
 
             // MOVE COMMANDS
+<<<<<<< HEAD
             testRotation(ctx);
             // testLinearMotion(ctx);
             // testServos(ctx);
@@ -326,6 +358,11 @@ void robot_step(Context &ctx)
             // startSwitch.begin();
             // startSwitch.waitForStart();
             // competitionRoutine(ctx);
+=======
+            // testRotation(ctx);
+            // testLinearMotion(ctx);
+
+>>>>>>> BLE
 
             ctx.currentAction = Robot::WAIT_START;
             break;
@@ -345,7 +382,16 @@ void robot_step(Context &ctx)
             if (!ctx.commandQueue) { break;}
 
             // 2. Get next command
-            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) { break; }
+            if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
+                // Queue vide après exécution → notifier le PC
+                if (ctx.queueWasRunning) {
+                    bleSerial.println("[EVENT] QUEUE_DONE");
+                    Serial.println("[FSM] QUEUE_DONE — all commands executed");
+                    ctx.queueWasRunning = false;
+                }
+                break;
+            }
+            ctx.queueWasRunning = true;
 
 
             #if DBG_FSM

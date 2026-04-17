@@ -219,9 +219,11 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
     } else if (strcmp(upper, "PING") == 0) {
         cmd.type = CommandType::Ping;
     
-    // CLEAR QUEUE
-    } else if (strcmp(upper, "CLEAR") == 0 || strcmp(upper, "CLEARQUEUE") == 0) {
-        cmd.type = CommandType::ClearQueue;
+    // CLEAR QUEUE — immediate, same priority as STOP
+    } else if (strcmp(upper, "CLEAR") == 0 || strcmp(upper, "CLEARQUEUE") == 0 || strcmp(upper, "CLEAR_QUEUE") == 0) {
+        bleStopRequested = true;
+        bleBridge.sendLog("[ESP32] CLEAR_QUEUE received — aborting + clearing");
+        return;
     
     // STOP EMERGENCY
     } else if (strcmp(upper, "STOP") == 0) {
