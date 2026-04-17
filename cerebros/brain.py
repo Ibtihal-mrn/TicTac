@@ -305,13 +305,15 @@ class Brain:
     def _send_exit_forward(self) -> None:
         """Envoie la séquence de sortie de zone hardcodée, avant le batch 1."""
         exit_mm = config.EXIT_ZONE_MM
+        # BLUE tourne à droite (-90°), YELLOW tourne à gauche (+90°)
+        rotate_angle = 90 if self.robot.team == Team.YELLOW else -90
         print(f"[Brain] Envoi séquence sortie de zone: FORWARD {exit_mm}mm → "
-              f"ROTATE -90° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
+              f"ROTATE {rotate_angle}° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
 
         self.action_queue.clear()
         self.action_queue.enqueue_many([
             Action(ActionType.FORWARD, exit_mm),
-            Action(ActionType.ROTATE, -90),
+            Action(ActionType.ROTATE, rotate_angle),
             Action(ActionType.FORWARD, exit_mm),
         ])
         self.executor.send_full_queue()

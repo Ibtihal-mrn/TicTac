@@ -76,8 +76,8 @@ void bleTask(void* pvParameters) {
         // Flush les logs en attente vers le PC via BLE notify
         bleBridge.update();
 
-        // Heartbeat toutes les 5 secondes
-        if (millis() - lastHeartbeat >= 5000) {
+        // Heartbeat toutes les 500 ms
+        if (millis() - lastHeartbeat >= 500) {
             char hb[128];
             snprintf(
                 hb,

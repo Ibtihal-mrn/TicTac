@@ -120,7 +120,7 @@ def main() -> None:
         ]
         batch3 = [
             # batch 3 : retour au nid
-            Position(2600, 1100),
+            Position(2600, 800),
             Position(2600, 1900),  
         ]
     else:  # Team.YELLOW
@@ -143,7 +143,7 @@ def main() -> None:
             Position(1500, 800),#position centrale pour recalcul
         ]
         batch3 = [
-            Position(400, 1100),
+            Position(400, 800),
             Position(400, 1900),# retour au nid
         ]
 
