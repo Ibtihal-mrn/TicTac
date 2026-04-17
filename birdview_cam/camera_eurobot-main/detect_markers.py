@@ -39,7 +39,7 @@ from cerebros import config as cerebros_config
 
 # Bypass de la tirette pour les tests PC/vision.
 # Remettre a False pour revenir au demarrage sur front IN -> OUT.
-BYPASS_TIRETTE = True
+BYPASS_TIRETTE = False
 
 
 def main() -> None:
@@ -180,6 +180,8 @@ def main() -> None:
         if not ret or frame is None:
             continue
 
+        _ticked_this_frame = False
+
         # Detecteurs en niveaux de gris.
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -264,7 +266,12 @@ def main() -> None:
                                    BrainPhase.WAITING_RECALC,
                                    BrainPhase.WAITING_TIMER):
                     brain.tick()
+                    _ticked_this_frame = True
 
+        # ── Tick hors détection : garantir les timers même sans vision ──
+        if not _ticked_this_frame and brain.phase in (
+                BrainPhase.RUNNING_BATCH, BrainPhase.WAITING_TIMER):
+            brain.tick()
         # draw_status(frame, corners_by_id, obj_aruco, q_data, h_img_to_grid)
 
         # ── Overlay Cerebros : targets + path A* + position robot ─────

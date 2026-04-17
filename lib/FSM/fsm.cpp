@@ -204,6 +204,7 @@ void robot_step(Context &ctx)
     if (bleStopRequested) {
         motion.abort();
         clearCommandQueue(ctx.commandQueue);
+        ctx.queueWasRunning = false;  // Eviter un faux QUEUE_DONE apres STOP
         ctx.currentAction = Robot::DISPATCH_CMD;
         bleStopRequested = false;
 

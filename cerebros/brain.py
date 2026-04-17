@@ -303,14 +303,17 @@ class Brain:
         print("=" * 60 + "\n")
 
     def _send_exit_forward(self) -> None:
-        """Envoie un FORWARD de sortie de zone seul, avant le batch 1."""
+        """Envoie la séquence de sortie de zone hardcodée, avant le batch 1."""
         exit_mm = config.EXIT_ZONE_MM
-        print(f"[Brain] Envoi FORWARD {exit_mm}mm (sortie de zone) — "
-              f"batch 1 calculé après QUEUE_DONE")
+        print(f"[Brain] Envoi séquence sortie de zone: FORWARD {exit_mm}mm → "
+              f"ROTATE -90° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
 
-        exit_action = Action(ActionType.FORWARD, exit_mm)
         self.action_queue.clear()
-        self.action_queue.enqueue_many([exit_action])
+        self.action_queue.enqueue_many([
+            Action(ActionType.FORWARD, exit_mm),
+            Action(ActionType.ROTATE, -90),
+            Action(ActionType.FORWARD, exit_mm),
+        ])
         self.executor.send_full_queue()
 
         if self._ble_bridge:
@@ -348,7 +351,10 @@ class Brain:
         if len(full_path) < 2:
             print(f"[Brain] Batch {idx + 1}: échec A* — skip")
             self._current_batch_idx += 1
-            return self._plan_and_send_current_batch()
+            # On repasse en WAITING_RECALC pour retenter au prochain tick
+            self.phase = BrainPhase.WAITING_RECALC
+            self._recalc_vision_frames = 0
+            return False
 
         # Stocker pour visualisation
         self.planned_path = list(full_path)
