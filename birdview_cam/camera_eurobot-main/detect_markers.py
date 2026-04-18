@@ -118,29 +118,25 @@ def main() -> None:
             Action(ActionType.FORWARD, 500),
         ]
         batch1 = [
-            # batch 1 : curseur de température et amener 12 caisses au nid
-            #Position(1000, 400),
-            #Position(1000, 700),#nid du milieu
-            #Position(700, 800),
-            Position(2300, 700),#vider haut
-            #Position(1500, 800), #position centrale pour recalcul
-            Position(2600, 0),
-            Position(3000, 50),
-            Position(3050, 1600), #activer electr
-            Position(500, 300),
+            # batch 1 : amener 6 caisses dans le nid
+            Position(2300, 700),
+            Position(2600, 50),
+            Position(2950, 50),
+            Position(3050, 1600), 
+            # implementer fonction de recul
+            Position(2000, 800),
             
             
             ]
-        batch2 = [
-            Position(3000, 0),       # target 0 → RELAIS_ON après
-            Position(2400, 0),       # target 1 → RELAIS_OFF après
-            Position(2800, 1000),
-            Position(2800, 1800),
+        batch2 = [  
+            # batch 2 : attendre en zone trackable via caméra           
+            Position(2400, 1000),       
         ]
+        
         batch3 = [
             # batch 3 : retour au nid
-            #Position(2600, 1100),
-            #Position(2600, 1900),  
+            Position(2600, 1100),
+            Position(2600, 1900),  
         ]
     else:  # Team.YELLOW
         # 3 commandes de sortie de zone (avant le batch)
@@ -151,25 +147,20 @@ def main() -> None:
         ]
         batch1 = [
             Position(700, 700),
-            Position(400, 0),
-            Position(50, 0),#activer electr
-            Position(50, 1600),
-            Position(2500, 500),#désactiver electr
-            #Position(150, 0),
-            #Position(150, 1000),
-            #Position(1500, 800), #position centrale pour recalcul
-            
+            Position(400, 50),
+            Position(50, 0),
+            Position(0, 1600),
+            # implementer fonction de recul
+            Position(700, 800),  
         ]
         batch2 = [
-            # batch 2 : aller vider les nids adverses
-            Position(100, 0),        # target 0 → RELAIS_ON après
-            Position(600, 0),        # target 1 → RELAIS_OFF après
-            Position(100, 1000),
-            Position(100, 1600),     # vider haut
+            # batch 2 : attendre en zone trackable via caméra
+            Position(700, 1000),                
         ]
         batch3 = [
-            #Position(400, 1100),
-            #Position(400, 1900),# retour au nid
+            #retour au nid
+            Position(400, 1100),
+            Position(300, 1900),
         ]
 
     batches = [batch1, batch2, batch3]
@@ -180,11 +171,15 @@ def main() -> None:
     ]
     brain.set_exit_actions(exit_actions)
     brain.set_batches(batches, batch_labels)
-    # Inject electroaimant ON/OFF in batch 2 (index 1)
-    brain.set_batch_inject_actions({
-        (1, 0): [Action(ActionType.RELAIS_ON)],   # after batch2 target 0
-        (1, 1): [Action(ActionType.RELAIS_OFF)],  # after batch2 target 1
-    })
+    # Post-batch 2 : deploy/retract à l'infini (1s chaque) jusqu'à fin du match
+    # 15 cycles × 4 cmds = 60 (queue ESP32 = 64 slots max)
+    servo_loop: list[Action] = []
+    for _ in range(15):
+        servo_loop.append(Action(ActionType.DEPLOY))
+        servo_loop.append(Action(ActionType.WAIT, 1000))
+        servo_loop.append(Action(ActionType.RETRACT))
+        servo_loop.append(Action(ActionType.WAIT, 1000))
+    brain.set_post_batch_actions({2: servo_loop})   # batch index 2 = batch 3
     print(f"[INIT] Team={team.value} — {len(batches)} batches, "
           f"{len(exit_actions)} exit commands")
 

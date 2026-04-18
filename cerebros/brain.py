@@ -97,9 +97,11 @@ class Brain:
         self._exit_actions: List[Action] = []         # exit zone commands
         self._waiting_for_exit_queue_done: bool = False
         self._ble_bridge = None  # set via set_ble_bridge()
-        self._last_batch_wait_s: float = 87.0  # attendre 87s avant le dernier batch
+        self._last_batch_wait_s: float = 85.0  # attendre 85s avant le dernier batch
         self._batch_inject_actions: dict[tuple[int, int], List[Action]] = {}
         # key = (batch_idx, target_idx), value = actions to inject after reaching that target
+        self._post_batch_actions: dict[int, List[Action]] = {}
+        # key = batch_idx, value = actions to send right after batch completes
         self._batch_send_time: float = 0.0     # timestamp of last queue send
         self._queue_done_timeout_s: float = 15.0  # timeout if QUEUE_DONE never arrives
         # ── Monitoring ────────────────────────────────────────────────
@@ -149,6 +151,17 @@ class Brain:
         for (bi, ti), acts in inject.items():
             cmds = [a.to_command() for a in acts]
             print(f"[Brain] Inject batch {bi+1} après target {ti}: {cmds}")
+
+    def set_post_batch_actions(self, post: dict[int, List[Action]]) -> None:
+        """Définit des actions à envoyer juste après la fin d'un batch.
+
+        Args:
+            post: dict {batch_idx: [Action, ...]}. Envoyées directement
+                  via BLE après QUEUE_DONE du batch concerné.
+        """
+        self._post_batch_actions = dict(post)
+        for bi, acts in post.items():
+            print(f"[Brain] Post-batch {bi+1}: {len(acts)} actions")
 
     def set_batches(self, batches: List[List[Position]],
                     batch_labels: Optional[List[List[str]]] = None) -> None:
@@ -480,6 +493,7 @@ class Brain:
             if elapsed_ms >= config.MATCH_DURATION_MS:
                 print("[Brain] FIN DU MATCH — STOP")
                 self.executor.abort()
+                self.executor.send_command("STOP")
                 self.phase = BrainPhase.FINISHED
                 return
 
@@ -502,13 +516,23 @@ class Brain:
 
                 print(f"[Brain] QUEUE_DONE reçu — batch "
                       f"{self._current_batch_idx + 1} terminé")
+                completed_idx = self._current_batch_idx
                 self._current_batch_idx += 1
+
+                # Envoyer les post-batch actions si définies
+                if completed_idx in self._post_batch_actions:
+                    post_acts = self._post_batch_actions[completed_idx]
+                    print(f"[Brain] Envoi post-batch {completed_idx+1}: "
+                          f"{len(post_acts)} actions")
+                    self.action_queue.clear()
+                    self.action_queue.enqueue_many(post_acts)
+                    self.executor.send_full_queue()
 
                 if self._current_batch_idx >= len(self._batches):
                     print("[Brain] Tous les batches terminés!")
                     self.phase = BrainPhase.FINISHED
                 elif self._current_batch_idx == len(self._batches) - 1:
-                    # Dernier batch (retour au nid) : attendre 87s de match
+                    # Dernier batch (retour au nid) : attendre 85s de match
                     self.phase = BrainPhase.WAITING_TIMER
                     print(f"[Brain] Attente timer {self._last_batch_wait_s}s "
                           f"avant le dernier batch (retour au nid)...")
