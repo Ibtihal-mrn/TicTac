@@ -1,41 +1,39 @@
 #include "Relais.h"
 
-#include "../utils/Debug.h"
+// Variables internes au module
+static int _relayPin;
+static bool _activeLow;
+static bool _relayState = false;
 
-
-
-// Broche et type de relais
-static int relayPin;
-static bool relayActiveLow;
-static bool relayState = false; // false = OFF, true = ON
-
+// Configuration de la broche et extinction au demarrage
 void relais_init(int pin, bool activeLow) {
-    relayPin = pin;
-    relayActiveLow = activeLow;
-    pinMode(relayPin, OUTPUT);
+    _relayPin  = pin;
+    _activeLow = activeLow;
 
-    // Éteindre le relais au démarrage
-    if (relayActiveLow) digitalWrite(relayPin, HIGH);
-    else digitalWrite(relayPin, LOW);
+    pinMode(_relayPin, OUTPUT);
 
-    relayState = false;
-    Serial.print("Relais initialisé sur la broche ");
-    Serial.println(relayPin);
+    // Eteindre le relais au demarrage
+    relais_off();
+
+    Serial.print("Relais initialise sur la broche ");
+    Serial.println(_relayPin);
 }
 
+// Active le relais selon la logique active bas ou active haut
 void relais_on() {
-    digitalWrite(relayPin, relayActiveLow ? LOW : HIGH);
-    relayState = true;
-    // Serial.println("Relais ON");
-    debugPrintf(DBG_MAGNET, "AIMANT ON\n");
+    digitalWrite(_relayPin, _activeLow ? LOW : HIGH);
+    _relayState = true;
+    Serial.println("Electroaimant ON");
 }
 
+// Desactive le relais selon la logique active bas ou active haut
 void relais_off() {
-    digitalWrite(relayPin, relayActiveLow ? HIGH : LOW);
-    relayState = false;
-    Serial.println("Relais OFF");
+    digitalWrite(_relayPin, _activeLow ? HIGH : LOW);
+    _relayState = false;
+    Serial.println("Electroaimant OFF");
 }
 
+// Retourne l'etat actuel du relais
 bool relais_isOn() {
-    return relayState;
+    return _relayState;
 }

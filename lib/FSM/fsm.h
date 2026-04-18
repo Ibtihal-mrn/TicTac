@@ -14,7 +14,7 @@ enum class Robot {
 	EXEC,	          // Exec Commands
 	EXEC_WAIT,		  // Wait ms
     EXEC_SERVO,
-	EMERGENCY_STOP,   // Obstacle Detected (Hardware US)
+	EMERGENCY_STOP_US,   // Obstacle Detected (Hardware US)
 	
 	// EXEC_MOVE,
 	// EXEC_ROTATE,
@@ -31,7 +31,7 @@ static const char* const stateList[] = {
     "DISPATCH_CMD",
     "EXEC",
     "EXEC_WAIT",
-    "EMERGENCY_STOP",
+    "EMERGENCY_STOP_US",
     "TIMER_END"
 };
 
@@ -45,6 +45,8 @@ enum class CommandType {
     Wait,
     DeployServo,
     RetractServo,
+    RelaisOn,
+    RelaisOff,
 
     //
     Ping,
@@ -82,7 +84,9 @@ struct Context {
 };
 
 
-
+// Match timer
+void startMatchTimer(Context& ctx);
+bool isMatchTimeEnded(const Context& ctx);
 
 // Fsm
 void fsm_init(Context& ctx, QueueHandle_t cmdQueue);

@@ -160,12 +160,12 @@ class WorldState:
                     grid_y=grid_y,
                 )
                 self.objects[obj_key] = obj
-                if DEBUG:
-                    print(f"[WorldState] Nouvel objet détecté : {obj}")
+                # if DEBUG:
+                #     print(f"[WorldState] Nouvel objet détecté : {obj}")
 
-        if DEBUG:
-            print(f"[WorldState] Update: {len(detections)} détections, "
-                  f"{len(self.objects)} objets en mémoire")
+        # if DEBUG:
+        #     print(f"[WorldState] Update: {len(detections)} détections, "
+        #           f"{len(self.objects)} objets en mémoire")
 
     def _update_ally_robot(self, marker_id: int, label: str,
                            pos_mm: Position) -> None:

@@ -36,10 +36,10 @@
 
 
 //! TEST : 
-//!        FRONT | US1 (8 , 9 ) | US2 (1, 2)    | US3 (4, 5) | 
-//!        RIGHT | US4 (6 , 7 ) | US5 (15, 16)  |
-//!        BACK  | US6 (/, /)   | US7 (/, /)    | US8 (/, /) | 
-//!        LEFT  | US9 (40, 39) | US10 (42, 41) | 
+//!        FRONT | US0 (39 , 40) | US1 (10, 11)  | US2 (4, 5) 
+//!        RIGHT | US3 (6 , 7 )  | US4 (17, 18)  |
+//!        BACK  | US5 (15, 16)  | US6 (8, 9  )  |  
+//!        LEFT  | US7 (21, 38)  | US8 (41, 42)  | US9 (2, 1)  
 
 
 // I2C
@@ -54,49 +54,54 @@ extern uint8_t US_OBSTACLE_CLEAR_CM;     // to prevent bouncing, implement hyste
 #define STOP_HOLD_MS        150   // sensor-level debounce
 #define STOP_CLEAR_HOLD_MS  800  // hub-level stop release hold
 
+//! TEST : 
+//!        FRONT | US0 (39 , 40) | US1 (10, 11)  | US2 (4, 5) 
+//!        RIGHT | US3 (6 , 7 )  | US4 (17, 18)  |
+//!        BACK  | US5 (15, 16)  | US6 (8, 9  )  | US7 (21, 38)
+//!        LEFT  | US8 (41, 42)  | US9 (2, 1)  
 
 // ==================
 //       FRONT
 // ==================
-#define US_F1_TRIG 8     // Left
-#define US_F1_ECHO 9
+#define US_F0_TRIG 40     // Left
+#define US_F0_ECHO 39
 
-#define US_F2_TRIG  1    // Middle
-#define US_F2_ECHO  2
+#define US_F1_TRIG 10     // Middle
+#define US_F1_ECHO 11
 
-#define US_F3_TRIG  4    // Rigth
-#define US_F3_ECHO  5
+#define US_F2_TRIG  4    // Rigth
+#define US_F2_ECHO  5
 
 // ==================
 //        RIGHT
 // ==================
-#define US_R1_TRIG  6    // Left
-#define US_R1_ECHO  7
-#define US_R2_TRIG  15   // Middle
-#define US_R2_ECHO  16
-// #define US_R3_TRIG      // Rigth
-// #define US_R3_ECHO
+#define US_R3_TRIG  6    // Left
+#define US_R3_ECHO  7
+
+#define US_R4_TRIG  17   // Rigth
+#define US_R4_ECHO  18
 
 // ==========
 //   BACK
 // ==========
-#define US_B1_TRIG   // Left
-#define US_B1_ECHO
-#define US_B2_TRIG   // Middle
-#define US_B2_ECHO
-#define US_B3_TRIG   // Rigth
-#define US_B3_ECHO
+#define US_B5_TRIG  15   // Left
+#define US_B5_ECHO  16
+
+#define US_B6_TRIG  8   // Middle
+#define US_B6_ECHO  9
+
+#define US_B7_TRIG  38 // Rigth
+#define US_B7_ECHO  21
 
 
 // ==================
 //       LEFT
 // ==================
-#define US_L1_TRIG  40     // Left
-#define US_L1_ECHO  39
-#define US_L2_TRIG  42  // Middle
-#define US_L2_ECHO  41
-// #define US_L3_TRIG      // Rigth
-// #define US_L3_ECHO 
+#define US_L8_TRIG  42     // Left
+#define US_L8_ECHO  41
+
+#define US_L9_TRIG  1  // Right
+#define US_L9_ECHO  2
 
 
 

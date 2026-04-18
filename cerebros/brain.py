@@ -94,7 +94,16 @@ class Brain:
         self._batches: List[List[Position]] = []     # list of target batches
         self._batch_labels: List[List[str]] = []     # labels per batch
         self._current_batch_idx: int = 0
-        self._ble_bridge = None  # set via set_ble_bridge()        self._last_batch_wait_s: float = 87.0  # attendre 87s avant le dernier batch
+        self._exit_actions: List[Action] = []         # exit zone commands
+        self._waiting_for_exit_queue_done: bool = False
+        self._ble_bridge = None  # set via set_ble_bridge()
+        self._last_batch_wait_s: float = 85.0  # attendre 85s avant le dernier batch
+        self._batch_inject_actions: dict[tuple[int, int], List[Action]] = {}
+        # key = (batch_idx, target_idx), value = actions to inject after reaching that target
+        self._post_batch_actions: dict[int, List[Action]] = {}
+        # key = batch_idx, value = actions to send right after batch completes
+        self._batch_send_time: float = 0.0     # timestamp of last queue send
+        self._queue_done_timeout_s: float = 15.0  # timeout if QUEUE_DONE never arrives
         # ── Monitoring ────────────────────────────────────────────────
         self._monitoring_deviation_threshold_mm = config.REPLAN_DISTANCE_MM
         self._monitoring_stuck_ticks = 0
@@ -123,6 +132,36 @@ class Brain:
     def set_ble_bridge(self, ble) -> None:
         """Branche le bridge BLE pour détecter QUEUE_DONE."""
         self._ble_bridge = ble
+
+    def set_exit_actions(self, actions: List[Action]) -> None:
+        """Définit les commandes de sortie de zone (envoyées avant le batch 1)."""
+        self._exit_actions = list(actions)
+        print(f"[Brain] {len(actions)} exit actions définies: "
+              f"{[a.to_command() for a in actions]}")
+
+    def set_batch_inject_actions(self, inject: dict[tuple[int, int], List[Action]]) -> None:
+        """Définit des actions à injecter après certains targets dans un batch.
+
+        Args:
+            inject: dict {(batch_idx, target_idx): [Action, ...]}.
+                    Les actions seront insérées dans la queue après avoir
+                    atteint le target target_idx du batch batch_idx.
+        """
+        self._batch_inject_actions = dict(inject)
+        for (bi, ti), acts in inject.items():
+            cmds = [a.to_command() for a in acts]
+            print(f"[Brain] Inject batch {bi+1} après target {ti}: {cmds}")
+
+    def set_post_batch_actions(self, post: dict[int, List[Action]]) -> None:
+        """Définit des actions à envoyer juste après la fin d'un batch.
+
+        Args:
+            post: dict {batch_idx: [Action, ...]}. Envoyées directement
+                  via BLE après QUEUE_DONE du batch concerné.
+        """
+        self._post_batch_actions = dict(post)
+        for bi, acts in post.items():
+            print(f"[Brain] Post-batch {bi+1}: {len(acts)} actions")
 
     def set_batches(self, batches: List[List[Position]],
                     batch_labels: Optional[List[List[str]]] = None) -> None:
@@ -167,8 +206,13 @@ class Brain:
                 print(f"[Brain] Heading vision: {robot_heading:.1f}°")
 
         # Compter les frames vision pendant le recalcul inter-batch
+        # Ne compter que si le robot est réellement détecté dans cette frame
         if self.phase == BrainPhase.WAITING_RECALC:
-            self._recalc_vision_frames = getattr(self, '_recalc_vision_frames', 0) + 1
+            robot_seen = any(label == self.robot.robot_id for label, _, _ in detections)
+            if robot_seen:
+                self._recalc_vision_frames = getattr(self, '_recalc_vision_frames', 0) + 1
+            else:
+                self._recalc_vision_frames = 0  # reset si le robot n'est plus vu
 
     # ══════════════════════════════════════════════════════════════════
     # PHASE 1 — INIT : Planification A* avant la tirette
@@ -293,9 +337,11 @@ class Brain:
             # Multi-batch mode : envoyer le FORWARD de sortie seul,
             # puis attendre QUEUE_DONE avant de calculer le batch 1.
             self._current_batch_idx = 0
+            self._waiting_for_exit_queue_done = True
             self._send_exit_forward()
         else:
             # Legacy mode : queue unique déjà remplie par init_plan
+            self._waiting_for_exit_queue_done = False
             print(f"[Brain] Actions en queue: {self.action_queue.size}")
             self.executor.send_full_queue()
             self.phase = BrainPhase.RUNNING_BATCH
@@ -303,6 +349,7 @@ class Brain:
         print("=" * 60 + "\n")
 
     def _send_exit_forward(self) -> None:
+<<<<<<< HEAD
         """Envoie la séquence de sortie de zone hardcodée, avant le batch 1."""
         exit_mm = config.EXIT_ZONE_MM
         # BLUE tourne à droite (-90°), YELLOW tourne à gauche (+90°)
@@ -316,11 +363,33 @@ class Brain:
             Action(ActionType.ROTATE, rotate_angle),
             Action(ActionType.FORWARD, exit_mm),
         ])
+=======
+        """Envoie la séquence de sortie de zone avant le batch 1."""
+        if self._exit_actions:
+            actions = self._exit_actions
+        else:
+            # fallback si pas d'exit_actions définies
+            exit_mm = config.EXIT_ZONE_MM
+            rotate_angle = -90 if self.robot.team == Team.BLUE else 90
+            actions = [
+                Action(ActionType.FORWARD, exit_mm),
+                Action(ActionType.ROTATE, rotate_angle),
+                Action(ActionType.FORWARD, exit_mm),
+            ]
+
+        cmds = [a.to_command() for a in actions]
+        print(f"[Brain] Envoi séquence sortie de zone: {' → '.join(cmds)} "
+              f"— batch 1 calculé après QUEUE_DONE")
+
+        self.action_queue.clear()
+        self.action_queue.enqueue_many(actions)
+>>>>>>> esp32s3
         self.executor.send_full_queue()
 
         if self._ble_bridge:
             self._ble_bridge.clear_queue_done()
 
+        self._batch_send_time = time.time()
         self.phase = BrainPhase.RUNNING_BATCH
 
     def _plan_and_send_current_batch(self) -> bool:
@@ -347,25 +416,70 @@ class Brain:
 
         # Point de départ : position caméra actuelle
         start_pos = Position(self.robot.position.x, self.robot.position.y)
+        has_injects = any((idx, ti) in self._batch_inject_actions
+                          for ti in range(len(targets)))
 
-        # A*
-        full_path = self.planner.plan_full_route(start_pos, targets, obstacles)
-        if len(full_path) < 2:
-            print(f"[Brain] Batch {idx + 1}: échec A* — skip")
-            self._current_batch_idx += 1
-            # On repasse en WAITING_RECALC pour retenter au prochain tick
-            self.phase = BrainPhase.WAITING_RECALC
-            self._recalc_vision_frames = 0
-            return False
+        if has_injects:
+            # Plan per-segment so we can inject actions between targets
+            actions: List[Action] = []
+            full_path: List[Position] = []
+            current_pos = start_pos
+            heading = self.robot.heading_deg
+
+            for ti, target in enumerate(targets):
+                segment = self.planner.plan_path(current_pos, target, obstacles)
+                if len(segment) < 2:
+                    print(f"[Brain] Batch {idx+1} segment {ti}: échec A*")
+                    continue
+                if full_path and segment:
+                    segment = segment[1:]
+                full_path.extend(segment)
+
+                seg_actions = self.planner.path_to_actions(
+                    [current_pos] + segment, heading, deploy_at_end=False)
+                actions.extend(seg_actions)
+
+                # Update heading from last segment direction
+                if len(segment) >= 2:
+                    heading = segment[-2].angle_to(segment[-1])
+                elif seg_actions:
+                    for a in reversed(seg_actions):
+                        if a.action_type == ActionType.ROTATE and a.value is not None:
+                            heading += a.value
+                            break
+
+                # Inject extra actions after this target
+                inject_key = (idx, ti)
+                if inject_key in self._batch_inject_actions:
+                    extra = self._batch_inject_actions[inject_key]
+                    actions.extend(extra)
+                    cmds = [a.to_command() for a in extra]
+                    print(f"[Brain] Inject après target {ti}: {cmds}")
+
+                current_pos = target
+
+            if not full_path or not actions:
+                print(f"[Brain] Batch {idx + 1}: échec A* — skip")
+                self._current_batch_idx += 1
+                self.phase = BrainPhase.WAITING_RECALC
+                self._recalc_vision_frames = 0
+                return False
+        else:
+            # Standard path: plan all targets at once
+            full_path = self.planner.plan_full_route(start_pos, targets, obstacles)
+            if len(full_path) < 2:
+                print(f"[Brain] Batch {idx + 1}: échec A* — skip")
+                self._current_batch_idx += 1
+                self.phase = BrainPhase.WAITING_RECALC
+                self._recalc_vision_frames = 0
+                return False
+            actions = self.planner.path_to_actions(
+                full_path, self.robot.heading_deg, deploy_at_end=False)
 
         # Stocker pour visualisation
         self.planned_path = list(full_path)
         self.planned_targets = list(targets)
         self.planned_target_labels = list(labels)
-
-        # Convertir en actions
-        actions = self.planner.path_to_actions(
-            full_path, self.robot.heading_deg, deploy_at_end=False)
 
         # Envoyer
         self.action_queue.clear()
@@ -376,9 +490,11 @@ class Brain:
         if self._ble_bridge:
             self._ble_bridge.clear_queue_done()
 
+        self._batch_send_time = time.time()
         self.phase = BrainPhase.RUNNING_BATCH
         print(f"[Brain] Batch {idx + 1} envoyé: {len(actions)} actions")
         return True
+
 
     def tick(self) -> None:
         """Un cycle de la boucle principale. Appeler à ~10 Hz."""
@@ -393,21 +509,46 @@ class Brain:
             if elapsed_ms >= config.MATCH_DURATION_MS:
                 print("[Brain] FIN DU MATCH — STOP")
                 self.executor.abort()
+                self.executor.send_command("STOP")
                 self.phase = BrainPhase.FINISHED
                 return
 
         # ── RUNNING_BATCH : attendre QUEUE_DONE du robot ─────────────
         if self.phase == BrainPhase.RUNNING_BATCH:
-            if self._ble_bridge and self._ble_bridge.queue_done:
+            queue_done = self._ble_bridge and self._ble_bridge.queue_done
+            timed_out = (time.time() - self._batch_send_time
+                         >= self._queue_done_timeout_s)
+            if timed_out and not queue_done:
+                print(f"[Brain] TIMEOUT {self._queue_done_timeout_s}s — "
+                      f"QUEUE_DONE non reçu, on continue quand même")
+            if queue_done or timed_out:
+                if self._waiting_for_exit_queue_done:
+                    self._waiting_for_exit_queue_done = False
+                    print("[Brain] QUEUE_DONE reçu — sortie de zone terminée")
+                    self.phase = BrainPhase.WAITING_RECALC
+                    self._recalc_vision_frames = 0
+                    print("[Brain] Attente de vision stable pour batch 1...")
+                    return
+
                 print(f"[Brain] QUEUE_DONE reçu — batch "
                       f"{self._current_batch_idx + 1} terminé")
+                completed_idx = self._current_batch_idx
                 self._current_batch_idx += 1
+
+                # Envoyer les post-batch actions si définies
+                if completed_idx in self._post_batch_actions:
+                    post_acts = self._post_batch_actions[completed_idx]
+                    print(f"[Brain] Envoi post-batch {completed_idx+1}: "
+                          f"{len(post_acts)} actions")
+                    self.action_queue.clear()
+                    self.action_queue.enqueue_many(post_acts)
+                    self.executor.send_full_queue()
 
                 if self._current_batch_idx >= len(self._batches):
                     print("[Brain] Tous les batches terminés!")
                     self.phase = BrainPhase.FINISHED
                 elif self._current_batch_idx == len(self._batches) - 1:
-                    # Dernier batch (retour au nid) : attendre 87s de match
+                    # Dernier batch (retour au nid) : attendre 85s de match
                     self.phase = BrainPhase.WAITING_TIMER
                     print(f"[Brain] Attente timer {self._last_batch_wait_s}s "
                           f"avant le dernier batch (retour au nid)...")

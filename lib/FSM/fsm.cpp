@@ -3,13 +3,17 @@
 #include "../../src/globals.h"
 
 #include "motors.h"
+#include "bras.h"
 #include "encoders.h"
 #include "us.h"
 #include "imu.h"
 #include "pid.h"
+#include "Relais.h"
 
 // #include "control.h"
 // #include "kinematics.h"
+#include "StartSwitch.h"
+#include "TeamSwitch.h"
 
 //
 #include "utils.h"
@@ -19,45 +23,12 @@
 // I2C sensors
 #include "i2c_comm.h"
 
-
-
 Motors motors(ENA, IN1, IN2, ENB, IN3, IN4);
 static PIDController motion(motors);
+StartSwitch startSwitch(GPIO_NUM_38);
+TeamSwitch teamSwitch((gpio_num_t)TEAM_SWITCH_PIN);
 
-
-
-
-
-void hardware_init(Context &ctx)
-{
-    // To be called in setup() in main.cpp
-
-    // motors_init();
-    encoders_init();
-    // ultrasonic_init(13, 10);  // trig, echo
-    // safety_init(40, 50);      // 40cm seuil, sonar toutes les 50ms
-
-    // IMU
-    if (!imu_init())
-    {
-        Serial.println("MPU6050 FAIL.");
-    } else
-    {
-        delay(200);
-        Serial.println("MPU6050 connected.");
-        imu_calibrate(600, 2); // ~1.2s, robot immobile
-        // Serial.println("IMU calibrated");
-    }
-
-    // Init Match Timer
-    // ctx.matchActive = false;
-    // ctx.matchDurationMs = MATCH_DURATION_MS;
-    // ctx.matchStartMs = 0;
-    // debugPrintf(DBG_FSM, "FSM -> INIT");
-    // ctx.currentAction = Robot::INIT;
-    // ctx.currentTeam = Team::TEAM_YELLOW;
-}
-
+// ------- INITS ---------
 void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
     
     // Init freeRtos Queue
@@ -79,6 +50,53 @@ void fsm_init(Context& ctx, QueueHandle_t cmdQueue) {
 
 }
 
+void hardware_init(Context &ctx)
+{
+    // To be called in setup() in main.cpp
+    bras_init();
+    encoders_init();
+
+    // Init relais
+    relais_init(RELAY_PIN, true);
+
+    // IMU
+    if (!imu_init())
+    {
+        Serial.println("MPU6050 FAIL.");
+    } else
+    {
+        delay(200);
+        Serial.println("MPU6050 connected.");
+        imu_calibrate(600, 2); // ~1.2s, robot immobile
+        // Serial.println("IMU calibrated");
+    }
+
+    // Init Match Timer
+    ctx.matchActive = false;
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+    ctx.matchStartMs = 0;
+    debugPrintf(DBG_FSM, "FSM -> INIT");
+    ctx.currentAction = Robot::INIT;
+
+    // Read switch
+    bool team = 0;  //TODO read teamswitch
+    ctx.currentTeam = Team::TEAM_YELLOW;    // TODO: read TeamSwicth
+    // heartbeatTeamName(); // done in main.cpp
+}
+
+
+// Match Timer
+void startMatchTimer(Context& ctx) {
+    ctx.matchActive = true;
+    ctx.matchStartMs = millis();
+    ctx.matchDurationMs = MATCH_DURATION_MS;
+}
+
+bool isMatchTimeEnded(const Context& ctx) {
+    return ctx.matchActive && (millis() - ctx.matchStartMs >= ctx.matchDurationMs);
+}
+
+
 
 // ---- US obstacle movement -------
 void driveForward(float mm, int speed) {
@@ -98,34 +116,27 @@ void rotate(float angle, int speed) {
 
 // ------- ROUTINES ----------
 void testRotation(Context &ctx){
-    // debugEnable(DBG_IMU);
-    // clear queue
-    // ctx.commandQueue = std::queue<RobotCommand>(); 
-    // Serial.println("[TEST] rotation sequence start");
+    RobotCommand rot1{CommandType::Rotate, 90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot1, 0);
+    RobotCommand wait1{CommandType::Wait}; xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand rot2{CommandType::Rotate, -90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand rot3{CommandType::Rotate, 360.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot3, 0);
 
 
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 80, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 80, 0});
 
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, 180.0f, 100, 0});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Wait, 0.0f, 0, 3000});
-    // ctx.commandQueue.push(RobotCommand{CommandType::Rotate, -180.0f, 100, 0});
-
-
-    Serial.print("[TEST] queued=");
-    // Serial.println(ctx.commandQueue.size());
 }
 void testLinearMotion(Context &ctx){
     if (!ctx.commandQueue) return;
 
-    RobotCommand move1{CommandType::MoveForward, 1000.0f, 80, 0};
+    RobotCommand move1{CommandType::MoveForward, 1000.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move1, 0);
 
     RobotCommand wait1{CommandType::Wait, 0.0f, 0, 5000};
     xQueueSendToBack(ctx.commandQueue, &wait1, 0);
 
-    RobotCommand move2{CommandType::MoveForward, 900.0f, 200, 0};
+    RobotCommand move2{CommandType::MoveBackward, 900.0f, 200, 0};
     xQueueSendToBack(ctx.commandQueue, &move2, 0);
     
 //     RobotCommand rotate1{CommandType::Rotate, 90.0f, 200, 0};
@@ -135,19 +146,91 @@ void testLinearMotion(Context &ctx){
 //     xQueueSendToBack(ctx.commandQueue, &rotate2, 0);
 }
 
-void enqueueTestRotation(QueueHandle_t q) {  //TODO: test this
-    RobotCommand cmd;
-    cmd.type = CommandType::Rotate;
-    cmd.value = 180.0f;
-    cmd.speed = 80;
-    cmd.waitMs = 0;
-    xQueueSendToBack(q, &cmd, 0);
+void testServos(Context &ctx){
+    if (!ctx.commandQueue) return;
 
-    cmd.type = CommandType::Wait;
-    cmd.value = 0;
-    cmd.speed = 0;
-    cmd.waitMs = 3000;
-    xQueueSendToBack(q, &cmd, 0);
+    RobotCommand deploy1{CommandType::DeployServo};
+    xQueueSendToBack(ctx.commandQueue, &deploy1, 0);
+
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand retract1{CommandType::RetractServo};
+    xQueueSendToBack(ctx.commandQueue, &retract1, 0);
+}
+
+
+void testElectroAimant(Context &ctx){
+    // ========= SEQUENCE ELECTROAIMANT =========
+    // Avancer 10 cm
+    RobotCommand move1{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move1, 0);
+
+    // Arrêt 2 secondes + relais on pendant ce temps
+    RobotCommand wait1{CommandType::Wait, 0.0f, 0, 2000};
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    RobotCommand relOn{CommandType::RelaisOn, 0.0f, 0, 0};
+    xQueueSendToBack(ctx.commandQueue, &relOn, 0);
+
+    // Avancer 10 cm relais actif
+    RobotCommand move2{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move2, 0);
+
+    // Relais off
+    RobotCommand relOff{CommandType::RelaisOff, 0.0f, 0, 0};
+    xQueueSendToBack(ctx.commandQueue, &relOff, 0);
+
+    // Continuer 10 cm
+    RobotCommand move3{CommandType::MoveForward, 100.0f, 200, 0};
+    xQueueSendToBack(ctx.commandQueue, &move3, 0);
+}
+
+void competitionRoutine(Context &ctx){
+    if (!ctx.commandQueue) return;
+
+    // SERVO
+    RobotCommand servo1{CommandType::DeployServo}; xQueueSendToBack(ctx.commandQueue, &servo1, 0);
+    RobotCommand wait1{CommandType::Wait}; xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+    RobotCommand servo2{CommandType::RetractServo}; xQueueSendToBack(ctx.commandQueue, &servo2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+
+    // MOVE FORWARD 130cm-à
+    RobotCommand move1{CommandType::MoveForward, 1690.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move1, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // ROTATE -90°s
+    RobotCommand rot1{CommandType::Rotate, 90.0f, 80, 0}; xQueueSendToBack(ctx.commandQueue, &rot1, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MOVE FORWARD 30cm
+    RobotCommand move2{CommandType::MoveForward, 500.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // ROTATE -90°
+    RobotCommand rot2{CommandType::Rotate, 80.0f, 90, 0}; xQueueSendToBack(ctx.commandQueue, &rot2, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MOVE FORWARD 150cm
+    RobotCommand move3{CommandType::MoveForward, 1700.0f, 200, 0}; xQueueSendToBack(ctx.commandQueue, &move3, 0);
+    xQueueSendToBack(ctx.commandQueue, &wait1, 0);
+
+    // MANGER :  SERVO FINISHER: 20 deploy/retract cycles
+    for (int i = 0; i < 20; i++) {
+        RobotCommand deploy{CommandType::DeployServo};
+        xQueueSendToBack(ctx.commandQueue, &deploy, 0);
+
+        RobotCommand waitDeploy{CommandType::Wait, 0.0f, 0, 300};
+        xQueueSendToBack(ctx.commandQueue, &waitDeploy, 0);
+
+        RobotCommand retract{CommandType::RetractServo};
+        xQueueSendToBack(ctx.commandQueue, &retract, 0);
+
+        RobotCommand waitRetract{CommandType::Wait, 0.0f, 0, 300};
+        xQueueSendToBack(ctx.commandQueue, &waitRetract, 0);
+    }
+
 }
 
 
@@ -186,34 +269,7 @@ static void clearCommandQueue(QueueHandle_t q) {
 }
 
 
-// ========== FSM ============
-void robot_step(Context &ctx)
-{
-    if (emergencyStopUS) {
-        // motion.abort();
-        // emergencyStopUS = false;
-        // ctx.currentAction = Robot::EMERGENCY_STOP;
-        static unsigned long Lpwm = 0;
-        if (millis() - Lpwm >= 2000){
-            bleSerial.println("emergencyStopUS");
-            Lpwm = millis();
-        }
-    }
-
-    // BLE Stop & Updates
-    if (bleStopRequested) {
-        motion.abort();
-        clearCommandQueue(ctx.commandQueue);
-        ctx.queueWasRunning = false;  // Eviter un faux QUEUE_DONE apres STOP
-        ctx.currentAction = Robot::DISPATCH_CMD;
-        bleStopRequested = false;
-
-        Serial.println("[FSM] BLE STOP");
-        bleSerial.println("[FSM] BLE STOP");
-        return;
-    }
-
-    // DBG
+void debugPrints(Context &ctx){
     #if DBG_FSM
         static unsigned long lastStatePrintMs = 0;
         if (millis() - lastStatePrintMs >= 2000) {
@@ -228,29 +284,86 @@ void robot_step(Context &ctx)
     #endif
     // printIMUVal();
     // printIMUAngleTest();
-    // printEncodersVal();
+    printEncodersVal();
     
+}
 
+// Stop Conditions
+void US_STOP(Context &ctx){
+    if (emergencyStopUS) {
+        motion.abort();
+        emergencyStopUS = false;
+        ctx.currentAction = Robot::EMERGENCY_STOP_US;
+        static unsigned long Lpwm = 0;
+        if (millis() - Lpwm >= 2000){ bleSerial.println("emergencyStopUS"); Lpwm = millis(); }
+
+        // Turn On builtin led
+        #ifdef LED_BUILTIN
+            digitalWrite(LED_BUILTIN, HIGH);
+        #endif
+    }
+}
+void BLE_STOP(Context &ctx){
+    if (bleStopRequested) {
+        motion.abort();
+        clearCommandQueue(ctx.commandQueue);
+        ctx.queueWasRunning = false;
+        ctx.currentAction = Robot::DISPATCH_CMD;
+        bleStopRequested = false;
+
+        Serial.println("[FSM] BLE STOP");
+        bleSerial.println("[FSM] BLE STOP");
+        // return true;
+    // } else { return false;}
+    }
+}
+
+
+// ========== FSM ============
+void robot_step(Context &ctx)
+{
+
+    // Stop Conditions
+    BLE_STOP(ctx);
+    if(ctx.currentAction == Robot::EXEC) US_STOP(ctx);   //TODO: only apply for mvmnt, not servo ?
+    
+    // US obstacle LED
+    if (emergencyStopUS) { digitalWrite(LED_BUILTIN, HIGH);} else{digitalWrite(LED_BUILTIN, LOW);}
+
+    // DBG
+    debugPrints(ctx);
+    
+    // Match time end check
+    if (isMatchTimeEnded(ctx)) { ctx.currentAction = Robot::TIMER_END; }
 
     // ===================================================
     switch (ctx.currentAction)
     {   
         case Robot::INIT:
-
             // MOVE COMMANDS
-            // testRotation(ctx);
+            testRotation(ctx);
             // testLinearMotion(ctx);
-
-
+            // testServos(ctx);
+            // testElectroAimant(ctx);
+            ;
+            // competitionRoutine(ctx);
             ctx.currentAction = Robot::WAIT_START;
             break;
 
         case Robot::WAIT_START:
             // ADD LaunchTrigger HERE
-            // start 100sec timer
-            // startMatchTimer(ctx);
-            // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
-            ctx.currentAction = Robot::DISPATCH_CMD;
+            startSwitch.begin();
+            if (startSwitch.isInserted()) {
+                // start 100sec timer
+                startMatchTimer(ctx);    // TODO
+
+                
+                // debugPrintf(DBG_FSM, "FSM -> DISPATCH_CMD");
+                ctx.currentAction = Robot::DISPATCH_CMD;
+            }
+            // startSwitch.waitForStart();
+
+            
             break;
 
 
@@ -260,14 +373,15 @@ void robot_step(Context &ctx)
 
             // 2. Get next command
             if (xQueueReceive(ctx.commandQueue, &ctx.currentCommand, 0) != pdTRUE) {
-                // Queue vide après exécution → notifier le PC
                 if (ctx.queueWasRunning) {
-                    bleSerial.println("[EVENT] QUEUE_DONE");
-                    Serial.println("[FSM] QUEUE_DONE — all commands executed");
                     ctx.queueWasRunning = false;
+                    Serial.println("[FSM] Queue terminee");
+                    bleBridge.sendLog("[EVENT] QUEUE_DONE");
                 }
+                ctx.currentAction = Robot::IDLE;
                 break;
             }
+
             ctx.queueWasRunning = true;
 
 
@@ -300,13 +414,27 @@ void robot_step(Context &ctx)
                     ctx.currentAction = Robot::EXEC_WAIT;
                     break;
 
+                // Controle electroaimant
+                case CommandType::RelaisOn:
+                    relais_on();
+                    ctx.currentAction = Robot::DISPATCH_CMD;
+                    break;
+
+                case CommandType::RelaisOff:
+                    relais_off();
+                    ctx.currentAction = Robot::DISPATCH_CMD;
+                    break;
+
                 case CommandType::DeployServo:
+                    bras_deployer();
                     break;
                 case CommandType::RetractServo:
+                    bras_retracter();
                     break;
 
                 case CommandType::ClearQueue:
                     clearCommandQueue(ctx.commandQueue);
+                    ctx.queueWasRunning = false;
                     break;
 
 
@@ -317,6 +445,10 @@ void robot_step(Context &ctx)
 
 
         case Robot::IDLE:
+            // Vérifier si de nouvelles commandes BLE sont arrivées
+            if (ctx.commandQueue && uxQueueMessagesWaiting(ctx.commandQueue) > 0) {
+                ctx.currentAction = Robot::DISPATCH_CMD;
+            }
             break;
 
         case Robot::EXEC:
@@ -341,11 +473,16 @@ void robot_step(Context &ctx)
                     : Robot::IDLE;            }
             break;
 
-        case Robot::EMERGENCY_STOP:
+        case Robot::EMERGENCY_STOP_US:
             motion.abort();
             if (digitalRead(STOP_PIN) == LOW) {
                 emergencyStopUS = false;
-                ctx.currentAction = Robot::IDLE;
+                ctx.currentAction = Robot::DISPATCH_CMD;
+
+                // Turn off builtin led
+                #ifdef LED_BUILTIN
+                    digitalWrite(LED_BUILTIN, LOW);
+                #endif
             }
             break;
 

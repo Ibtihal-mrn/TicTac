@@ -52,6 +52,11 @@ void StartSwitch::waitForStart()
     // attendre insertion
     while (!isInserted())
     {
+        static unsigned long lastStatePrintMs = 0;
+        if (millis() - lastStatePrintMs >= 2000) {
+            Serial.print("Wait for start");
+            lastStatePrintMs = millis();
+        }
         delay(5);
     }
 

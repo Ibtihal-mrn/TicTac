@@ -4,13 +4,28 @@
 // Hardware
 #include "../lib/UltrasonicFunction/us.h" 
 #include "i2c_comm.h"
-
-
-// Config & Debug prints
 #include "utils.h"
 #include "Debug.h"
 // #include "config.h"  // do not add
 #include "config_coprocessor.h"
+
+
+/* --------------- Coprocessor Hub : ----------------------
+    This Hub controls 10 US set in zones that can be activated or not.
+    
+    -> There are 2 layers :
+        1. Per sensor hysteresis : 
+                - Debounce : sensor must be under thresh for x ms before triggering a stop 
+                - Hysteresis : 
+                        - Triggers when dist < US_OBSTACLE_THRESHOLD_CM for at least STOP_HOLD_MS
+                        - Clears   when dist > US_OBSTACLE_CLEAR_CM     for at least STOP_HOLD_MS
+        2. Debounce STOP pin :
+                - When 1 US triggers, it can trigger the global STOP_PIN (sent to the robot).
+                a.ka : based on all US detections, how fast can i write the STOP_PIN ?
+                - STOP happens immediately (whichever US triggers, after his hysteresis, always triggers a stop)
+                - only CLEAR after 2000ms of not a single US detecting any obstacle.
+*/
+
 
 
 
@@ -32,9 +47,6 @@ uint8_t US_OBSTACLE_THRESHOLD_CM = 17;
 uint8_t US_OBSTACLE_CLEAR_CM     = 20;  // initial values
 
 // debug prints for Hysterisis debounce resilience
-static bool stopState = false;
-static unsigned long lastStopChange = 0;
-static bool lastStopState = false; // only for debug prints
 
 
 
@@ -93,7 +105,8 @@ const char* zoneName(uint8_t zone) {
     }
 }
 
-void debugSensors(bool stopState) {
+static void printHubStatus(bool stopState) {
+#if DEBUG
     static unsigned long lastPrint = 0;
     const unsigned long PRINT_MS = 250;
 
@@ -105,7 +118,7 @@ void debugSensors(bool stopState) {
     Serial.print(F("STOP: "));
     Serial.println(stopState ? F("TRIGGERED") : F("CLEAR"));
 
-    const uint8_t zones[] = {ZONE_FRONT, ZONE_LEFT, ZONE_RIGHT, ZONE_BACK};
+    const uint8_t zones[] = {ZONE_FRONT, ZONE_RIGHT, ZONE_BACK, ZONE_LEFT};
 
     for (uint8_t z = 0; z < 4; z++) {
         uint8_t zone = zones[z];
@@ -135,20 +148,33 @@ void debugSensors(bool stopState) {
     }
 
     Serial.println(F("============================"));
+#endif
 }
 
 
-//TODO: remove this duplicate fn
-void debugStopPinState(bool currentState){
-    // ONLY toggle the lastStopState to print when stopPin is on or off
-    if (currentState != lastStopState) {
-        lastStopState = currentState;
 
-        Serial.print("STOP → ");
-        Serial.println(currentState ? "TRIGGERED" : "CLEARED");
-    }
+
+// ------- Helpers
+void setupUS(){
+    // FRONT
+    us_add(ZONE_FRONT, US_F0_TRIG, US_F0_ECHO);
+    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
+    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
+
+    // RIGHT
+    us_add(ZONE_RIGHT, US_R3_TRIG, US_R3_ECHO);
+    us_add(ZONE_RIGHT, US_R4_TRIG, US_R4_ECHO);
+
+    // BACK
+    us_add(ZONE_BACK, US_B5_TRIG, US_B5_ECHO);
+    us_add(ZONE_BACK, US_B6_TRIG, US_B6_ECHO);
+    us_add(ZONE_BACK, US_B7_TRIG, US_B7_ECHO);
+
+    // LEFT
+    us_add(ZONE_LEFT, US_L8_TRIG, US_L8_ECHO);
+    us_add(ZONE_LEFT, US_L9_TRIG, US_L9_ECHO);
+
 }
-
 
 void updatePacket(bool stopState){
     packet.front_mm = us_getDistanceForZone(ZONE_FRONT);
@@ -158,7 +184,7 @@ void updatePacket(bool stopState){
 
     packet.danger_flags = stopState ? 1 : 0;
 
-    if (true)return;
+    // if (true)return;
 
     #if DEBUG
         static unsigned long Lpt = 0;
@@ -195,9 +221,7 @@ bool debounceStopPin(bool rawStop){
         stopLatched = true;
         clearSince = 0;
     } else if (stopLatched) {
-        if (clearSince == 0) {
-            clearSince = millis();
-        }
+        if (clearSince == 0) { clearSince = millis(); }
 
         if (millis() - clearSince >= STOP_CLEAR_HOLD_MS) {
             stopLatched = false;
@@ -207,33 +231,23 @@ bool debounceStopPin(bool rawStop){
 
     digitalWrite(STOP_PIN_HUB, stopLatched);
 
-    if (stopLatched != lastPrintedState) {
-        if (DEBUG) Serial.println(stopLatched ? "STOP → TRIGGERED" : "STOP → CLEARED");
-        lastPrintedState = stopLatched;
-    }
+    #if DEBUG
+        if (stopLatched != lastPrintedState) {
+            if (DEBUG) Serial.println(stopLatched ? "STOP → TRIGGERED" : "STOP → CLEARED");
+            lastPrintedState = stopLatched;
+        }
+    #endif
 
     return stopLatched;
 }
 
-void setupUS(){
-    // FRONT
-    us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
-
-    // RIGHT
-    us_add(ZONE_RIGHT, US_R1_TRIG, US_R1_ECHO);
-    us_add(ZONE_RIGHT, US_R2_TRIG, US_R2_ECHO);
-
-    // LEFT
-    us_add(ZONE_LEFT, US_L1_TRIG, US_L1_ECHO);
-    us_add(ZONE_LEFT, US_L2_TRIG, US_L2_ECHO);
-
-    // BACK
-    // us_add(ZONE_FRONT, US_F1_TRIG, US_F1_ECHO);
-    // us_add(ZONE_FRONT, US_F2_TRIG, US_F2_ECHO);
-    // us_add(ZONE_FRONT, US_F3_TRIG, US_F3_ECHO);
-
+static bool anyObstacleActive() {
+    for (int i = 0; i < us_count(); i++) {
+        if (sensors[i].enabled && sensors[i].obstacle) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ================== 
@@ -264,34 +278,31 @@ void setup() {
 //      LOOP 
 // ==================
 void loop() {
-    // //  if (true) return;
+    // rawStop : immediate stop request from the sensors
+    // stableStop : debounced/latched
 
     // imAlive();
-    bool stopState = false; // tracks the current stop pin state
+    bool rawStop = false; // tracks the current stop pin state
     
     // 1. Update each sensor
-    for (int i = 0; i < us_count(); i++) {
-        updateSensorAndStop(i);    // Update sensor with hysteresis
-        if (sensors[i].obstacle) stopState = true;
-    }
+    updateSensorAndStop_delayed();
+
+    rawStop = anyObstacleActive();
 
     // 2. Apply STOP
-    bool stableStop = debounceStopPin(stopState);
+    bool stableStop = debounceStopPin(rawStop);
 
     // 3. UPDATE PACKET
     updatePacket(stableStop);
 
     // 4. Debug
-    #if DEBUG
-        debugSensors(stopState); // optionally print all sensor distances
-        // debugStopPinState(stopState);               // print if stop pin has been toggled
+    #if DEBUG 
+        printHubStatus(stableStop); // optionally print all sensor distances
     #endif
 
 
     // 5. I2C commands
     handleCommand();
-    
-    
     delay(10);
 
 }

@@ -24,6 +24,7 @@ void initUSConfig(){
 
 // ===== SLAVE =====
 void onReceive(int len) {
+    // Note : SINGLE PARAM COMMANDS ONLY
     if (len < 1) return;
 
     lastCmd = Wire.read();
@@ -88,19 +89,29 @@ bool setZones(uint8_t mask) {
 }
 
 bool setThresholds(uint8_t obst_thr, uint8_t clear_thr) {
+    // Set OBSTACLE
     Wire.beginTransmission(HUB_ADDR);
     Wire.write(CMD_SET_OBSTACLE_THRESHOLD);
     Wire.write(obst_thr);
-    Wire.write(CMD_SET_CLEAR_THRESHOLD);
-    Wire.write(clear_thr);
-
     uint8_t err = Wire.endTransmission();
-
     if (err != 0) {
         Serial.print("I2C error (setThresholds): ");
         Serial.println(err);
         return false;
     }
+
+    // Set CLEAR
+    Wire.beginTransmission(HUB_ADDR);
+    Wire.write(CMD_SET_CLEAR_THRESHOLD);
+    Wire.write(clear_thr);
+    err = Wire.endTransmission();
+    if (err != 0) {
+        Serial.print("I2C error (setThresholds): ");
+        Serial.println(err);
+        return false;
+    }
+
+    // Return
     return true;
 }
 

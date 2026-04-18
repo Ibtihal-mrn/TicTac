@@ -208,6 +208,13 @@ void BLEBridge::parseCommand_(const char* raw, size_t len) {
     // RETRACT
     } else if (strcmp(upper, "RETRACT") == 0) {
         cmd.type = CommandType::RetractServo;
+    
+    // ELECTROMAGNET
+    } else if (strcmp(upper, "RELAISON") == 0) {
+        cmd.type = CommandType::RelaisOn;
+    } else if (strcmp(upper, "RELAISOFF") == 0) {
+    cmd.type = CommandType::RelaisOff;
+
     // PING
     } else if (strcmp(upper, "PING") == 0) {
         cmd.type = CommandType::Ping;

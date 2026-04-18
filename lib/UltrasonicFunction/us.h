@@ -7,7 +7,7 @@
 
 // ====== CONFIG =======
 #define MAX_SENSORS 10
-#define US_DELAY = 30
+#define US_DELAY    40
 
 // ===== SENSOR STRUCT =====
 struct Sensor {
@@ -16,8 +16,10 @@ struct Sensor {
     bool enabled;
     bool obstacle=false;
     int16_t distance=-2;
-    int16_t lastDistance = -2; //Hysteresis
-    unsigned long lastChange=0;
+    int16_t lastDistance = -2; // (-2) : uninitialized, (-1) : error
+
+    uint32_t obstacleSince = 0;  // when a valid obstacle was first seen
+    uint32_t clearSince = 0;     // when the sensor first became clear
 };
 
 // ======== EXTERN VARS ======
@@ -35,6 +37,7 @@ uint8_t us_getZone(uint8_t index);
 int16_t us_getDistance(uint8_t index);
 int16_t us_getDistanceForZone(uint8_t zone);
 
+bool updateSensorAndStop_delayed();
 bool updateSensorAndStop(int i);
 
 
