@@ -152,7 +152,7 @@ def main() -> None:
         batch1 = [
             Position(700, 700),
             Position(400, 0),
-            Position(100, 50),#activer electr
+            Position(50, 0),#activer electr
             Position(50, 1600),
             Position(2500, 500),#désactiver electr
             #Position(150, 0),
