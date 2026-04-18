@@ -78,15 +78,15 @@ def main() -> None:
     while ble.detected_team is None and (_time.time() - _team_wait_start) < 10.0:
         _time.sleep(0.2)
 
-    # 4. Team, Robot ID & Marker ID
+    # 4. Team, Robot ID & Marker ID range
     if ble.detected_team == "YELLOW":
         team = Team.YELLOW
         robot_id = "YR1"
-        our_robot_marker_id = cerebros_config.OUR_ROBOT_YELLOW_ID  # =6
+        our_robot_marker_ids = cerebros_config.OUR_ROBOT_YELLOW_IDS  # {6..10}
     else:
         team = Team.BLUE
         robot_id = "BR1"
-        our_robot_marker_id = cerebros_config.OUR_ROBOT_BLUE_ID    # =1
+        our_robot_marker_ids = cerebros_config.OUR_ROBOT_BLUE_IDS    # {1..5}
 
     if ble.detected_team is not None:
         print(f"[INIT] Équipe reçue du robot: {ble.detected_team}")
@@ -120,9 +120,9 @@ def main() -> None:
         batch1 = [
             # batch 1 : amener 6 caisses dans le nid
             Position(2300, 700),
-            Position(2600, 50),
-            Position(2950, 50),
-            Position(3050, 1600), 
+            Position(2600, 0),
+            Position(2900, 50),
+            Position(3000, 1600), 
             # implementer fonction de recul
             Position(2000, 800),
             
@@ -171,7 +171,11 @@ def main() -> None:
     ]
     brain.set_exit_actions(exit_actions)
     brain.set_batches(batches, batch_labels)
-    # Post-batch 2 : deploy/retract à l'infini (1s chaque) jusqu'à fin du match
+    # Inject BACKWARD 100mm dans batch 1 après le 4ème target (index 3)
+    brain.set_batch_inject_actions({
+        (0, 3): [Action(ActionType.BACKWARD, 100)],
+    })
+    # Post-batch 3 : deploy/retract à l'infini (1s chaque) jusqu'à fin du match
     # 15 cycles × 4 cmds = 60 (queue ESP32 = 64 slots max)
     servo_loop: list[Action] = []
     for _ in range(15):
@@ -255,9 +259,13 @@ def main() -> None:
             detections = _build_detected_list(
                 corners_by_id, obj_aruco, h_img_to_grid)
 
-            # Compute Robot Heading
-            robot_heading = get_marker_heading(
-                our_robot_marker_id, obj_aruco, h_img_to_grid)
+            # Compute Robot Heading (pick whichever marker in our range is visible)
+            robot_heading = None
+            for _mid, _ in obj_aruco:
+                if _mid in our_robot_marker_ids:
+                    robot_heading = get_marker_heading(
+                        _mid, obj_aruco, h_img_to_grid)
+                    break
 
             # 
             if detections:

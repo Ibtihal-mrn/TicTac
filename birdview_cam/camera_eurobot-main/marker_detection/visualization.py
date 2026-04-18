@@ -103,6 +103,26 @@ def draw_corner_markers(frame: np.ndarray, corners_by_id: dict[int, np.ndarray])
         draw_detection(frame, corner[0], f"C{marker_id}", (0, 255, 255))
 
 
+def _is_robot_marker(marker_id: int) -> bool:
+    """True si le marker est un robot (BR1-5 = ids 1-5, YR1-5 = ids 6-10)."""
+    return 1 <= marker_id <= 10
+
+
+def _draw_forward_arrow(frame: np.ndarray, corners: np.ndarray) -> None:
+    """Dessine une flèche vers l'avant du marker (bord corner0→corner1)."""
+    pts = corners.astype(np.float64)
+    center = pts.mean(axis=0)
+    # Vecteur "avant" = milieu du bord supérieur (c0→c1) depuis le centre
+    mid_top = (pts[0] + pts[1]) / 2.0
+    dx, dy = mid_top[0] - center[0], mid_top[1] - center[1]
+    length = max((dx**2 + dy**2) ** 0.5, 1.0)
+    # Prolonger la flèche de 2× la demi-diagonale
+    scale = 2.0
+    tip = (int(center[0] + dx * scale), int(center[1] + dy * scale))
+    origin = (int(center[0]), int(center[1]))
+    cv2.arrowedLine(frame, origin, tip, (0, 255, 0), 3, tipLength=0.3)
+
+
 def draw_object_markers(
     frame: np.ndarray,
     aerial: np.ndarray | None,
@@ -119,6 +139,10 @@ def draw_object_markers(
         label = f"A{marker_id}[{pos[0]:.1f},{pos[1]:.1f}]" if pos else f"A{marker_id}"
 
         draw_detection(frame, corner[0], label, (0, 255, 0))
+
+        # Flèche avant pour les markers robots
+        if _is_robot_marker(marker_id):
+            _draw_forward_arrow(frame, corner[0])
 
         if aerial is not None and frame_count % 2 == 0:
             draw_aerial_detection(

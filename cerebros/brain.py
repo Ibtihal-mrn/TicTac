@@ -113,6 +113,9 @@ class Brain:
         self._last_replan_tick = 0
         self._replan_cooldown_ticks = 5    # ~0.5s à 10Hz entre deux replans
 
+        # Prefixe robot pour matcher n'importe quel BRx ou YRx
+        self._robot_label_prefix = "YR" if team == Team.YELLOW else "BR"
+
         pos_info = str(self.robot.position) if self._robot_position_known else "inconnue (attente vision)"
         print(f"[Brain] Prêt. Robot à {pos_info}, "
               f"heading={self.robot.heading_deg}°")
@@ -194,7 +197,7 @@ class Brain:
         # Detecter la premiere apparition du robot par la vision
         if not self._robot_position_known:
             for label, gx, gy in detections:
-                if label == self.robot.robot_id:
+                if label.startswith(self._robot_label_prefix):
                     self._robot_position_known = True
                     print(f"[Brain] Robot detecte par la vision a "
                           f"{self.robot.position}")
@@ -208,7 +211,7 @@ class Brain:
         # Compter les frames vision pendant le recalcul inter-batch
         # Ne compter que si le robot est réellement détecté dans cette frame
         if self.phase == BrainPhase.WAITING_RECALC:
-            robot_seen = any(label == self.robot.robot_id for label, _, _ in detections)
+            robot_seen = any(label.startswith(self._robot_label_prefix) for label, _, _ in detections)
             if robot_seen:
                 self._recalc_vision_frames = getattr(self, '_recalc_vision_frames', 0) + 1
             else:
@@ -349,21 +352,6 @@ class Brain:
         print("=" * 60 + "\n")
 
     def _send_exit_forward(self) -> None:
-<<<<<<< HEAD
-        """Envoie la séquence de sortie de zone hardcodée, avant le batch 1."""
-        exit_mm = config.EXIT_ZONE_MM
-        # BLUE tourne à droite (-90°), YELLOW tourne à gauche (+90°)
-        rotate_angle = 90 if self.robot.team == Team.YELLOW else -90
-        print(f"[Brain] Envoi séquence sortie de zone: FORWARD {exit_mm}mm → "
-              f"ROTATE {rotate_angle}° → FORWARD {exit_mm}mm — batch 1 calculé après QUEUE_DONE")
-
-        self.action_queue.clear()
-        self.action_queue.enqueue_many([
-            Action(ActionType.FORWARD, exit_mm),
-            Action(ActionType.ROTATE, rotate_angle),
-            Action(ActionType.FORWARD, exit_mm),
-        ])
-=======
         """Envoie la séquence de sortie de zone avant le batch 1."""
         if self._exit_actions:
             actions = self._exit_actions
@@ -383,7 +371,6 @@ class Brain:
 
         self.action_queue.clear()
         self.action_queue.enqueue_many(actions)
->>>>>>> esp32s3
         self.executor.send_full_queue()
 
         if self._ble_bridge:

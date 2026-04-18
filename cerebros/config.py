@@ -36,8 +36,8 @@ CELL_H_MM = TABLE_H_MM / GRID_ROWS   # 100 mm
 CORNER_IDS = {20, 21, 22, 23}
 
 # Notre robot est identifié par le marker de l'équipe (1 si bleu, 6 si jaune)
-OUR_ROBOT_BLUE_ID   = 1   # Marker ArUco 1 → BR1
-OUR_ROBOT_YELLOW_ID = 6   # Marker ArUco 6 → YR1
+OUR_ROBOT_BLUE_IDS   = set(range(1, 6))    # Markers ArUco 1-5 → BR1-BR5
+OUR_ROBOT_YELLOW_IDS = set(range(6, 11))   # Markers ArUco 6-10 → YR1-YR5
 
 BLUE_ROBOT_IDS  = set(range(1, 6))     # 1‑5
 YELLOW_ROBOT_IDS = set(range(6, 11))   # 6‑10

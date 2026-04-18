@@ -177,7 +177,12 @@ class WorldState:
             self.ally_robots[rid].update_from_vision(pos_mm.x, pos_mm.y)
 
         # Si c'est notre robot principal, mettre à jour aussi
-        if self.our_robot and self.our_robot.robot_id == rid:
+        # (le marker ArUco peut varier entre 1-5 ou 6-10, donc on compare
+        #  par plage d'IDs plutôt que par robot_id exact)
+        if self.our_robot and marker_id in (
+            config.OUR_ROBOT_BLUE_IDS if self.team == Team.BLUE
+            else config.OUR_ROBOT_YELLOW_IDS
+        ):
             self.our_robot.update_from_vision(pos_mm.x, pos_mm.y)
 
     def _update_enemy_robot(self, marker_id: int, label: str,
