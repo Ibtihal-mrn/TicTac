@@ -49,7 +49,7 @@ def get_marker_heading(
     obj_aruco: list[tuple[int, np.ndarray]],
     h_img_to_grid: np.ndarray | None,
 ) -> float | None:
-    """Calcule le heading (en degres) d'un marqueur a partir de ses corners ArUco.
+    """Calcule le heading brut d'un marqueur (bord superieur c0→c1).
 
     OpenCV retourne les 4 coins dans l'ordre :
         corner[0] = top-left, corner[1] = top-right,
@@ -60,7 +60,9 @@ def get_marker_heading(
     superieur du tag.
 
     Returns:
-        Angle en degres (0 = droite, sens trigo), ou None si non trouve.
+        Angle brut en degres (0 = droite, sens trigo), ou None si non trouve.
+        L'appelant doit appliquer l'offset de calibration pour obtenir
+        le heading reel du robot.
     """
     if h_img_to_grid is None:
         return None

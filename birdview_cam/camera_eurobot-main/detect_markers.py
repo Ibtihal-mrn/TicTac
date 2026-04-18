@@ -187,6 +187,23 @@ def main() -> None:
     print(f"[INIT] Team={team.value} — {len(batches)} batches, "
           f"{len(exit_actions)} exit commands")
 
+    # ── Calcul du heading attendu après la sortie de zone ─────────────
+    # initial_heading + somme des ROTATE dans exit_actions
+    _expected_heading_after_exit = 0.0  # initial_heading
+    for _ea in exit_actions:
+        if _ea.action_type == ActionType.ROTATE and _ea.value is not None:
+            _expected_heading_after_exit += _ea.value
+    # Normaliser [-180, 180]
+    while _expected_heading_after_exit > 180:
+        _expected_heading_after_exit -= 360
+    while _expected_heading_after_exit < -180:
+        _expected_heading_after_exit += 360
+    print(f"[INIT] Heading attendu après sortie de zone: "
+          f"{_expected_heading_after_exit:.0f}°")
+
+    # Offset ArUco : calibré au premier reading après QUEUE_DONE de la sortie
+    _heading_offset: float | None = None  # None = pas encore calibré
+
 
     # 7. OpenCv Window and Tag Detection
     create_windows()                      # Ouverture des fenetres camera / aerienne.
@@ -263,8 +280,30 @@ def main() -> None:
             robot_heading = None
             for _mid, _ in obj_aruco:
                 if _mid in our_robot_marker_ids:
-                    robot_heading = get_marker_heading(
+                    raw_heading = get_marker_heading(
                         _mid, obj_aruco, h_img_to_grid)
+                    if raw_heading is not None:
+                        # Calibration : au premier reading après QUEUE_DONE exit,
+                        # on calcule l'offset = expected - raw
+                        if _heading_offset is None:
+                            if brain.phase == BrainPhase.WAITING_RECALC:
+                                _heading_offset = _expected_heading_after_exit - raw_heading
+                                # Normaliser [-180, 180]
+                                while _heading_offset > 180:
+                                    _heading_offset -= 360
+                                while _heading_offset < -180:
+                                    _heading_offset += 360
+                                print(f"[CALIB] Offset ArUco calibré: "
+                                      f"expected={_expected_heading_after_exit:.0f}° "
+                                      f"raw={raw_heading:.0f}° → "
+                                      f"offset={_heading_offset:.0f}°")
+                        if _heading_offset is not None:
+                            robot_heading = raw_heading + _heading_offset
+                            # Normaliser [-180, 180]
+                            while robot_heading > 180:
+                                robot_heading -= 360
+                            while robot_heading < -180:
+                                robot_heading += 360
                     break
 
             # 
