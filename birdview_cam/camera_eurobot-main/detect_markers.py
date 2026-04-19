@@ -111,10 +111,12 @@ def main() -> None:
     # Batch 2 : correction + suite depuis la position caméra
     # Batch 3 : retour au nid
     if team == Team.BLUE:
-        # 3 commandes de sortie de zone (avant le batch)
+        # commandes de sortie de zone (avant le batch)
         exit_actions = [
             Action(ActionType.FORWARD, 500),
+            Action(ActionType.WAIT, 1000),
             Action(ActionType.ROTATE, -90),
+            Action(ActionType.WAIT, 1000),
             Action(ActionType.FORWARD, 500),
         ]
         batch1 = [
@@ -130,7 +132,7 @@ def main() -> None:
             ]
         batch2 = [  
             # batch 2 : attendre en zone trackable via caméra           
-            Position(2400, 1000),       
+            Position(2400, 800),       
         ]
         
         batch3 = [
@@ -139,10 +141,12 @@ def main() -> None:
             Position(2600, 1900),  
         ]
     else:  # Team.YELLOW
-        # 3 commandes de sortie de zone (avant le batch)
+        # commandes de sortie de zone (avant le batch)
         exit_actions = [
             Action(ActionType.FORWARD, 500),
+            Action(ActionType.WAIT, 1000),
             Action(ActionType.ROTATE, 90),
+            Action(ActionType.WAIT, 1000),
             Action(ActionType.FORWARD, 500),
         ]
         batch1 = [
@@ -155,7 +159,7 @@ def main() -> None:
         ]
         batch2 = [
             # batch 2 : attendre en zone trackable via caméra
-            Position(700, 1000),                
+            Position(700, 800),                
         ]
         batch3 = [
             #retour au nid
